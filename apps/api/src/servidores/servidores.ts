@@ -9,8 +9,9 @@ import {
   type PaginaEventosServidor,
   type Configuracao,
 } from '@sisdoc/contratos';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { transacao } from '../banco';
+import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
@@ -43,21 +44,6 @@ type LinhaVinculo = {
   removido: boolean;
 };
 
-async function auditar(
-  cliente: PoolClient,
-  sessao: SessaoAutenticada,
-  acao: string,
-  entidade: string,
-  entidadeId: string | null,
-  pessoaId: string | null,
-  ip: string,
-): Promise<void> {
-  await cliente.query(`
-    INSERT INTO seguranca.auditoria (usuario_id, acao, entidade, entidade_id, pessoa_id, ip)
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `, [sessao.usuario.id, acao, entidade, entidadeId, pessoaId, ip]);
-}
-
 export class ServidoresService {
   private readonly protetor: ProtetorDados;
 
@@ -86,7 +72,7 @@ export class ServidoresService {
             OR ($3::bytea IS NOT NULL AND p.cpf_hash = $3))
         ORDER BY v.id LIMIT $5
       `, [padraoNome, matricula, cpfHash, consulta.cursor ?? null, consulta.limite + 1]);
-      await auditar(cliente, sessao, 'servidores_pesquisados', 'busca', null, null, ip);
+      await auditarConsultaFuncional(cliente, sessao, 'servidores_pesquisados', 'busca', null, null, ip);
       return {
         itens: resultado.rows.slice(0, consulta.limite).map((linha) => ({
           pessoaId: linha.pessoa_id,
@@ -126,7 +112,7 @@ export class ServidoresService {
         FROM nucleo.vinculo WHERE pessoa_id = $1 AND ($2::uuid IS NULL OR id > $2::uuid)
         ORDER BY id LIMIT $3
       `, [pessoa.id, cursor ?? null, limite + 1]);
-      await auditar(cliente, sessao, 'servidor_consultado', 'pessoa', pessoa.id, pessoa.id, ip);
+      await auditarConsultaFuncional(cliente, sessao, 'servidor_consultado', 'pessoa', pessoa.id, pessoa.id, ip);
       return {
         pessoa: { id: pessoa.id, nome: pessoa.nome, cpfMascarado: `***.***.${cpf.slice(6, 9)}-**` },
         vinculos: resultado.rows.slice(0, limite).map((linha) => ({
@@ -175,7 +161,7 @@ export class ServidoresService {
         WHERE vinculo_id = $1 AND ($2::uuid IS NULL OR id > $2::uuid)
         ORDER BY id LIMIT $3
       `, [vinculoId, cursor ?? null, limite + 1]);
-      await auditar(cliente, sessao, 'eventos_consultados', 'vinculo', vinculoId, pessoaId, ip);
+      await auditarConsultaFuncional(cliente, sessao, 'eventos_consultados', 'vinculo', vinculoId, pessoaId, ip);
       return {
         itens: resultado.rows.slice(0, limite).map((linha) => ({
           id: linha.id,

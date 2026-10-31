@@ -7,6 +7,7 @@ import {
   type TipoBuscaServidor,
 } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
+import { CalculoDof } from './calculo-dof';
 
 type Props = { onErro: (erro: unknown) => void; onLimpar: () => void };
 type Consulta = { q: string; tipo: TipoBuscaServidor };
@@ -55,10 +56,11 @@ function Eventos({ pessoaId, vinculoId, onErro, onLimpar }: Props & { pessoaId: 
   );
 }
 
-function Detalhe({ pessoaId, onFechar, onErro, onLimpar }: Props & { pessoaId: string; onFechar: () => void }) {
+function Detalhe({ pessoaId, csrf, onFechar, onErro, onLimpar }: Props & { pessoaId: string; csrf: string; onFechar: () => void }) {
   const [detalhe, setDetalhe] = useState<DetalheServidor | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [vinculoId, setVinculoId] = useState<string | null>(null);
+  const [vinculoCalculo, setVinculoCalculo] = useState<{ id: string; matricula: string; admissao: string } | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
   useEffect(() => {
@@ -66,6 +68,7 @@ function Detalhe({ pessoaId, onFechar, onErro, onLimpar }: Props & { pessoaId: s
     setDetalhe(null);
     setFalhou(false);
     setVinculoId(null);
+    setVinculoCalculo(null);
     api.servidor(pessoaId, cursor).then((resultado) => {
       if (ativa) setDetalhe(resultado);
     }).catch((erro: unknown) => {
@@ -82,9 +85,10 @@ function Detalhe({ pessoaId, onFechar, onErro, onLimpar }: Props & { pessoaId: s
           <h4>{detalhe.pessoa.nome}</h4>
           <p>CPF: {detalhe.pessoa.cpfMascarado}</p>
           <div className="tabela"><table>
-            <thead><tr><th scope="col">Matrícula</th><th scope="col">Origem</th><th scope="col">Regime</th><th scope="col">Cargo / referência</th><th scope="col">Classe / nível</th><th scope="col">Órgão / setor</th><th scope="col">Admissão / desligamento</th><th scope="col">Vínculo anterior</th><th scope="col">Eventos</th></tr></thead>
+            <thead><tr><th scope="col">Matrícula</th><th scope="col">Origem</th><th scope="col">Regime</th><th scope="col">Cargo / referência</th><th scope="col">Classe / nível</th><th scope="col">Órgão / setor</th><th scope="col">Admissão / desligamento</th><th scope="col">Vínculo anterior</th><th scope="col">Eventos</th><th scope="col">Cálculo</th></tr></thead>
             <tbody>{detalhe.vinculos.map((vinculo) => {
               const anterior = detalhe.vinculos.find((item) => item.id === vinculo.matriculaAnteriorId);
+              const admissao = vinculo.admissao;
               return (
                 <tr key={vinculo.id}>
                   <td>{vinculo.matricula}{vinculo.removidoNaFonte ? ' — removido na fonte' : ''}</td>
@@ -94,7 +98,14 @@ function Detalhe({ pessoaId, onFechar, onErro, onLimpar }: Props & { pessoaId: s
                   <td>{[vinculo.orgao, vinculo.setor].filter(Boolean).join(' / ') || 'Não informado'}</td>
                   <td>{vinculo.admissao ?? 'Não informada'} / {vinculo.desligamento ?? 'Não informado'}</td>
                   <td>{anterior?.matricula ?? (vinculo.matriculaAnteriorId ? 'Vínculo não visível nesta página' : '—')}</td>
-                  <td><button type="button" className="secundario" onClick={() => { onLimpar(); setVinculoId(vinculo.id); }}>Eventos <span className="sr-only">da matrícula {vinculo.matricula}</span></button></td>
+                  <td><button type="button" className="secundario" onClick={() => { onLimpar(); setVinculoCalculo(null); setVinculoId(vinculo.id); }}>Eventos <span className="sr-only">da matrícula {vinculo.matricula}</span></button></td>
+                  <td>{admissao ? (
+                    <button type="button" className="secundario" onClick={() => {
+                      onLimpar();
+                      setVinculoId(null);
+                      setVinculoCalculo({ id: vinculo.id, matricula: vinculo.matricula, admissao });
+                    }}>Calcular DOF <span className="sr-only">da matrícula {vinculo.matricula}</span></button>
+                  ) : 'Admissão ausente na fonte'}</td>
                 </tr>
               );
             })}</tbody>
@@ -104,13 +115,18 @@ function Detalhe({ pessoaId, onFechar, onErro, onLimpar }: Props & { pessoaId: s
             <button type="button" className="secundario" disabled={!detalhe.proximoCursor} onClick={() => setCursor(detalhe.proximoCursor ?? undefined)}>Próxima página de vínculos</button>
           </div>
           {vinculoId && <Eventos key={vinculoId} pessoaId={pessoaId} vinculoId={vinculoId} onErro={onErro} onLimpar={onLimpar} />}
+          {vinculoCalculo && (
+            <CalculoDof key={vinculoCalculo.id} pessoaId={pessoaId} vinculoId={vinculoCalculo.id}
+              nome={detalhe.pessoa.nome} matricula={vinculoCalculo.matricula} admissao={vinculoCalculo.admissao}
+              csrf={csrf} onFechar={() => setVinculoCalculo(null)} onErro={onErro} onLimpar={onLimpar} />
+          )}
         </>
       )}
     </section>
   );
 }
 
-export function Servidores({ onErro, onLimpar }: Props) {
+export function Servidores({ csrf, onErro, onLimpar }: Props & { csrf: string }) {
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [pagina, setPagina] = useState<PaginaBuscaServidores | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
@@ -180,7 +196,7 @@ export function Servidores({ onErro, onLimpar }: Props) {
           </div>
         </>
       )}
-      {pessoaId && <Detalhe key={pessoaId} pessoaId={pessoaId} onFechar={() => setPessoaId(null)} onErro={onErro} onLimpar={onLimpar} />}
+      {pessoaId && <Detalhe key={pessoaId} pessoaId={pessoaId} csrf={csrf} onFechar={() => setPessoaId(null)} onErro={onErro} onLimpar={onLimpar} />}
     </section>
   );
 }

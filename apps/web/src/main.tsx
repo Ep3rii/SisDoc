@@ -143,7 +143,7 @@ function App() {
       <div className="conteudo">
         <p className="etiqueta">Sistema em construção — não autorizado para uso operacional</p>
         <h1>DOF e DTC</h1>
-        <p>O cálculo pela interface e a emissão de documentos ainda não estão disponíveis.</p>
+        <p>O cálculo de referência da DOF é provisório. Documentos e emissão ainda não estão disponíveis.</p>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
@@ -160,7 +160,7 @@ function App() {
                 <button type="button" className="secundario" onClick={() => setTela('auditoria')}>Auditoria</button>
               )}
             </nav>
-            {funcional && tela === 'busca' && <Servidores onErro={tratarErro} onLimpar={limparMensagens} />}
+            {funcional && tela === 'busca' && <Servidores csrf={sessao.csrf} onErro={tratarErro} onLimpar={limparMensagens} />}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
               <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />
             )}

@@ -16,6 +16,7 @@ import {
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
   paginaUsuariosSchema,
+  resultadoCalculoDofSchema,
   respostaSessaoSchema,
   usuarioAdministrativoSchema,
 } from '@sisdoc/contratos';
@@ -1679,6 +1680,148 @@ describe('fundação em recursos descartáveis', () => {
           `Busca sintética HTTPS, máximos em ms: nome=${duracoes.nome.toFixed(1)}, CPF=${duracoes.cpf.toFixed(1)}, ` +
           `matrícula=${duracoes.matricula.toFixed(1)}, página ampla=${duracoes.pagina.toFixed(1)}.\n`,
         );
+      } finally {
+        await encerrar();
+      }
+    } finally {
+      await cliente.end();
+    }
+  });
+
+  it('calcula DOF autorizada com mais de 41 anos sem alterar a fonte ou criar emissão', async () => {
+    const config = await carregarConfiguracao(arquivoConfig);
+    const protetor = new ProtetorDados(config.chaves);
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    const pessoaId = randomUUID();
+    const vinculoId = randomUUID();
+    const semAdmissaoId = randomUUID();
+    const cpf = cpfSintetico(900000001);
+    const senha = 'CalculoFicticio!12345';
+    const hashSenha = await gerarHashSenha(senha);
+    const perfis = ['analista', 'coordenador', 'secretario_adjunto', 'admin'] as const;
+    try {
+      await cliente.query(`
+        INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
+        VALUES ($1, $2, $3, 'Pessoa DOF fictícia', 'pessoa dof ficticia')
+      `, [pessoaId, protetor.cifrar(Buffer.from(cpf, 'ascii'), {
+        schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'cpf_cifrado',
+      }), protetor.hashCpf(cpf)]);
+      await cliente.query(`
+        INSERT INTO nucleo.vinculo (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem, admissao)
+        VALUES ($1, $3, 'DOF-FICTICIA-1', 'DOF-FICTICIA-1', 'fonte-dof-sintetica', $4, '1980-01-01'),
+               ($2, $3, 'DOF-FICTICIA-2', 'DOF-FICTICIA-2', 'fonte-dof-sintetica', $5, NULL)
+      `, [vinculoId, semAdmissaoId, pessoaId, randomUUID(), randomUUID()]);
+      for (const papel of perfis) {
+        await cliente.query(`
+          INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+          VALUES ($1, $2, 'Operador DOF fictício', $3, $4, false)
+        `, [randomUUID(), `CALCULO-${papel.toUpperCase()}-FICTICIO`, hashSenha, papel]);
+      }
+      const estadoAntes = await cliente.query(`
+        SELECT (SELECT count(*) FROM documentos.documento) AS documentos,
+               (SELECT count(*) FROM documentos.emissao) AS emissoes,
+               (SELECT count(*) FROM nucleo.afastamento WHERE vinculo_id = $1) AS afastamentos,
+               (SELECT count(*) FROM nucleo.incorporacao WHERE vinculo_id = $1) AS incorporacoes,
+               (SELECT to_char(admissao, 'YYYY-MM-DD') FROM nucleo.vinculo WHERE id = $1) AS admissao
+      `, [vinculoId]);
+      const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
+      try {
+        const sessoes = new Map<string, { cookie: string; csrf: string }>();
+        for (const papel of perfis) {
+          const login = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/auth/login',
+            corpo: { matricula: `CALCULO-${papel.toUpperCase()}-FICTICIO`, senha },
+          });
+          expect(login.status, login.corpo).toBe(200);
+          const sessao = respostaSessaoSchema.parse(JSON.parse(login.corpo));
+          const cookie = login.headers['set-cookie']?.[0].split(';')[0];
+          if (!cookie) throw new Error('Cookie de cálculo sintético ausente.');
+          sessoes.set(papel, { cookie, csrf: sessao.csrf });
+        }
+        const anos = Array.from({ length: 45 }, (_, indice) => ({
+          ano: 1980 + indice, abrangencia: 'intervalo_declarado',
+          faltas: indice === 1 ? 1 : 0, ts: 0, pf: 0, ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
+        }));
+        const entrada = { pessoaId, vinculoId, inicio: '1980-01-01', fim: '2024-12-31', anos, confirmacaoDados: true };
+        const analista = sessoes.get('analista');
+        const admin = sessoes.get('admin');
+        if (!analista || !admin) throw new Error('Sessões de cálculo sintético ausentes.');
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/calculos', corpo: entrada,
+        })).status).toBe(401);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/calculos', corpo: entrada, cookie: analista.cookie,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/calculos', corpo: entrada, ...admin,
+        })).status).toBe(403);
+        for (const papel of ['analista', 'coordenador', 'secretario_adjunto']) {
+          const sessao = sessoes.get(papel);
+          if (!sessao) throw new Error('Sessão funcional sintética ausente.');
+          const resposta = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/calculos', corpo: entrada, ...sessao,
+          });
+          expect(resposta.status, resposta.corpo).toBe(200);
+          expect(resposta.corpo).not.toContain(cpf);
+          const resultado = resultadoCalculoDofSchema.parse(JSON.parse(resposta.corpo));
+          expect(resultado.periodo.linhas).toHaveLength(45);
+          expect(resultado.periodo.linhas.at(-1)?.ano).toBe(2024);
+          expect(resultado.totais).toMatchObject({
+            diasBrutos: 16437, contribuicaoMunicipio: 16436, efetivoExercicio: 16436,
+          });
+          expect(resultado.regra.classificacao).toBe('provisoria');
+          expect(resultado.avisos.map((aviso) => aviso.codigo)).toContain('regra_provisoria');
+        }
+        for (const invalida of [
+          { ...entrada, confirmacaoDados: false },
+          { ...entrada, posse: '1900-01-01' },
+          { ...entrada, regras: { classificacao: 'oficial' } },
+          { ...entrada, anos: anos.slice(1) },
+          { ...entrada, anos: [{ ...anos[0], faltas: 999 }, ...anos.slice(1)] },
+          { ...entrada, vinculoId: semAdmissaoId },
+          { ...entrada, inicio: '2000-01-01', fim: '2000-12-31', anos: [anos[20]] },
+        ]) {
+          const resposta = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/calculos', corpo: invalida, ...analista,
+          });
+          expect(resposta.status, resposta.corpo).toBe(400);
+        }
+        const naoRelacionado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/calculos', corpo: { ...entrada, pessoaId: randomUUID() }, ...analista,
+        });
+        expect(naoRelacionado.status).toBe(404);
+        const inicioAnterior = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/calculos', corpo: { ...entrada, inicio: '1979-01-01' }, ...analista,
+        });
+        expect(inicioAnterior.status, inicioAnterior.corpo).toBe(200);
+        expect(resultadoCalculoDofSchema.parse(JSON.parse(inicioAnterior.corpo)).avisos.map((aviso) => aviso.codigo))
+          .toContain('inicio_ajustado_posse');
+        const comAcumulado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/calculos',
+          corpo: {
+            ...entrada, inicio: '2000-01-01', fim: '2000-12-31', anos: [anos[20]],
+            acumuladoAnterior: { ts: 0, pf: 0, origem: 'Conferência sintética' },
+          },
+          ...analista,
+        });
+        expect(comAcumulado.status, comAcumulado.corpo).toBe(200);
+        const auditoria = await cliente.query<{ detalhes: unknown }>(`
+          SELECT detalhes FROM seguranca.auditoria WHERE acao = 'calculo_solicitado' AND pessoa_id = $1
+        `, [pessoaId]);
+        expect(auditoria.rowCount).toBeGreaterThanOrEqual(7);
+        expect(JSON.stringify(auditoria.rows)).not.toContain(cpf);
+        const estadoDepois = await cliente.query(`
+          SELECT (SELECT count(*) FROM documentos.documento) AS documentos,
+                 (SELECT count(*) FROM documentos.emissao) AS emissoes,
+                 (SELECT count(*) FROM nucleo.afastamento WHERE vinculo_id = $1) AS afastamentos,
+                 (SELECT count(*) FROM nucleo.incorporacao WHERE vinculo_id = $1) AS incorporacoes,
+                 (SELECT to_char(admissao, 'YYYY-MM-DD') FROM nucleo.vinculo WHERE id = $1) AS admissao
+        `, [vinculoId]);
+        expect(estadoDepois.rows).toEqual(estadoAntes.rows);
       } finally {
         await encerrar();
       }

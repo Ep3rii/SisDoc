@@ -1,10 +1,10 @@
 # Operação — aplicação ainda não autorizada
 
 O login, a administração e a consulta de servidores existem para verificação
-em recursos descartáveis. O motor de referência foi testado, mas **não há
-fluxo de cálculo na interface, emissão, importação, backup ou serviço Windows
-implementados**. Não instalar ou usar operacionalmente até a conclusão das
-demais fatias, revisão e autorização formal.
+em recursos descartáveis. Há cálculo provisório de DOF pela interface, mas
+**não há rascunho, prévia de documento, emissão, importação, backup ou serviço
+Windows implementados**. Não instalar ou usar operacionalmente até a
+conclusão das demais fatias, revisão e autorização formal.
 
 ## Pré-requisitos para uma futura instalação
 
@@ -93,6 +93,20 @@ não registra esse termo na auditoria ou em log de acesso, mas histórico de
 rede, extensões, proxies ou servidores intermediários podem registrar URLs.
 Não habilite publicação por proxy sem configurar e verificar a supressão de
 parâmetros sensíveis em seus logs. A consulta é local e não faz sincronização.
+
+## Cálculo de referência da DOF
+
+Nos detalhes de um vínculo com admissão informada, selecione **Calcular DOF**,
+informe o intervalo e prepare a tabela anual. Confira registros de
+afastamentos e incorporações em sua origem e lance os dias em cada ano;
+esses registros ainda não são carregados automaticamente. Ao confirmar a
+tabela, campos vazios representam zero, inclusive nas páginas não exibidas.
+Para início após a admissão, informe também os acumulados anteriores de T/S e
+P/F e sua origem. Datas anteriores à admissão geram aviso de ajuste.
+
+O cálculo usa a regra provisória no servidor e não grava rascunho ou emissão.
+Se a admissão estiver ausente, o cálculo é indisponível até a correção pela
+fonte autorizada. A interface não permite alterar dados funcionais da fonte.
 
 ## Verificação de software
 

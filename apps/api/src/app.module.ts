@@ -3,6 +3,8 @@ import { APP_GUARD } from '@nestjs/core';
 import type { Configuracao } from '@sisdoc/contratos';
 import type { Pool } from 'pg';
 import { BANCO, CONFIGURACAO } from './injecao';
+import { CalculosController } from './calculos/calculos.controller';
+import { CalculosService } from './calculos/calculos';
 import { AutenticacaoService } from './seguranca/autenticacao';
 import { AutenticacaoController } from './seguranca/autenticacao.controller';
 import { GuardaAcesso, Publica } from './seguranca/guarda';
@@ -37,7 +39,7 @@ export class AppModule {
   static registrar(banco: Pool, configuracao: Configuracao): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController],
+      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController],
       providers: [
         { provide: BANCO, useValue: banco },
         { provide: CONFIGURACAO, useValue: configuracao },
@@ -55,6 +57,11 @@ export class AppModule {
           provide: ServidoresService,
           useFactory: (pool: Pool, config: Configuracao) => new ServidoresService(pool, config),
           inject: [BANCO, CONFIGURACAO],
+        },
+        {
+          provide: CalculosService,
+          useFactory: (pool: Pool) => new CalculosService(pool),
+          inject: [BANCO],
         },
         { provide: APP_GUARD, useClass: GuardaAcesso },
         { provide: 'ENCERRAR_BANCO', useValue: { onApplicationShutdown: () => banco.end() } },

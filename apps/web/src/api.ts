@@ -4,6 +4,7 @@ import {
   paginaEventosServidorSchema,
   paginaUsuariosSchema,
   detalheServidorSchema,
+  resultadoCalculoDofSchema,
   respostaSessaoSchema,
   usuarioAdministrativoSchema,
   type AtualizarUsuario,
@@ -14,6 +15,8 @@ import {
   type PaginaEventosServidor,
   type PaginaUsuarios,
   type RespostaSessao,
+  type ResultadoCalculoDof,
+  type SolicitarCalculoDof,
   type TipoBuscaServidor,
   type UsuarioAdministrativo,
 } from '@sisdoc/contratos';
@@ -122,5 +125,8 @@ export const api = {
     const consulta = new URLSearchParams({ vinculoId, limite: '25' });
     if (cursor) consulta.set('cursor', cursor);
     return validar(paginaEventosServidorSchema, await requisitar(`servidores/${id}/eventos?${consulta.toString()}`));
+  },
+  async calcularDof(csrf: string, dados: SolicitarCalculoDof): Promise<ResultadoCalculoDof> {
+    return validar(resultadoCalculoDofSchema, await requisitar('calculos', 'POST', dados, csrf));
   },
 };

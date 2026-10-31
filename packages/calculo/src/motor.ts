@@ -1,30 +1,18 @@
-import { dataFuncionalSchema, tipoDocumentoSchema } from '@sisdoc/contratos';
+import {
+  acumuladoAnteriorSchema,
+  anoCalculoSchema,
+  dataFuncionalSchema,
+  tipoDocumentoSchema,
+} from '@sisdoc/contratos';
 import { z } from 'zod';
 import { diasEntre, dividirIntervaloPorAno } from './calendario';
 import { regrasVersaoSchema, type RegrasVersao } from './regras';
 
-const quantidade = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
-const anoEntradaSchema = z.strictObject({
-  ano: z.number().int().min(1).max(9999),
-  abrangencia: z.enum(['ano_civil', 'intervalo_declarado']),
-  faltas: quantidade,
-  ts: quantidade,
-  pf: quantidade,
-  ip: quantidade,
-  outros: quantidade,
-  pb: quantidade,
-  pv: quantidade,
-  licencaPremio: quantidade,
-});
 const periodoEntradaSchema = z.strictObject({
   inicio: dataFuncionalSchema,
   fim: dataFuncionalSchema,
-  anos: z.array(anoEntradaSchema).min(1).max(9999),
-  acumuladoAnterior: z.strictObject({
-    ts: quantidade,
-    pf: quantidade,
-    origem: z.string().trim().min(1),
-  }).optional(),
+  anos: z.array(anoCalculoSchema).min(1).max(9999),
+  acumuladoAnterior: acumuladoAnteriorSchema.optional(),
 });
 export const entradaCalculoSchema = z.strictObject({
   tipo: tipoDocumentoSchema,
@@ -189,7 +177,7 @@ export function calcular(entrada: unknown): ResultadoCalculo {
       }
       const inicioAno = Number(inicio.slice(0, 4));
       const fimAno = Number(periodo.fim.slice(0, 4));
-      const porAno = new Map<number, z.infer<typeof anoEntradaSchema>>();
+      const porAno = new Map<number, z.infer<typeof anoCalculoSchema>>();
       for (const item of periodo.anos) {
         if (item.ano < inicioAno || item.ano > fimAno || porAno.has(item.ano)) {
           return erro(avisos, 'anos_inconsistentes', 'Cada ano do período deve constar uma única vez.', periodo.ordem, item.ano);

@@ -10,6 +10,7 @@ import {
   detalheServidorSchema,
   eventosServidorQuerySchema,
   incorporacaoSchema,
+  solicitarCalculoDofSchema,
 } from '../packages/contratos/dist/index.js';
 import { cpfSintetico } from './dados-sinteticos.js';
 
@@ -65,6 +66,27 @@ describe('contratos de domínio', () => {
     expect(detalheServidorSchema.safeParse({
       ...detalhe, pessoa: { ...pessoa, cpfMascarado: '***.***.12-**' },
     }).success).toBe(false);
+  });
+
+  it('exige confirmação e não permite escolher a regra ou a posse no cálculo de DOF', () => {
+    const entrada = {
+      pessoaId: randomUUID(), vinculoId: randomUUID(), inicio: '2024-01-01', fim: '2024-12-31',
+      anos: [{
+        ano: 2024, abrangencia: 'intervalo_declarado', faltas: 0, ts: 0, pf: 0,
+        ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
+      }],
+      confirmacaoDados: true,
+    };
+    expect(solicitarCalculoDofSchema.safeParse(entrada).success).toBe(true);
+    for (const invalida of [
+      { ...entrada, confirmacaoDados: false },
+      { ...entrada, posse: '2024-01-01' },
+      { ...entrada, regras: {} },
+      { ...entrada, fim: '2023-12-31' },
+      { ...entrada, anos: [{ ...entrada.anos[0], faltas: -1 }] },
+    ]) {
+      expect(solicitarCalculoDofSchema.safeParse(invalida).success).toBe(false);
+    }
   });
 
   it('valida limites, ordem e sobreposição inclusiva dos períodos', () => {
