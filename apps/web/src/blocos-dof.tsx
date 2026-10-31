@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import {
   atualizarBlocosDofSchema,
   codigoBlocoDofSchema,
@@ -23,10 +24,13 @@ type Props = {
   onPrevia: (prova: ProvaFontePreviaDof | null) => void;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
+  destinoPrevia: HTMLDivElement | null;
+  onFonte: (fonte: DadosFontePreviaDof | null) => void;
 };
 
 export function BlocosDof({
   rascunho, csrf, bloqueado, previaBloqueada = false, somenteLeitura = false, onAtualizar, onPendente, onPrevia, onErro, onLimpar,
+  destinoPrevia, onFonte,
 }: Props) {
   const [blocos, setBlocos] = useState(rascunho.blocos);
   const [tipo, setTipo] = useState<CodigoBlocoDof>('contratacao');
@@ -44,7 +48,8 @@ export function BlocosDof({
   useEffect(() => {
     setFonte(null);
     onPrevia(null);
-  }, [rascunho.id, rascunho.revisao, onPrevia]);
+    onFonte(null);
+  }, [rascunho.id, rascunho.revisao, onPrevia, onFonte]);
 
   function alterar(novos: BlocoRascunhoDof[], novoMotivo = motivo) {
     setBlocos(novos);
@@ -111,6 +116,7 @@ export function BlocosDof({
       }
       if (ativa.current) {
         setFonte(resposta);
+        onFonte(resposta);
         onPrevia({ documentoId: resposta.documentoId, revisao: resposta.revisao, provaFonte: resposta.provaFonte });
       }
     } catch (erro) {
@@ -123,12 +129,12 @@ export function BlocosDof({
   const alterados = JSON.stringify(blocos) !== JSON.stringify(rascunho.blocos);
   const salvos = new Set(rascunho.blocos.map((bloco) => bloco.id));
   return (
-    <section className="separado" aria-labelledby="blocos-dof-titulo">
+    <>
+    <section aria-labelledby="blocos-dof-titulo">
       <h4 id="blocos-dof-titulo">Blocos provisórios da DOF</h4>
       <p>Os blocos começam vazios; nenhum texto oficial foi aprovado. As alterações exigem motivo e ficam apenas no rascunho. Limites técnicos: 200 blocos, 8.000 caracteres por bloco e 20.000 no total.</p>
       <p>Variáveis disponíveis: {'{{nome}}'}, {'{{matricula}}'}, {'{{cpf}}'}, {'{{nascimento}}'}, {'{{nome_mae}}'}, {'{{regime_juridico}}'}, {'{{cargo}}'}, {'{{nivel}}'}, {'{{referencia}}'}, {'{{orgao}}'}, {'{{processo}}'}, {'{{admissao}}'}, {'{{inicio}}'}, {'{{fim}}'}, {'{{dias_periodo}}'}, {'{{tempo_contribuicao}}'} e {'{{efetivo_exercicio}}'}. Variáveis indisponíveis e expressões malformadas são destacadas.</p>
       {bloqueado && <p className="aviso erro">Salve ou descarte as alterações do cálculo e do processo antes de editar os blocos.</p>}
-      <div className="editor-previa">
         <form onSubmit={salvar}>
           <fieldset disabled={ocupado || bloqueado || somenteLeitura}>
             <label>Tipo de bloco
@@ -168,13 +174,18 @@ export function BlocosDof({
             <button type="submit" disabled={!alterados}>{ocupado ? 'Salvando...' : 'Salvar blocos'}</button>
           </fieldset>
         </form>
-        <div>
-          <h5>Prévia provisória</h5>
-          <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Os dados da fonte são consultados ao abrir; feche e reabra para atualizá-los. Não possui validade oficial.</p>
+      {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
+    </section>
+    {destinoPrevia && createPortal(
+        <div className="previa-documento">
+          <details className="orientacoes-dof">
+            <summary>Dados consultados ao abrir · proteja a prévia</summary>
+            <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Os dados da fonte são consultados ao abrir; feche e reabra para atualizá-los. A prévia contém dados pessoais integrais; proteja a tela. Não possui validade oficial.</p>
+          </details>
           {fonte && fonte.documentoId === rascunho.id && fonte.revisao === rascunho.revisao ? (
             <>
               <button type="button" className="secundario" disabled={previaBloqueada}
-                onClick={() => { setFonte(null); onPrevia(null); }}>
+                onClick={() => { setFonte(null); onPrevia(null); onFonte(null); }}>
                 Fechar prévia
               </button>
               <iframe
@@ -185,8 +196,7 @@ export function BlocosDof({
             </>
           ) : <button type="button" className="secundario" disabled={ocupado || previaBloqueada} onClick={() => void abrirPrevia()}>Abrir prévia</button>}
         </div>
-      </div>
-      {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
-    </section>
+      , destinoPrevia)}
+    </>
   );
 }

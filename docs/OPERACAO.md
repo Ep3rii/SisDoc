@@ -1,17 +1,18 @@
-# Operação — aplicação ainda não autorizada
+# Operação local — uso operacional autorizado
 
-O login, a administração e a consulta de servidores existem para verificação
-em recursos descartáveis. Há cálculo, rascunho, blocos e prévia provisórios de
-DOF e conferência provisória pela interface, mas **não há emissão, importação,
-backup ou serviço Windows implementados**. A prévia não é um modelo oficial. Não instalar
-ou usar operacionalmente até a
-conclusão das demais fatias, revisão e autorização formal.
+Há uma [instalação local inicializada](INSTALACAO_LOCAL.md), com banco
+permanente, HTTPS e administrador inicial, **autorizada para uso operacional**
+pelo responsável em 31/10/2026 ([decisão 021](decisoes/021-autorizacao-operacional.md)).
+Estão liberados consulta de servidores e cálculo, rascunho, blocos, prévia e
+conferência de DOF pela interface. **Não há emissão com PDF, DTCs, importação,
+backup ou serviço Windows da aplicação implementados**. A prévia segue
+identificada como provisória; confira o conteúdo antes de qualquer uso oficial.
 O renderizador, o armazenamento e o processador experimentais de PDF são
 usados apenas por testes sintéticos: não há worker iniciado, botão de download,
 arquivo operacional persistido, reprocessamento autorizado, numeração ou
 emissão.
 
-## Pré-requisitos para uma futura instalação
+## Pré-requisitos para uma nova instalação
 
 - Windows compatível e com suporte de segurança comprovado; Node 24.20.0 nesta
   máquina e PostgreSQL 16. O PostgreSQL usado pelos testes é descartável e não
@@ -51,10 +52,14 @@ $env:SISDOC_CONFIG = 'C:\caminho\externo\config\aplicacao.json'
 npm start
 ```
 
+Para a instalação já inicializada, use o caminho e as instruções de
+[reinicialização local](INSTALACAO_LOCAL.md); não repita o setup.
+
 O backend atende apenas em `127.0.0.1` por HTTPS. O endereço aberto pelo
 navegador deve usar o nome do certificado e a porta configurada, e a CA deve
-ser confiável para o navegador. Não desative a validação TLS. Proxy Caddy/IIS,
-serviço, regras de rede e certificado operacional confiável ainda exigem
+ser confiável para o navegador. Não desative a validação TLS. O certificado
+local já é confiável neste Windows e o HTTPS direto dispensa proxy para
+loopback. Serviço automático e eventual publicação por Caddy/IIS exigem
 implementação e aprovação; não expor esta aplicação à rede.
 
 O administrador criado pelo setup precisa alterar a senha no primeiro acesso.
@@ -102,13 +107,35 @@ parâmetros sensíveis em seus logs. A consulta é local e não faz sincronizaç
 
 ## Cálculo de referência da DOF
 
+O menu lateral e a busca global seguem o
+[protótipo visual](../Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg).
+O editor tem cinco abas: **Dados do servidor**, **Período**, **Tabela ano a
+ano**, **Blocos de texto** e **Conferência**. Use as setas esquerda/direita,
+Home e End para navegar pelas abas por teclado. A troca de aba preserva os
+campos editados; buscar outra pessoa ou mudar de tela pede confirmação quando
+há alterações não salvas. No celular, abra **Menu** para navegar.
+
+No desktop, a prévia fica à direita e os totais/ação de salvamento ficam na
+barra inferior. As deduções exibidas são as deduções de contribuição do
+resultado, não a diferença entre dias brutos e contribuição, que pode incluir
+incorporações. DTCs, histórico e emissão aparecem indisponíveis. A situação
+da fonte informa consulta local, sem inventar data de sincronização.
+
 Nos detalhes de um vínculo com admissão informada, selecione **Calcular DOF**,
-informe o intervalo e prepare a tabela anual. Confira registros de
+informe o intervalo na aba **Período** e prepare a tabela anual. Confira registros de
 afastamentos e incorporações em sua origem e lance os dias em cada ano;
 esses registros ainda não são carregados automaticamente. Ao confirmar a
 tabela, campos vazios representam zero, inclusive nas páginas não exibidas.
 Para início após a admissão, informe também os acumulados anteriores de T/S e
 P/F e sua origem. Datas anteriores à admissão geram aviso de ajuste.
+
+Os cartões em **Dados do servidor** são somente leitura. Campos completos da
+fonte são exibidos apenas após **Abrir prévia**, consulta auditada, e são
+limpos ao fechar a prévia ou mudar a revisão. A data exibida é a admissão
+disponível na fonte, não uma data de posse/exercício inferida.
+Os ajustes cadastrais exclusivos da declaração previstos na seção 9 do
+[guia descritivo](../Modelos%20e%20Documentação/guia_descritivo_declaracoes_funcionais_e_tempo_contribuicao.md)
+ainda precisam ser implementados; não alterar a fonte para simulá-los.
 
 O cálculo usa a regra provisória no servidor; calcular não grava rascunho nem
 emissão. Analista e coordenador podem salvar o resultado como rascunho com
@@ -152,6 +179,9 @@ salvos não são apagados, mas podem ser desativados. A revisão protege as
 alterações de cálculo, blocos e processo em conjunto. Salve ou descarte uma categoria
 antes de editar a outra.
 
+Edite os blocos em **Blocos de texto**. O painel de prévia permanece acessível
+ao trocar de aba, mas não abre automaticamente nem elimina a auditoria.
+
 **Abrir prévia** registra a consulta e mostra o cálculo salvo com as alterações
 locais dos blocos, mesmo antes de salvá-las. Ela exibe CPF integral e nome da
 mãe, quando disponível, além dos demais campos da fonte necessários à DOF;
@@ -176,7 +206,9 @@ literais. Por exemplo, `####/####` é apenas um formato sintético, não uma
 recomendação institucional. São aceitas até dez máscaras de até 100
 caracteres, sem partes opcionais ou repetição variável dentro de cada máscara.
 
-No rascunho, informe o processo compatível e um motivo. A gravação é cifrada e
+Na aba **Dados do servidor**, informe o processo compatível e um motivo.
+A instalação local atual não tem máscara configurada; inclusão e substituição
+permanecem indisponíveis até uma definição institucional. A gravação é cifrada e
 compartilha a revisão com cálculo e blocos. Para remover um processo incorreto,
 marque a confirmação e informe o motivo; a remoção permanece possível mesmo sem
 máscara configurada. O histórico de ajustes preserva os valores cifrados. A
@@ -184,7 +216,7 @@ prévia usa o processo salvo, não o texto ainda em edição.
 
 ## Encaminhamento para análise
 
-No rascunho próprio, salve ou descarte as alterações pendentes, escolha um
+Na aba **Conferência** do rascunho próprio, salve ou descarte as alterações pendentes, escolha um
 coordenador ativo e selecione **Encaminhar rascunho**. O destinatário pode
 consultar o cálculo, os blocos, o processo e a prévia em **Encaminhados a mim**.
 Ele também pode selecionar **Devolver rascunho** e informar o motivo para o

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import {
   dataFuncionalSchema,
   criarRascunhoDofSchema,
   solicitarCalculoDofSchema,
   type AnoCalculo,
+  type DadosFontePreviaDof,
   type ProvaFontePreviaDof,
   type RascunhoDof,
   type ResultadoCalculoDof,
@@ -42,11 +43,20 @@ type Campo = typeof campos[number][0];
 type ValoresAno = Partial<Record<Campo, string>>;
 type Tabela = { inicio: string; fim: string; anos: number[] };
 const tamanhoPagina = 20;
+const abas = [
+  ['dados', 'Dados do servidor'], ['periodo', 'Período'], ['tabela', 'Tabela ano a ano'],
+  ['blocos', 'Blocos de texto'], ['conferencia', 'Conferência'],
+] as const;
+type Aba = typeof abas[number][0];
 
 export function CalculoDof({
   pessoaId, vinculoId, nome, matricula, admissao, csrf, podeSalvar, somenteLeitura = false, rascunhoInicial,
   onFechar, onErro, onLimpar, onPendente, confirmarSaida,
 }: Props) {
+  const id = useId();
+  const [aba, setAba] = useState<Aba>(rascunhoInicial ? 'tabela' : 'periodo');
+  const [destinoPrevia, setDestinoPrevia] = useState<HTMLDivElement | null>(null);
+  const [fontePrevia, setFontePrevia] = useState<DadosFontePreviaDof | null>(null);
   const admissaoAlterada = Boolean(rascunhoInicial && admissao !== rascunhoInicial.resultado.admissaoConsiderada);
   const [admissaoAtual, setAdmissaoAtual] = useState(admissao);
   const [inicio, setInicio] = useState(rascunhoInicial?.entrada.inicio ?? admissao ?? '');
@@ -164,6 +174,7 @@ export function CalculoDof({
     const ultimoAno = Number(fim.slice(0, 4));
     const anos = Array.from({ length: ultimoAno - primeiroAno + 1 }, (_, indice) => primeiroAno + indice);
     setTabela({ inicio, fim, anos });
+    setAba('tabela');
     setPagina(0);
     invalidar();
     onLimpar();
@@ -303,9 +314,28 @@ export function CalculoDof({
     ? rascunho.entrada.anos.filter((ano) => !anosTabela.has(ano.ano)).map((ano) => ano.ano)
     : [];
   const edicaoIndisponivel = somenteLeitura || Boolean(rascunho?.encaminhamento);
+  const bloqueioCalculo = ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
+    || operacaoEncaminhamento || operacaoConferencia || edicaoIndisponivel || !admissaoAtual;
+  const bloqueioSalvar = ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
+    || operacaoEncaminhamento || operacaoConferencia || edicaoIndisponivel;
+  const dadosServidor = [
+    ['Nome', fontePrevia?.nome ?? rascunho?.nome ?? nome],
+    ['Matrícula', fontePrevia?.matricula ?? rascunho?.matricula ?? matricula],
+    ['CPF', fontePrevia?.cpf ?? 'Disponível na prévia auditada'],
+    ['Nascimento', fontePrevia ? fontePrevia.nascimento ?? 'Não informado' : 'Não consultado'],
+    ['Nome da mãe', fontePrevia ? fontePrevia.nomeMae ?? 'Não informado' : 'Não consultado'],
+    ['Cargo', fontePrevia ? fontePrevia.cargo ?? 'Não informado' : 'Não consultado'],
+    ['Regime jurídico', fontePrevia ? fontePrevia.regimeJuridico ?? 'Não informado' : 'Não consultado'],
+    ['Nível / referência', fontePrevia ? [fontePrevia.nivel, fontePrevia.referencia].filter(Boolean).join(' / ') || 'Não informado' : 'Não consultado'],
+    ['Admissão na fonte', admissaoAtual ?? 'Não informado'],
+    ['Órgão de origem', fontePrevia ? fontePrevia.orgao ?? 'Não informado' : 'Não consultado'],
+  ];
   return (
-    <section className="painel separado" aria-labelledby="calculo-dof-titulo">
-      <h4 id="calculo-dof-titulo">Cálculo de referência — DOF</h4>
+    <section className="estudio-dof" aria-labelledby="calculo-dof-titulo">
+      <div className="area-dof">
+      <div className="editor-dof">
+      <p className="identificador-documento">DOF · Declaração de Ocorrências Funcionais</p>
+      <h2 id="calculo-dof-titulo">DOF — {rascunho?.nome ?? nome}</h2>
       <p>{rascunho?.nome ?? nome} — matrícula {rascunho?.matricula ?? matricula}. Admissão na fonte: {admissaoAtual ?? 'não informada'}.</p>
       {rascunho && <p>{somenteLeitura ? 'Rascunho encaminhado' : 'Rascunho próprio'} — revisão {rascunho.revisao}. Ainda não conferido nem emitido.</p>}
       {rascunho && podeSalvar && !somenteLeitura
@@ -318,16 +348,54 @@ export function CalculoDof({
             : admissaoAtual ? ' Prepare a tabela e confira novamente antes de salvar.' : ' A edição está indisponível até a correção na fonte.'}
         </p>
       )}
-      <p className="etiqueta">Regra provisória (planilha). O cálculo não grava dados; salvar cria apenas um rascunho, sem conferir ou emitir.</p>
-      <p>As ocorrências da fonte não são carregadas automaticamente. Confira os registros e informe os dias de cada intervalo; campos vazios serão tratados como zero somente após sua confirmação.</p>
-      <form onSubmit={calcular}>
-        <fieldset disabled={ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
-          || operacaoEncaminhamento || operacaoConferencia || edicaoIndisponivel || !admissaoAtual}>
+      <details className="orientacoes-dof">
+        <summary>Regra e prévia provisórias — emissão oficial indisponível</summary>
+        <p>Regra provisória (planilha). O cálculo não grava dados; salvar cria apenas um rascunho, sem conferir ou emitir.</p>
+        <p>As ocorrências da fonte não são carregadas automaticamente. Confira os registros e informe os dias de cada intervalo; campos vazios serão tratados como zero somente após sua confirmação.</p>
+      </details>
+      <nav className="abas-dof" role="tablist" aria-label="Seções da DOF">
+        {abas.map(([codigo, titulo], indice) => (
+          <button key={codigo} type="button" role="tab" id={`${id}-aba-${codigo}`} aria-controls={`${id}-painel-${codigo}`}
+            aria-selected={aba === codigo} tabIndex={aba === codigo ? 0 : -1} onClick={() => setAba(codigo)}
+            onKeyDown={(evento) => {
+              let destino: number;
+              if (evento.key === 'ArrowRight') destino = (indice + 1) % abas.length;
+              else if (evento.key === 'ArrowLeft') destino = (indice + abas.length - 1) % abas.length;
+              else if (evento.key === 'Home') destino = 0;
+              else if (evento.key === 'End') destino = abas.length - 1;
+              else return;
+              evento.preventDefault();
+              setAba(abas[destino][0]);
+              evento.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[destino]?.focus();
+            }}>{titulo}</button>
+        ))}
+      </nav>
+      <div role="tabpanel" id={`${id}-painel-dados`} aria-labelledby={`${id}-aba-dados`} hidden={aba !== 'dados'}>
+        <dl className="dados-servidor">{dadosServidor.map(([rotulo, valor]) => (
+          <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>
+        ))}</dl>
+        <p>Os campos da fonte são somente leitura. Abra a prévia auditada para consultá-los. Ajustes cadastrais exclusivos da declaração ainda não estão implementados.</p>
+        {rascunho && (podeSalvar || somenteLeitura) && (
+          <ProcessoDof rascunho={rascunho} csrf={csrf}
+            bloqueado={calculoPendente || blocosPendentes || encaminhamentoPendente
+              || operacaoEncaminhamento || operacaoConferencia || ocupado}
+            somenteLeitura={edicaoIndisponivel}
+            onAtualizar={setRascunho} onPendente={marcarProcesso} onErro={onErro} onLimpar={onLimpar} />
+        )}
+      </div>
+      <div role="tabpanel" id={`${id}-painel-periodo`} aria-labelledby={`${id}-aba-periodo`} hidden={aba !== 'periodo'}>
+        <fieldset disabled={bloqueioCalculo}>
           <div className="grade">
             <label>Início do período<input type="date" value={inicio} required onChange={(evento) => { setInicio(evento.target.value); setTabela(null); invalidar(); }} /></label>
             <label>Fim do período<input type="date" value={fim} required onChange={(evento) => { setFim(evento.target.value); setTabela(null); invalidar(); }} /></label>
           </div>
           <button type="button" className="secundario" onClick={preparar}>Preparar tabela anual</button>
+        </fieldset>
+      </div>
+      <div role="tabpanel" id={`${id}-painel-tabela`} aria-labelledby={`${id}-aba-tabela`} hidden={aba !== 'tabela'}>
+      <form onSubmit={calcular} noValidate>
+        <fieldset disabled={bloqueioCalculo}>
+          {!tabela && <p>Informe o período e prepare a tabela anual na aba Período.</p>}
           {tabela && (
             <>
               {admissaoAtual && inicio < admissaoAtual && <p className="aviso">O início será ajustado à admissão; confira o aviso no resultado.</p>}
@@ -390,9 +458,8 @@ export function CalculoDof({
         </section>
       )}
       {podeSalvar && resultado && pedidoCalculado && (
-        <form className="separado" onSubmit={salvar}>
-          <fieldset disabled={ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
-            || operacaoEncaminhamento || operacaoConferencia || edicaoIndisponivel}>
+        <form id={`${id}-salvar`} className="separado" onSubmit={salvar} noValidate>
+          <fieldset disabled={bloqueioSalvar}>
             {anosExcluidos.length > 0 && (
               <>
                 <p className="aviso erro">
@@ -409,31 +476,29 @@ export function CalculoDof({
             <label>Motivo dos lançamentos ou da alteração
               <textarea value={motivo} onChange={(evento) => { setMotivo(evento.target.value); marcarCalculo(true); }} maxLength={2000} required />
             </label>
-            <button type="submit">{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>
           </fieldset>
         </form>
       )}
+      </div>
+      <div role="tabpanel" id={`${id}-painel-blocos`} aria-labelledby={`${id}-aba-blocos`} hidden={aba !== 'blocos'}>
+        {!rascunho && <p>Salve o rascunho para adicionar os blocos de texto.</p>}
+      {rascunho && (podeSalvar || somenteLeitura) && (
+        <BlocosDof rascunho={rascunho} csrf={csrf} destinoPrevia={destinoPrevia} onFonte={setFontePrevia}
+          bloqueado={calculoPendente || processoPendente || encaminhamentoPendente
+            || operacaoEncaminhamento || operacaoConferencia || ocupado}
+          previaBloqueada={operacaoConferencia}
+          somenteLeitura={edicaoIndisponivel}
+          onAtualizar={setRascunho} onPendente={marcarBlocos} onPrevia={setProvaPrevia} onErro={onErro} onLimpar={onLimpar} />
+      )}
+      </div>
+      <div role="tabpanel" id={`${id}-painel-conferencia`} aria-labelledby={`${id}-aba-conferencia`} hidden={aba !== 'conferencia'}>
+      {!rascunho && <p>Salve o rascunho antes de encaminhar ou conferir a DOF.</p>}
       {rascunho && (podeSalvar || somenteLeitura) && (
         <ConfirmacaoInicioDof rascunho={rascunho} csrf={csrf}
           bloqueado={calculoPendente || blocosPendentes || processoPendente || encaminhamentoPendente
             || operacaoEncaminhamento || operacaoConferencia || ocupado}
           somenteLeitura={edicaoIndisponivel}
           onAtualizar={setRascunho} onOcupado={setOcupado} onErro={onErro} onLimpar={onLimpar} />
-      )}
-      {rascunho && (podeSalvar || somenteLeitura) && (
-        <ProcessoDof rascunho={rascunho} csrf={csrf}
-          bloqueado={calculoPendente || blocosPendentes || encaminhamentoPendente
-            || operacaoEncaminhamento || operacaoConferencia || ocupado}
-          somenteLeitura={edicaoIndisponivel}
-          onAtualizar={setRascunho} onPendente={marcarProcesso} onErro={onErro} onLimpar={onLimpar} />
-      )}
-      {rascunho && (podeSalvar || somenteLeitura) && (
-        <BlocosDof rascunho={rascunho} csrf={csrf}
-          bloqueado={calculoPendente || processoPendente || encaminhamentoPendente
-            || operacaoEncaminhamento || operacaoConferencia || ocupado}
-          previaBloqueada={operacaoConferencia}
-          somenteLeitura={edicaoIndisponivel}
-          onAtualizar={setRascunho} onPendente={marcarBlocos} onPrevia={setProvaPrevia} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && (podeSalvar || somenteLeitura) && (
         <VerificacaoConferenciaDof rascunho={rascunho} csrf={csrf}
@@ -459,6 +524,27 @@ export function CalculoDof({
           onDevolvido={() => onFechar('Rascunho devolvido para ajustes. Ele continua não conferido.')}
           onErro={onErro} onLimpar={onLimpar} />
       )}
+      </div>
+      </div>
+      <aside className="painel-previa" aria-label="Prévia do documento">
+        <p className="identificador-documento">Prévia do documento · sem validade oficial</p>
+        {!rascunho && <p>Salve o rascunho para abrir a prévia auditada.</p>}
+        <div ref={setDestinoPrevia} />
+      </aside>
+      </div>
+      <footer className="barra-totais" aria-label="Totais calculados da DOF">
+        <dl>
+          <div><dt>Dias no período</dt><dd>{resultado?.totais.diasBrutos.toLocaleString('pt-BR') ?? '—'}</dd></div>
+          <div><dt>Deduções de contribuição</dt><dd>{resultado?.periodo.linhas.reduce((total, linha) => total + linha.deducaoContribuicao, 0).toLocaleString('pt-BR') ?? '—'}</dd></div>
+          <div><dt>Efetivo exercício</dt><dd>{resultado?.totais.efetivoExercicio.toLocaleString('pt-BR') ?? '—'}</dd></div>
+          <div><dt>Contribuição</dt><dd>{resultado?.totais.totalContribuicao.toLocaleString('pt-BR') ?? '—'}</dd></div>
+        </dl>
+        <div className="acoes">
+          {podeSalvar && resultado && pedidoCalculado && <button type="submit" form={`${id}-salvar`} className="secundario"
+            disabled={bloqueioSalvar}>{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>}
+          <button type="button" disabled title="Emissão, numeração e snapshot ainda não implementados">Emitir PDF · indisponível</button>
+        </div>
+      </footer>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       <div className="acoes"><button type="button" className="secundario" disabled={ocupado || operacaoEncaminhamento || operacaoConferencia} onClick={() => {
         if (confirmarSaida()) { onPendente(false); onFechar(); }

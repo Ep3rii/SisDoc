@@ -5,7 +5,7 @@ import { api, ErroApi } from './api';
 import { Auditoria } from './auditoria';
 import { ConferidosDof } from './conferidos-dof';
 import { RascunhosDof } from './rascunhos-dof';
-import { Servidores } from './servidores';
+import { BuscaGlobal, Servidores, type Consulta } from './servidores';
 import { nomesPerfis, Usuarios } from './usuarios';
 import './estilos.css';
 
@@ -82,6 +82,8 @@ function App() {
   const [erro, setErro] = useState('');
   const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
+  const [consulta, setConsulta] = useState<Consulta | null>(null);
+  const [menuAberto, setMenuAberto] = useState(false);
   const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
   const pendencias = useRef(false);
   const registrarPendencia = useCallback((valor: boolean) => {
@@ -94,6 +96,7 @@ function App() {
     setMensagem('');
     if (problema instanceof ErroApi && problema.status === 401) {
       setSessao(null);
+      setConsulta(null);
       if (pendencias.current) {
         registrarPendencia(false);
         setErro('A sessão terminou. As alterações não salvas foram descartadas; entre novamente.');
@@ -134,6 +137,7 @@ function App() {
     try {
       await api.sair(sessao.csrf);
       setSessao(null);
+      setConsulta(null);
       registrarPendencia(false);
       setErro('');
       setMensagem('Sessão encerrada.');
@@ -142,6 +146,7 @@ function App() {
     }
   }
   const entrar = (resultado: RespostaSessao) => {
+    setConsulta(null);
     setSessao(resultado);
     setErro('');
     setMensagem('');
@@ -149,6 +154,7 @@ function App() {
   };
   const encerrarLocal = (texto: string) => {
     setSessao(null);
+    setConsulta(null);
     setErro('');
     setMensagem(texto);
   };
@@ -160,26 +166,70 @@ function App() {
     setErro('');
     setMensagem('');
   };
-  const navegar = (destino: typeof tela) => {
+  const navegar = (destino: typeof tela, busca: Consulta | null = null) => {
     if (!confirmarSaida()) return;
     registrarPendencia(false);
     limparMensagens();
     setChaveTela((atual) => atual + 1);
     setTela(destino);
+    setConsulta(busca);
+    setMenuAberto(false);
   };
   const funcional = sessao && sessao.usuario.papel !== 'admin';
   const podeSalvar = sessao?.usuario.papel === 'analista' || sessao?.usuario.papel === 'coordenador';
 
   return (
-    <main className="pagina">
+    <div className="pagina">
+      <aside className={`barra-lateral${menuAberto ? ' aberta' : ''}`} aria-label="Menu principal">
+        <div className="identidade"><span className="marca">SisDOC</span><span>SEMAD · Declarações funcionais</span></div>
+        {sessao && !sessao.usuario.trocaSenhaObrigatoria && (
+          <>
+            <button type="button" className="menu-toggle" aria-expanded={menuAberto} aria-controls="navegacao-principal"
+              onClick={() => setMenuAberto((valor) => !valor)}>Menu</button>
+            <nav id="navegacao-principal" aria-label="Navegação">
+              {funcional && <>
+                <p className="grupo-menu">DOFs</p>
+                <button type="button" aria-label="Buscar servidores" aria-current={tela === 'busca' ? 'page' : undefined}
+                  onClick={() => navegar('busca')}>Buscar servidores<span>DOF · Ocorrências funcionais</span></button>
+                {podeSalvar && <>
+                  <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>Meus rascunhos</button>
+                  <button type="button" aria-current={tela === 'conferidos' ? 'page' : undefined} onClick={() => navegar('conferidos')}>DOFs conferidas</button>
+                </>}
+                {sessao.usuario.papel === 'coordenador' && <button type="button"
+                  aria-current={tela === 'encaminhados' ? 'page' : undefined} onClick={() => navegar('encaminhados')}>Encaminhados a mim</button>}
+                <p className="grupo-menu">DTCs · Em desenvolvimento</p>
+                <button type="button" disabled>DTC IPAM<span>Anexo III</span></button>
+                <button type="button" disabled>DTC Comissionado<span>Benefício junto ao INSS</span></button>
+                <button type="button" disabled>DTC INSS<span>RGPS</span></button>
+                <div className="menu-separado"><button type="button" disabled>Histórico<span>Disponível após implementar a emissão</span></button></div>
+              </>}
+              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <p className="grupo-menu">Administração</p>}
+              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
+                onClick={() => navegar('usuarios')}>Usuários</button>}
+              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <button type="button"
+                aria-current={tela === 'auditoria' ? 'page' : undefined} onClick={() => navegar('auditoria')}>Auditoria</button>}
+            </nav>
+          </>
+        )}
+        {sessao && <div className="usuario-local">
+          <p>Conectado como <strong>{sessao.usuario.nome}</strong> — {nomesPerfis[sessao.usuario.papel]}.</p>
+          <button type="button" className="cabecalho-botao" onClick={sair}>Sair</button>
+        </div>}
+      </aside>
+      <div className="area-principal">
       <header className="cabecalho">
-        <div><span className="marca">SisDoc</span><span>Declarações funcionais</span></div>
-        {sessao && <button type="button" className="cabecalho-botao" onClick={sair}>Sair</button>}
+        {funcional && !sessao.usuario.trocaSenhaObrigatoria
+          ? <BuscaGlobal onBuscar={(busca) => navegar('busca', busca)} onErro={tratarErro} />
+          : <span>Declarações funcionais e de tempo de contribuição</span>}
+        <span className="estado-fonte">Consulta local · sincronização indisponível</span>
       </header>
+      <main>
       <div className="conteudo">
-        <p className="etiqueta">Sistema em construção — não autorizado para uso operacional</p>
-        <h1>DOF e DTC</h1>
-        <p>O cálculo, a prévia e a conferência da DOF são provisórios e não têm validade oficial. A emissão ainda não está disponível.</p>
+        <h1 className="sr-only">DOF e DTC</h1>
+        <details className="situacao-implantacao">
+          <summary>Uso operacional autorizado em 31/10/2026 — emissão de PDF e DTCs ainda indisponíveis</summary>
+          <p>Consulta, cálculo, rascunhos, prévia e conferência da DOF estão liberados. As regras e a prévia seguem identificadas como provisórias; confira o documento antes do uso oficial.</p>
+        </details>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
@@ -188,21 +238,9 @@ function App() {
           <TrocaSenha sessao={sessao} onConcluir={() => encerrarLocal('Senha alterada. Entre novamente.')} onErro={tratarErro} />
         ) : (
           <>
-            <p>Conectado como <strong>{sessao.usuario.nome}</strong> — {nomesPerfis[sessao.usuario.papel]}.</p>
             {alteracoesPendentes && <p className="etiqueta" role="status">Há alterações não salvas.</p>}
-            <nav className="acoes" aria-label="Navegação">
-              {funcional && <button type="button" className="secundario" onClick={() => navegar('busca')}>Buscar servidores</button>}
-              {podeSalvar && <button type="button" className="secundario" onClick={() => navegar('rascunhos')}>Meus rascunhos</button>}
-              {podeSalvar && <button type="button" className="secundario" onClick={() => navegar('conferidos')}>DOFs conferidas</button>}
-              {sessao.usuario.papel === 'coordenador' && (
-                <button type="button" className="secundario" onClick={() => navegar('encaminhados')}>Encaminhados a mim</button>
-              )}
-              {sessao.usuario.papel === 'admin' && <button type="button" className="secundario" onClick={() => navegar('usuarios')}>Usuários</button>}
-              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && (
-                <button type="button" className="secundario" onClick={() => navegar('auditoria')}>Auditoria</button>
-              )}
-            </nav>
             {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf} podeSalvar={podeSalvar}
+              consulta={consulta}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
@@ -222,7 +260,9 @@ function App() {
           </>
         )}
       </div>
-    </main>
+      </main>
+      </div>
+    </div>
   );
 }
 

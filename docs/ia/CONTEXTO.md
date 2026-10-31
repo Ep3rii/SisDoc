@@ -1,10 +1,13 @@
 # Contexto de construção
 
 Fontes ativas: [prompt de construção](../../Modelos%20e%20Documentação/PROMPT_CONSTRUCAO_APLICACAO_DOF_DTC.md) e
-[regras de cálculo](../../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md).
+[regras de cálculo](../../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md),
+[guia descritivo](../../Modelos%20e%20Documentação/guia_descritivo_declaracoes_funcionais_e_tempo_contribuicao.md)
+e [protótipo visual](../../Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg).
 Este contexto é derivado dessas fontes e não substitui suas condições de aceite.
 
-O objetivo é um monólito para criar, conferir e emitir DOF, DTC IPAM,
+O objetivo principal é agilizar a busca de dados locais e a preparação das
+declarações. O sistema é um monólito para criar, conferir e emitir DOF, DTC IPAM,
 DTC Comissionado e DTC INSS, com PDF, histórico e auditoria. Busca, cálculo,
 prévia e emissão usam dados locais; somente o módulo de sincronização acessa a
 fonte externa. O cálculo é puro e compartilhado pelo servidor e navegador.
@@ -19,6 +22,21 @@ Modelos limpos e regras precisam ser aprovados antes da emissão operacional.
 Inferências e perfis provisórios não constituem aprovação administrativa;
 a emissão afetada permanece bloqueada. A imagem é referência visual, não fonte
 de dados nem de texto oficial.
+
+O guia distingue EE de contribuição e exige modelos e fluxos próprios para
+cada declaração. Os ajustes de campos durante a preparação, previstos na
+seção 9, deverão ser exclusivos do documento/rascunho, com auditoria e sem
+sobrescrita da fonte. Essa edição cadastral ainda não foi implementada.
+Regras ambíguas continuam dependendo de validação da área responsável.
+
+O layout usa menu lateral escuro, busca global, abas, editor com prévia
+auditada à direita e totais fixos. Recursos ausentes são sinalizados, não
+simulados. A instalação local foi inicializada vazia e autorizada para uso
+operacional pelo responsável em 31/10/2026
+([decisão 021](../decisoes/021-autorizacao-operacional.md)); a emissão com PDF
+ainda não existe e exigirá liberação própria quando implementada.
+Estado, confiança HTTPS e próxima etapa estão em
+[INSTALACAO_LOCAL.md](../INSTALACAO_LOCAL.md).
 
 O trabalho segue as fatias e respectivos gates da seção 7 do prompt. O estado
 efetivo e as evidências ficam em [PROGRESSO.md](../PROGRESSO.md).

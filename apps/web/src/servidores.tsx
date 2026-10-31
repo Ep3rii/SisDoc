@@ -11,7 +11,34 @@ import { CalculoDof } from './calculo-dof';
 
 type Props = { onErro: (erro: unknown) => void; onLimpar: () => void };
 type ProtecaoEdicao = { onPendente: (valor: boolean) => void; confirmarSaida: () => boolean };
-type Consulta = { q: string; tipo: TipoBuscaServidor };
+export type Consulta = { q: string; tipo: TipoBuscaServidor };
+
+export function BuscaGlobal({ onBuscar, onErro }: {
+  onBuscar: (consulta: Consulta) => void; onErro: (erro: unknown) => void;
+}) {
+  function buscar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const valores = new FormData(evento.currentTarget);
+    const resultado = buscarServidoresQuerySchema.safeParse({ q: valores.get('q'), tipo: valores.get('tipo') });
+    if (!resultado.success || !resultado.data.tipo) {
+      onErro(new ErroApi(400, 'Informe nome com ao menos três caracteres, CPF válido ou matrícula exata.'));
+      return;
+    }
+    onBuscar({ q: resultado.data.q, tipo: resultado.data.tipo });
+  }
+  return (
+    <form className="busca-global" onSubmit={buscar} aria-label="Busca de servidores">
+      <label><span className="sr-only">Tipo de busca</span>
+        <select name="tipo" defaultValue="nome"><option value="nome">Nome</option><option value="cpf">CPF</option><option value="matricula">Matrícula</option></select>
+      </label>
+      <label><span className="sr-only">Termo de busca</span>
+        <input name="q" maxLength={200} required autoComplete="off" placeholder="Buscar servidor" aria-describedby="orientacao-busca" />
+      </label>
+      <button type="submit">Buscar</button>
+      <span className="sr-only" id="orientacao-busca">Nome: mínimo de três caracteres. CPF: com ou sem máscara. Matrícula: informe o valor exato.</span>
+    </form>
+  );
+}
 
 function Eventos({ pessoaId, vinculoId, onErro, onLimpar }: Props & { pessoaId: string; vinculoId: string }) {
   const [pagina, setPagina] = useState<PaginaEventosServidor | null>(null);
@@ -82,6 +109,14 @@ function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPen
     });
     return () => { ativa = false; };
   }, [pessoaId, cursor, versao, onErro]);
+  if (vinculoCalculo && detalhe) {
+    return (
+      <CalculoDof key={vinculoCalculo.id} pessoaId={pessoaId} vinculoId={vinculoCalculo.id}
+        nome={detalhe.pessoa.nome} matricula={vinculoCalculo.matricula} admissao={vinculoCalculo.admissao}
+        csrf={csrf} podeSalvar={podeSalvar} onFechar={() => setVinculoCalculo(null)} onErro={onErro} onLimpar={onLimpar}
+        onPendente={onPendente} confirmarSaida={confirmarSaida} />
+    );
+  }
   return (
     <section className="painel separado" aria-labelledby="detalhe-titulo">
       <h3 id="detalhe-titulo">Detalhes do servidor</h3>
@@ -127,22 +162,15 @@ function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPen
               onClick={() => trocarContexto(() => setCursor(detalhe.proximoCursor ?? undefined))}>Próxima página de vínculos</button>
           </div>
           {vinculoId && <Eventos key={vinculoId} pessoaId={pessoaId} vinculoId={vinculoId} onErro={onErro} onLimpar={onLimpar} />}
-          {vinculoCalculo && (
-            <CalculoDof key={vinculoCalculo.id} pessoaId={pessoaId} vinculoId={vinculoCalculo.id}
-              nome={detalhe.pessoa.nome} matricula={vinculoCalculo.matricula} admissao={vinculoCalculo.admissao}
-              csrf={csrf} podeSalvar={podeSalvar} onFechar={() => setVinculoCalculo(null)} onErro={onErro} onLimpar={onLimpar}
-              onPendente={onPendente} confirmarSaida={confirmarSaida} />
-          )}
         </>
       )}
     </section>
   );
 }
 
-export function Servidores({ csrf, podeSalvar, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
-  csrf: string; podeSalvar: boolean;
+export function Servidores({ csrf, podeSalvar, consulta, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
+  csrf: string; podeSalvar: boolean; consulta: Consulta | null;
 }) {
-  const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [pagina, setPagina] = useState<PaginaBuscaServidores | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [pessoaId, setPessoaId] = useState<string | null>(null);
@@ -164,38 +192,12 @@ export function Servidores({ csrf, podeSalvar, onErro, onLimpar, onPendente, con
     return () => { ativa = false; };
   }, [consulta, cursor, versao, onErro]);
 
-  function buscar(evento: FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
-    if (!confirmarSaida()) return;
-    onPendente(false);
-    const valores = new FormData(evento.currentTarget);
-    const resultado = buscarServidoresQuerySchema.safeParse({ q: valores.get('q'), tipo: valores.get('tipo') });
-    if (!resultado.success || !resultado.data.tipo) {
-      setConsulta(null);
-      setPagina(null);
-      setPessoaId(null);
-      setCursor(undefined);
-      setFalhou(false);
-      onErro(new ErroApi(400, 'Informe nome com ao menos três caracteres, CPF válido ou matrícula exata.'));
-      return;
-    }
-    onLimpar();
-    setPessoaId(null);
-    setCursor(undefined);
-    setConsulta({ q: resultado.data.q, tipo: resultado.data.tipo });
-  }
-
   return (
     <section aria-labelledby="busca-titulo">
-      <h2 id="busca-titulo">Consulta de servidores</h2>
-      <p>Os resultados são locais. Matrículas e sufixos são preservados; confira a origem quando houver duplicidade.</p>
-      <form className="painel grade-busca" onSubmit={buscar}>
-        <label>Tipo de busca<select name="tipo" defaultValue="nome"><option value="nome">Nome</option><option value="cpf">CPF</option><option value="matricula">Matrícula</option></select></label>
-        <label>Termo de busca<input name="q" maxLength={200} required autoComplete="off" aria-describedby="orientacao-busca" /></label>
-        <p id="orientacao-busca">Nome: mínimo de três caracteres. CPF: com ou sem máscara. Matrícula: informe o valor exato.</p>
-        <button type="submit">Buscar</button>
-      </form>
-      {falhou ? <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>Tentar buscar novamente</button> : consulta && !pagina ? <p role="status">Buscando...</p> : pagina && (
+      <h2 id="busca-titulo" className={pessoaId ? 'sr-only' : undefined}>Consulta de servidores</h2>
+      {!pessoaId && <p>Os resultados são locais. Matrículas e sufixos são preservados; confira a origem quando houver duplicidade.</p>}
+      {!consulta && <p>Use a busca no topo por nome, CPF ou matrícula para selecionar um vínculo.</p>}
+      {!pessoaId && (falhou ? <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>Tentar buscar novamente</button> : consulta && !pagina ? <p role="status">Buscando...</p> : pagina && (
         <>
           <h3>Resultados</h3>
           {pagina.itens.length === 0 ? <p>Nenhum vínculo encontrado.</p> : (
@@ -220,7 +222,7 @@ export function Servidores({ csrf, podeSalvar, onErro, onLimpar, onPendente, con
               onClick={() => trocarContexto(() => { setPessoaId(null); setCursor(pagina.proximoCursor ?? undefined); })}>Próxima página de resultados</button>
           </div>
         </>
-      )}
+      ))}
       {pessoaId && <Detalhe key={pessoaId} pessoaId={pessoaId} csrf={csrf} podeSalvar={podeSalvar}
         onFechar={() => setPessoaId(null)} onErro={onErro} onLimpar={onLimpar}
         onPendente={onPendente} confirmarSaida={confirmarSaida} />}

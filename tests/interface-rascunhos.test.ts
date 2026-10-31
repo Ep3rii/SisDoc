@@ -467,9 +467,14 @@ async function iniciarCalculo(pagina: Page) {
 }
 
 async function calcularTabela(pagina: Page) {
+  await selecionarAba(pagina, 'Tabela ano a ano');
   await pagina.getByRole('checkbox', { name: /Confirmei todos os anos/ }).check();
   await pagina.getByRole('button', { name: 'Calcular DOF', exact: true }).click();
   await pagina.getByRole('heading', { name: 'Resultado provisório' }).waitFor();
+}
+
+async function selecionarAba(pagina: Page, nome: 'Dados do servidor' | 'Período' | 'Tabela ano a ano' | 'Blocos de texto' | 'Conferência') {
+  await pagina.getByRole('tab', { name: nome, exact: true }).click();
 }
 
 async function abrirRascunho(pagina: Page) {
@@ -515,6 +520,69 @@ describe('interface de rascunhos com API sintética', () => {
     estado.liberarPreconferencia?.();
     await pagina.close({ runBeforeUnload: false });
     expect(estado.erros).toEqual([]);
+  });
+
+  it('mantém o layout em duas colunas, navega por teclado e protege a edição na busca global', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await pagina.getByLabel('Faltas em 1980').fill('2');
+    await pagina.getByLabel('PB em 1980').fill('10');
+    await calcularTabela(pagina);
+    expect(await pagina.locator('.barra-totais dd').allTextContents()).toEqual(['16.437', '2', '16.435', '16.445']);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Conferência fictícia do layout');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    await selecionarAba(pagina, 'Dados do servidor');
+    await pagina.getByText('Disponível na prévia auditada', { exact: true }).waitFor();
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    await pagina.locator('.dados-servidor').getByText('Mãe fictícia <img src=x>', { exact: true }).waitFor();
+    expect(await pagina.getByRole('tabpanel').count()).toBe(1);
+    const editor = await pagina.locator('.editor-dof').boundingBox();
+    const previa = await pagina.locator('.painel-previa').boundingBox();
+    if (!editor || !previa) throw new Error('Editor ou painel de prévia não está visível.');
+    expect(editor.width).toBeGreaterThan(300);
+    expect(previa.width).toBeGreaterThan(300);
+    expect(previa.x).toBeGreaterThanOrEqual(editor.x + editor.width - 1);
+    const quadro = await pagina.locator('iframe[title="Prévia provisória da DOF"]').boundingBox();
+    const rodape = await pagina.locator('.barra-totais').boundingBox();
+    if (!quadro || !rodape) throw new Error('Prévia ou rodapé não está visível.');
+    expect(quadro.y + quadro.height).toBeLessThanOrEqual(rodape.y);
+    const conferencia = await pagina.getByRole('tab', { name: 'Conferência', exact: true }).boundingBox();
+    if (!conferencia) throw new Error('A aba de conferência não está visível.');
+    expect(conferencia.x + conferencia.width).toBeLessThanOrEqual(editor.x + editor.width);
+    expect(await pagina.getByRole('button', { name: /Emitir PDF/ }).isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: /DTC IPAM/ }).isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: /Histórico/ }).isDisabled()).toBe(true);
+    const dados = pagina.getByRole('tab', { name: 'Dados do servidor', exact: true });
+    await dados.focus();
+    await pagina.keyboard.press('ArrowRight');
+    expect(await pagina.getByRole('tab', { name: 'Período', exact: true }).getAttribute('aria-selected')).toBe('true');
+    await pagina.keyboard.press('End');
+    expect(await pagina.getByRole('tab', { name: 'Conferência', exact: true }).getAttribute('aria-selected')).toBe('true');
+    await pagina.keyboard.press('Home');
+    expect(await dados.getAttribute('aria-selected')).toBe('true');
+    await pagina.keyboard.press('ArrowRight');
+    await pagina.keyboard.press('ArrowRight');
+    await pagina.getByLabel('Faltas em 1980').fill('1');
+    await selecionarAba(pagina, 'Dados do servidor');
+    expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').isVisible()).toBe(true);
+    await selecionarAba(pagina, 'Tabela ano a ano');
+    expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('1');
+    await pagina.getByLabel('Termo de busca').fill('Outra pessoa');
+    pagina.once('dialog', (dialogo) => void dialogo.dismiss());
+    await pagina.getByRole('button', { name: 'Buscar', exact: true }).click();
+    expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('1');
+    expect(await pagina.getByText('Há alterações não salvas.', { exact: true }).isVisible()).toBe(true);
+    await selecionarAba(pagina, 'Dados do servidor');
+    await pagina.getByRole('button', { name: 'Fechar prévia' }).click();
+    expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').count()).toBe(0);
+    expect(await pagina.getByText('Disponível na prévia auditada', { exact: true }).isVisible()).toBe(true);
+    expect(await pagina.locator('.dados-servidor').getByText('Mãe fictícia <img src=x>', { exact: true }).count()).toBe(0);
+    await pagina.setViewportSize({ width: 375, height: 812 });
+    await pagina.getByRole('button', { name: 'Menu', exact: true }).click();
+    expect(await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).isVisible()).toBe(true);
+    expect(await pagina.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   });
 
   it('salva, reabre e revisa 45 anos; preserva edições diante de conflito e falha de comunicação', async () => {
@@ -602,6 +670,7 @@ describe('interface de rascunhos com API sintética', () => {
     await abrirRascunho(pagina);
     await pagina.getByRole('alert').getByText(/admissão considerada no resultado salvo/).waitFor();
     expect(await pagina.getByRole('button', { name: 'Salvar alterações' }).count()).toBe(0);
+    await selecionarAba(pagina, 'Período');
     await pagina.getByRole('button', { name: 'Preparar tabela anual' }).click();
     await pagina.getByText('44 ano(s) no intervalo efetivo.', { exact: false }).waitFor();
     estado.admissao = null;
@@ -621,6 +690,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
     await abrirRascunho(pagina);
+    await selecionarAba(pagina, 'Período');
     await pagina.getByLabel('Fim do período').fill('2023-12-31');
     await pagina.getByRole('button', { name: 'Preparar tabela anual' }).click();
     await calcularTabela(pagina);
@@ -643,6 +713,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
 
+    await selecionarAba(pagina, 'Blocos de texto');
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
     const textoInicial = '<script>window.top.intrusao=1</script> {{nome}} {{cargo}} {{desconhecida}}';
     await pagina.getByLabel('Texto do bloco 1').fill(textoInicial);
@@ -708,6 +779,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
     await pagina.getByText('Blocos salvos na revisão 3.', { exact: false }).waitFor();
     await abrirRascunho(pagina);
+    await selecionarAba(pagina, 'Blocos de texto');
     expect(await pagina.getByLabel('Texto do bloco 1').inputValue()).toBe('Alteração que deve ser preservada');
     expect(await pagina.getByRole('checkbox', { name: 'Ativar bloco 2' }).isChecked()).toBe(false);
 
@@ -732,6 +804,7 @@ describe('interface de rascunhos com API sintética', () => {
     estado.adiarPrevia = true;
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await expect.poll(() => estado.liberarPrevia !== null).toBe(true);
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByLabel('Número do processo').fill('1234/5678');
     await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
@@ -750,6 +823,7 @@ describe('interface de rascunhos com API sintética', () => {
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados fictícios');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('Esta consulta não foi vinculada a uma prévia aberta.', { exact: false }).waitFor();
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
@@ -802,6 +876,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
     await quadro.getByText('BLOCO-200-', { exact: false }).waitFor();
+    await selecionarAba(pagina, 'Blocos de texto');
     expect(await quadro.locator('tbody tr').count()).toBe(45);
     const duracoes: number[] = [];
     for (let indice = 0; indice < 5; indice += 1) {
@@ -837,6 +912,7 @@ describe('interface de rascunhos com API sintética', () => {
     const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
     await quadro.getByText('Há expressões de variáveis malformadas nos blocos ativos.').waitFor();
     expect(await quadro.locator('mark').count()).toBe(6600);
+    await selecionarAba(pagina, 'Blocos de texto');
     const duracoes: number[] = [];
     for (let indice = 0; indice < 5; indice += 1) {
       const inicio = await pagina.evaluate(() => performance.now());
@@ -858,9 +934,10 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByLabel('Número do processo').fill('12345678');
     await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
-    expect(await pagina.getByRole('button', { name: 'Adicionar bloco' }).isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Adicionar bloco', includeHidden: true }).isDisabled()).toBe(true);
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
     await pagina.getByRole('alert').getByText(/Confira o número do processo/).waitFor();
     expect(estado.escritas).toBe(1);
@@ -868,6 +945,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
     await pagina.getByText('Processo salvo na revisão 2.', { exact: false }).waitFor();
     expect(estado.rascunho?.processo).toBe('1234/5678');
+    await selecionarAba(pagina, 'Blocos de texto');
     expect(await pagina.getByRole('button', { name: 'Adicionar bloco' }).isDisabled()).toBe(false);
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
     await pagina.getByLabel('Texto do bloco 1').fill('Referência {{processo}}');
@@ -878,6 +956,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
     await pagina.getByText('Blocos salvos na revisão 3.', { exact: false }).waitFor();
 
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByLabel('Número do processo').fill('9999/9999');
     await pagina.getByLabel('Motivo da alteração do processo').fill('Correção fictícia');
     estado.conflito = true;
@@ -895,6 +974,7 @@ describe('interface de rascunhos com API sintética', () => {
     if (!estado.rascunho) throw new Error('Rascunho sintético ausente.');
     estado.rascunho = { ...estado.rascunho, mascarasProcesso: [] };
     await abrirRascunho(pagina);
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByText('Nenhuma máscara de processo está configurada.', { exact: false }).waitFor();
     expect(await pagina.getByLabel('Número do processo').inputValue()).toBe('9999/9999');
     expect(await pagina.getByLabel('Número do processo').isDisabled()).toBe(true);
@@ -913,9 +993,11 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
 
+    await selecionarAba(pagina, 'Blocos de texto');
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
-    expect(await pagina.getByRole('button', { name: 'Escolher coordenador' }).isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Escolher coordenador', includeHidden: true }).isDisabled()).toBe(true);
     await pagina.getByRole('button', { name: 'Remover bloco novo 1' }).click();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Escolher coordenador' }).click();
     await pagina.getByLabel('Coordenador destinatário').selectOption(coordenadorId);
     estado.falhaRede = true;
@@ -927,7 +1009,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Rascunho encaminhado na revisão 2.', { exact: false }).waitFor();
     expect(await pagina.getByLabel('Faltas em 1980').isDisabled()).toBe(true);
     expect(await pagina.getByLabel('Número do processo').isDisabled()).toBe(true);
-    expect(await pagina.getByRole('button', { name: 'Adicionar bloco' }).isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Adicionar bloco', includeHidden: true }).isDisabled()).toBe(true);
     expect(estado.rascunho?.encaminhamento?.destinatarioId).toBe(coordenadorId);
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
@@ -947,11 +1029,13 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
 
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
     estado.papel = 'analista';
     await pagina.reload();
     await abrirRascunho(pagina);
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByLabel('Motivo do recolhimento').fill('Correção fictícia necessária');
     expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(1);
     estado.falhaRede = true;
@@ -972,6 +1056,7 @@ describe('interface de rascunhos com API sintética', () => {
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados fictícios');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Escolher coordenador' }).click();
     await pagina.getByLabel('Coordenador destinatário').selectOption(coordenadorId);
     await pagina.getByRole('button', { name: 'Encaminhar rascunho' }).click();
@@ -981,6 +1066,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.reload();
     await pagina.getByRole('button', { name: 'Encaminhados a mim' }).click();
     await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('heading', { name: 'Devolver para ajustes' }).waitFor();
     expect(await pagina.getByRole('heading', { name: 'Última devolução para ajustes' }).count()).toBe(0);
     const motivo = 'Ajustar dado fictício <img src="x" onerror="alert(1)">';
@@ -1017,8 +1103,9 @@ describe('interface de rascunhos com API sintética', () => {
     const armazenamentos = await pagina.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
     expect(armazenamentos).not.toContain(motivo);
     expect(await pagina.getByLabel('Faltas em 1980').isEnabled()).toBe(true);
-    expect(await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Conferir DOF provisória', includeHidden: true }).count()).toBe(0);
     estado.adiarConsultaDevolucao = true;
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByLabel('Número do processo').fill('1234/5678');
     await pagina.getByLabel('Motivo da alteração do processo').fill('Ajuste fictício após devolução');
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
@@ -1037,10 +1124,12 @@ describe('interface de rascunhos com API sintética', () => {
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados inteiramente fictícios');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByLabel('Número do processo').fill('1234/5678');
     await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
     await pagina.getByText('Processo salvo na revisão 2.', { exact: false }).waitFor();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Escolher coordenador' }).click();
     await pagina.getByLabel('Coordenador destinatário').selectOption(coordenadorId);
     await pagina.getByRole('button', { name: 'Encaminhar rascunho' }).click();
@@ -1050,6 +1139,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.reload();
     await pagina.getByRole('button', { name: 'Encaminhados a mim' }).click();
     await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
@@ -1120,16 +1210,19 @@ describe('interface de rascunhos com API sintética', () => {
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados fictícios');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('Rascunho não conferido — revisão 1,', { exact: false }).waitFor();
     await pagina.getByText('Informe o número do processo.').waitFor();
     expect(await pagina.getByText('A aprovação do modelo ainda não foi verificada.').count()).toBe(1);
     expect(await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).count()).toBe(0);
 
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByLabel('Número do processo').fill('1234/5678');
-    expect(await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Verificar pendências para conferência', includeHidden: true }).isDisabled()).toBe(true);
     expect(await pagina.getByText('Rascunho não conferido — revisão 1,', { exact: false }).count()).toBe(0);
     await pagina.getByLabel('Número do processo').clear();
+    await selecionarAba(pagina, 'Blocos de texto');
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
     await pagina.getByLabel('Texto do bloco 1').fill('Teste {{nome}} {{inexistente}} {{malformada');
     await pagina.getByLabel('Motivo da alteração dos blocos').fill('Teste de variáveis');
@@ -1137,6 +1230,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Blocos salvos na revisão 2.', { exact: false }).waitFor();
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/Expressão malformada/).first().waitFor();
+    await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
     await pagina.getByText('Há variáveis indisponíveis.').waitFor();
@@ -1145,6 +1239,7 @@ describe('interface de rascunhos com API sintética', () => {
     estado.adiarPreconferencia = true;
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await expect.poll(() => estado.liberarPreconferencia !== null).toBe(true);
+    await selecionarAba(pagina, 'Dados do servidor');
     await pagina.getByLabel('Número do processo').fill('1234/5678');
     await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
@@ -1157,12 +1252,14 @@ describe('interface de rascunhos com API sintética', () => {
   it('exige confirmação explícita do início ajustado sem conferir o rascunho', async () => {
     await pagina.goto(endereco);
     await iniciarCalculo(pagina);
+    await selecionarAba(pagina, 'Período');
     await pagina.getByLabel('Início do período').fill('1979-01-01');
     await pagina.getByRole('button', { name: 'Preparar tabela anual' }).click();
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    await selecionarAba(pagina, 'Conferência');
     const botao = pagina.getByRole('button', { name: 'Confirmar ajuste do início' });
     expect(await botao.isDisabled()).toBe(true);
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();

@@ -1,7 +1,9 @@
 # Progresso da construção
 
 Fontes ativas: [prompt](../Modelos%20e%20Documentação/PROMPT_CONSTRUCAO_APLICACAO_DOF_DTC.md)
-e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md).
+e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md),
+[guia descritivo](../Modelos%20e%20Documentação/guia_descritivo_declaracoes_funcionais_e_tempo_contribuicao.md)
+e [protótipo visual](../Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg).
 
 | Fatia | Estado | Evidência |
 |---|---|---|
@@ -327,11 +329,40 @@ esse método, e o estado concluído do banco não comprova o arquivo em disco.
 Um reprocessamento operacional autorizado e auditado ainda não foi implementado.
 A suíte completa voltou a passar com 130 testes em 17 arquivos.
 
-Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
-possui emissão, importação ou instalação como
-serviço; não está pronta para uso operacional. Requisitos de certificado,
-conta de serviço, proxy, backup e suporte do sistema operacional permanecem
-sem aceite.
+Até essa etapa, nenhum banco, serviço, certificado ou dado real havia sido alterado.
+
+## Preparação dos componentes locais — 31/10/2026
+
+Foi instalado o PostgreSQL 16.15-5 com o instalador oficial da EDB, após
+verificação do hash e da assinatura e autorização para criar o serviço Windows.
+O serviço `postgresql-x64-16` inicia automaticamente como `NetworkService`.
+O instalador configurou inicialmente a escuta em todas as interfaces; ela foi
+restringida a `127.0.0.1:5432` e o serviço foi reiniciado. A autenticação local
+usa `scram-sha-256`. A conexão sem senha foi recusada e uma consulta autenticada
+confirmou PostgreSQL 16.15, codificação UTF-8 e endereço local.
+
+Foram confirmados Node 24.20.0, npm 11.19.0, dependências npm e Chromium
+156.0.8078.4. `npm test` passou com 130 testes em 17 arquivos e
+`npm run typecheck` passou. Após a instalação, os 25 testes de
+`node scripts\executar-testes.cjs tests\fundacao.test.ts` também passaram.
+Esses testes usam PostgreSQL e demais recursos descartáveis, não o serviço
+instalado; eles não validam a aplicação integrada ao banco permanente.
+
+O [suporte regular do Windows 10 Pro 22H2](https://learn.microsoft.com/en-us/lifecycle/products/windows-10-home-and-pro)
+terminou em 14/10/2025. Não foi verificada a cobertura por atualizações de
+segurança estendidas; o suporte aplicável deve ser confirmado antes do uso
+operacional.
+Até esta preparação dos componentes, não haviam sido criados banco ou papéis do SisDoc, certificado, configuração
+`SISDOC_CONFIG` ou serviço da aplicação. O proxy permanece sem decisão e sem
+integração. A preparação do PostgreSQL não equivale à instalação do SisDoc
+nem autoriza seu uso operacional. A inicialização e a autorização posteriores
+estão registradas abaixo.
+
+A aplicação não possui emissão, importação ou instalação como serviço. O uso
+operacional das funções existentes foi autorizado em 31/10/2026
+([decisão 021](decisoes/021-autorizacao-operacional.md)); certificado local
+autossinado foi aceito por não haver acesso externo. Conta de serviço, proxy,
+backup e suporte do sistema operacional permanecem pendentes.
 Divergências e decisões estão em
 [001-regras-e-estado-inicial.md](decisoes/001-regras-e-estado-inicial.md) e
 [002-modelo-e-protecao.md](decisoes/002-modelo-e-protecao.md) e
@@ -352,4 +383,71 @@ Divergências e decisões estão em
 [017-conferencia-provisoria-dof.md](decisoes/017-conferencia-provisoria-dof.md) e
 [018-pdf-provisorio-dof.md](decisoes/018-pdf-provisorio-dof.md) e
 [019-armazenamento-pdf.md](decisoes/019-armazenamento-pdf.md) e
-[020-processamento-pdf-provisorio.md](decisoes/020-processamento-pdf-provisorio.md).
+[020-processamento-pdf-provisorio.md](decisoes/020-processamento-pdf-provisorio.md) e
+[021-autorizacao-operacional.md](decisoes/021-autorizacao-operacional.md).
+
+## Inicialização local e layout — 31/10/2026
+
+Após a configuração do PostgreSQL, foram provisionados o banco `sisdoc`
+em UTF-8 e os logins separados `sisdoc_migracao` e `sisdoc_app`, sem
+privilégios administrativos. As credenciais ficaram protegidas fora do
+checkout; o login da aplicação não recebe as credenciais de migração.
+
+Foi configurado HTTPS direto em loopback com certificado folha autossinado,
+não emissor de CA, para `localhost` e `127.0.0.1`, válido até 31/10/2027.
+A confiança em `LocalMachine\Root` foi instalada mediante autorização
+expressa para todos os usuários Windows, além da confiança do Node.
+Não foram desativados TLS, validação de certificados ou controles de sessão.
+
+Somente depois dessas etapas, o setup foi inicializado com confirmação
+interativa. Aplicou 13 migrações até `012-conferencia-dof`, criou um
+administrador ativo com troca obrigatória de senha e a configuração externa
+em `C:\ProgramData\SisDoc\instalacao`. O banco tem **zero pessoas**:
+nenhum dado real ou fictício foi importado. A lista externa de senhas comuns
+foi instalada com a licença MIT do SecLists preservada.
+
+O backend foi iniciado manualmente em **https://localhost:3443/**. Foram
+verificados certificado confiável no Windows, página inicial, health 200,
+sessão não autenticada 401 e escuta exclusiva em `127.0.0.1`.
+O PostgreSQL tem serviço automático; **a aplicação ainda não tem serviço
+Windows**. O primeiro login e a troca de senha deverão ser feitos pelo
+responsável, sem compartilhar a senha.
+
+O editor DOF foi reorganizado conforme o protótipo: menu lateral escuro
+por perfil, busca global, dados em cartões, cinco abas acessíveis, prévia
+auditada independente da aba e barra inferior com totais e salvamento.
+DTCs, histórico e emissão continuam claramente indisponíveis. A admissão
+não foi rotulada como posse/exercício e as deduções não incluem
+incorporações indevidamente. Troca de abas preserva valores e a busca
+global confirma antes de descartar edições.
+
+Os 16 testes de interface de rascunhos passaram, incluindo regressão do
+layout em duas colunas, teclado, prévia entre abas, cancelamento de busca,
+menu móvel e ausência de overflow horizontal em 375 pixels.
+O novo teste também verifica os quatro totais exatos com faltas e
+incorporação PB, e a limpeza de dados integrais ao fechar a prévia.
+A comparação visual foi feita com dados inteiramente fictícios em API
+simulada, não no banco instalado. Em uma execução direcionada, os máximos
+edição-exibição foram 39,4 ms para 45 anos, 99,0 ms no limite de blocos e
+174,2 ms com delimitadores malformados. Não são garantia operacional.
+
+Foram preparados [README](../README.md),
+[instalação local](INSTALACAO_LOCAL.md), [operação](OPERACAO.md) e contexto
+de construção. A autorização operacional solicitada foi recebida como
+intenção do responsável, mas emissão, importação, DTCs, edição cadastral
+exclusiva da declaração, backups, serviço, suporte de segurança e aceite
+institucional permanecem pendentes. As máscaras de processo estão ausentes.
+O gate da fatia 5 continua parcial; próximos passos detalhados na
+documentação da instalação.
+
+`npm run typecheck` passou e `npm test` passou com **131 testes em 17
+arquivos**, usando recursos descartáveis. O aviso preexistente de bundle
+frontend acima de 500 kB continua; não foi ocultado nem tratado como falha.
+
+## Autorização operacional — 31/10/2026
+
+O responsável autorizou expressamente o uso operacional da instalação local
+(`https://localhost:3443/`). A autorização, seu escopo e os recursos ainda
+indisponíveis estão na [decisão 021](decisoes/021-autorizacao-operacional.md).
+A interface passou a indicar a autorização; novas instalações continuam
+iniciando sem autorização até registro próprio do responsável.
