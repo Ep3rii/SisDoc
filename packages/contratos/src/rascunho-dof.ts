@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { resultadoCalculoDofSchema, solicitarCalculoDofSchema } from './calculo';
 import { dataFuncionalSchema } from './dominio';
+import { mascaraProcessoSchema, numeroProcessoSchema } from './processo';
 
 const motivoSchema = z.string().trim().min(1, 'Informe o motivo dos lançamentos.').max(2000);
 const revisaoSchema = z.number().int().min(1).max(2147483647);
@@ -34,6 +35,17 @@ export const atualizarBlocosDofSchema = z.strictObject({
   revisao: revisaoSchema,
   motivo: motivoSchema,
   blocos: blocosDofSchema,
+});
+
+export const atualizarProcessoDofSchema = z.strictObject({
+  revisao: revisaoSchema,
+  motivo: motivoSchema,
+  processo: numeroProcessoSchema.nullable(),
+  confirmarRemocao: z.boolean().optional(),
+}).superRefine((dados, contexto) => {
+  if ((dados.processo === null) !== (dados.confirmarRemocao === true)) {
+    contexto.addIssue({ code: 'custom', message: 'A remoção do processo exige confirmação explícita.' });
+  }
 });
 
 export const criarRascunhoDofSchema = z.strictObject({
@@ -70,8 +82,11 @@ export const rascunhoDofSchema = resumoRascunhoDofSchema.extend({
   entrada: solicitarCalculoDofSchema,
   resultado: resultadoCalculoDofSchema,
   blocos: blocosDofSchema,
+  processo: numeroProcessoSchema.nullable(),
+  mascarasProcesso: z.array(mascaraProcessoSchema).max(10),
 });
 
+export type AtualizarProcessoDof = z.infer<typeof atualizarProcessoDofSchema>;
 export type BlocoRascunhoDof = z.infer<typeof blocoRascunhoDofSchema>;
 export type AtualizarBlocosDof = z.infer<typeof atualizarBlocosDofSchema>;
 export type CriarRascunhoDof = z.infer<typeof criarRascunhoDofSchema>;

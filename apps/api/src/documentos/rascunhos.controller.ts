@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http';
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import {
-  atualizarBlocosDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema, paginaUuidQuerySchema,
+  atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema, paginaUuidQuerySchema,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { z } from 'zod';
@@ -65,5 +65,13 @@ export class RascunhosController {
     const dados = atualizarBlocosDofSchema.safeParse(corpo);
     if (!dados.success) throw new BadRequestException('Confira a revisão, os blocos e o motivo da alteração.');
     return this.rascunhos.atualizarBlocos(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
+  }
+
+  @ExigirAcao('editar_rascunho')
+  @Patch(':id/processo')
+  atualizarProcesso(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = atualizarProcessoDofSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira a revisão, o número do processo e o motivo da alteração.');
+    return this.rascunhos.atualizarProcesso(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
   }
 }

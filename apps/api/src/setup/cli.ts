@@ -25,6 +25,7 @@ async function executar(): Promise<void> {
     const nomeTls = await perguntar('Nome DNS presente no certificado: ');
     const sidServico = await perguntar('SID da conta Windows de serviço sem privilégios: ');
     const listaSenhas = await perguntar('Caminho absoluto da lista local de senhas comuns: ');
+    const mascarasProcesso = await perguntar('Máscaras de processo separadas por vírgula (vazio para não configurar): ');
     const matricula = await perguntar('Matrícula do administrador inicial: ');
     const nome = await perguntar('Nome do administrador inicial: ');
     const senha = await segredo('Senha inicial do administrador (mínimo 12 caracteres): ');
@@ -40,6 +41,7 @@ async function executar(): Promise<void> {
       tls: { certificado, chave, ca, nome: nomeTls },
       sidServico,
       listaSenhas,
+      ...(mascarasProcesso.trim() ? { processos: { mascaras: mascarasProcesso.split(',').map((item) => item.trim()) } } : {}),
       administrador: { matricula, nome, senha },
     };
     const arquivo = await instalar(opcoes);

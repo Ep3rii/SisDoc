@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo, rascunhos cifrados, blocos e prévia provisória; conferência, emissão e PDF ainda não implementados |
+| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos e prévia provisória; conferência, emissão e PDF ainda não implementados |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -127,6 +127,18 @@ São medições locais, sem garantia de capacidade operacional ou integração d
 navegador à CA operacional. O bundle principal ainda ultrapassa 500 kB.
 O gate da fatia 5 continua **não cumprido**.
 
+Também foi acrescentado o número de processo cifrado e validado por máscaras
+explicitamente configuradas, sem formato institucional presumido. Sua
+alteração usa motivo e revisão; a remoção requer confirmação. Sem máscara
+configurada, inclusão e substituição são bloqueadas. A migração
+`006-processo-dof` só é aplicada em banco novo.
+
+`npm run typecheck`, `npm test` (80 testes em dez arquivos) e `npm audit`
+passaram; não foram apontadas vulnerabilidades nas dependências. Os testes
+incluem configuração ausente, cifra, remoção, permissões e concorrência em
+infraestrutura descartável e API simulada. Essa preparação não implementa a
+conferência nem autoriza emissão.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -140,4 +152,5 @@ Divergências e decisões estão em
 [005-consulta-servidores.md](decisoes/005-consulta-servidores.md) e
 [006-calculo-interativo-dof.md](decisoes/006-calculo-interativo-dof.md) e
 [007-rascunhos-dof.md](decisoes/007-rascunhos-dof.md) e
-[008-blocos-e-previa-dof.md](decisoes/008-blocos-e-previa-dof.md).
+[008-blocos-e-previa-dof.md](decisoes/008-blocos-e-previa-dof.md) e
+[009-processo-dof.md](decisoes/009-processo-dof.md).

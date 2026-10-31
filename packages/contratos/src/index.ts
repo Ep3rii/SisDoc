@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { configuracaoProcessosSchema } from './processo';
 
 export * from './dominio';
 export * from './autenticacao';
@@ -7,6 +8,7 @@ export * from './paginacao';
 export * from './servidores';
 export * from './calculo';
 export * from './rascunho-dof';
+export * from './processo';
 
 const porta = z.number().int().min(1).max(65535);
 const chave = z.string().regex(/^[A-Za-z0-9+/]{43}=$/);
@@ -33,6 +35,7 @@ export const configuracaoSchema = z.strictObject({
   seguranca: z.strictObject({
     listaSenhas: z.string().min(1),
   }).optional(),
+  processos: configuracaoProcessosSchema.optional(),
 });
 
 export type Configuracao = z.infer<typeof configuracaoSchema>;

@@ -3,10 +3,13 @@ import { BadRequestException, ConflictException, NotFoundException, ServiceUnava
 import { REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
   blocoRascunhoDofSchema,
+  numeroProcessoSchema,
+  processoCorrespondeMascara,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
   solicitarCalculoDofSchema,
   type AtualizarBlocosDof,
+  type AtualizarProcessoDof,
   type AtualizarRascunhoDof,
   type BlocoRascunhoDof,
   type CodigoBlocoDof,
@@ -39,6 +42,7 @@ type LinhaRascunho = {
   atualizado_em: Date;
   entrada_cifrada: Buffer;
   resultado_calculo_cifrado: Buffer | null;
+  processo_cifrado: Buffer | null;
   regra_codigo: string;
   regra_versao: string;
   regra_atual: boolean;
@@ -80,9 +84,11 @@ function mudancas(anterior: SolicitarCalculoDof | null, novo: SolicitarCalculoDo
 
 export class RascunhosService {
   private readonly protetor: ProtetorDados;
+  private readonly mascarasProcesso: string[];
 
   constructor(private readonly banco: Pool, configuracao: Configuracao) {
     this.protetor = new ProtetorDados(configuracao.chaves);
+    this.mascarasProcesso = configuracao.processos?.mascaras ?? [];
   }
 
   private cifrar(tabela: string, id: string, campo: string, valor: unknown): Buffer {
@@ -149,6 +155,9 @@ export class RascunhosService {
       entrada,
       resultado,
       blocos: await this.blocos(cliente, linha.id),
+      processo: linha.processo_cifrado
+        ? numeroProcessoSchema.parse(this.ler('documento', linha.id, 'processo_cifrado', linha.processo_cifrado)) : null,
+      mascarasProcesso: this.mascarasProcesso,
     });
   }
 
@@ -161,7 +170,8 @@ export class RascunhosService {
     const consulta = await cliente.query<LinhaRascunho>(`
       SELECT d.id, d.pessoa_id, d.vinculo_id, p.nome, v.matricula,
         to_char(v.admissao, 'YYYY-MM-DD') AS admissao, d.revisao, d.criado_em, d.atualizado_em,
-        d.entrada_cifrada, d.resultado_calculo_cifrado, r.codigo AS regra_codigo, r.versao AS regra_versao,
+        d.entrada_cifrada, d.resultado_calculo_cifrado, d.processo_cifrado,
+        r.codigo AS regra_codigo, r.versao AS regra_versao,
         (r.codigo = $3 AND r.versao = $4 AND r.configuracao = $5::jsonb) AS regra_atual
       FROM documentos.documento d
       JOIN nucleo.pessoa p ON p.id = d.pessoa_id
@@ -425,6 +435,51 @@ export class RascunhosService {
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_blocos_editados', 'documento', id, linha.pessoa_id, ip);
       const atualizado = await this.linha(cliente, id, sessao.usuario.id);
       if (!atualizado) throw new Error('Rascunho com blocos atualizados não pôde ser recuperado.');
+      return { valor: await this.apresentar(cliente, atualizado) };
+    });
+    return concluir(tentativa);
+  }
+
+  async atualizarProcesso(
+    sessao: SessaoAutenticada,
+    ip: string,
+    id: string,
+    dados: AtualizarProcessoDof,
+  ): Promise<RascunhoDof> {
+    const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
+      }
+      const processoNovo = dados.processo;
+      if (processoNovo !== null && this.mascarasProcesso.length === 0) {
+        throw new ServiceUnavailableException('Nenhuma máscara de processo foi configurada. Solicite a configuração ao administrador.');
+      }
+      if (processoNovo !== null
+          && !this.mascarasProcesso.some((mascara) => processoCorrespondeMascara(processoNovo, mascara))) {
+        return { falha: { tipo: 'invalido', mensagem: 'O número do processo não corresponde às máscaras configuradas.' } };
+      }
+      const anterior = await this.apresentar(cliente, linha);
+      if (anterior.processo === dados.processo) {
+        return { falha: { tipo: 'conflito', mensagem: 'O número de processo não foi alterado.' } };
+      }
+      await cliente.query(`
+        UPDATE documentos.documento SET processo_cifrado = $1, atualizado_por = $2,
+          atualizado_em = now(), revisao = revisao + 1 WHERE id = $3
+      `, [dados.processo === null ? null : this.cifrar('documento', id, 'processo_cifrado', dados.processo),
+        sessao.usuario.id, id]);
+      await this.registrarAjustes(cliente, id, sessao.usuario.id, dados.motivo, [
+        { campo: 'processo', anterior: anterior.processo, novo: dados.processo },
+      ]);
+      await auditarConsultaFuncional(cliente, sessao, 'rascunho_processo_editado', 'documento', id, linha.pessoa_id, ip);
+      const atualizado = await this.linha(cliente, id, sessao.usuario.id);
+      if (!atualizado) throw new Error('Rascunho com processo atualizado não pôde ser recuperado.');
       return { valor: await this.apresentar(cliente, atualizado) };
     });
     return concluir(tentativa);

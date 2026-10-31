@@ -11,6 +11,7 @@ import {
   usuarioAdministrativoSchema,
   type AtualizarUsuario,
   type AtualizarBlocosDof,
+  type AtualizarProcessoDof,
   type AtualizarRascunhoDof,
   type CriarRascunhoDof,
   type CriarUsuario,
@@ -150,6 +151,9 @@ export const api = {
   },
   async atualizarBlocosDof(csrf: string, id: string, dados: AtualizarBlocosDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/blocos`, 'PATCH', dados, csrf));
+  },
+  async atualizarProcessoDof(csrf: string, id: string, dados: AtualizarProcessoDof): Promise<RascunhoDof> {
+    return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/processo`, 'PATCH', dados, csrf));
   },
   async obterPreviaDof(id: string): Promise<number> {
     let resposta: Response;

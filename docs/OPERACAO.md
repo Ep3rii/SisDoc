@@ -32,7 +32,8 @@ conclusão das demais fatias, revisão e autorização formal.
 
 Após instalar dependências do lockfile com `npm ci`, `npm run setup` deve ser
 executado por operador autorizado em terminal interativo. O comando solicita os
-parâmetros acima, senhas sem eco e confirmação explícita `CRIAR`. Ele aplica a
+parâmetros acima, senhas sem eco, máscaras de processo opcionais e confirmação
+explícita `CRIAR`. Ele aplica a
 estrutura versionada ao banco vazio, cria chaves próprias e um administrador
 com troca de senha obrigatória. Não cria banco ou papéis PostgreSQL e não
 importa dados. Se a transação ficar com estado incerto, preserve a raiz e
@@ -66,12 +67,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 005, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 006, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `005-blocos-dof` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `006-processo-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -130,7 +131,7 @@ altera dados funcionais da fonte e o rascunho não é conferência nem emissão.
 Após salvar um rascunho próprio, adicione blocos vazios, edite seu texto,
 reordene e ative/desative conforme necessário. Salve com motivo; blocos já
 salvos não são apagados, mas podem ser desativados. A revisão protege as
-alterações de cálculo e blocos em conjunto. Salve ou descarte uma categoria
+alterações de cálculo, blocos e processo em conjunto. Salve ou descarte uma categoria
 antes de editar a outra.
 
 **Abrir prévia** registra a consulta e mostra o cálculo salvo com as alterações
@@ -139,6 +140,23 @@ validade oficial; seu layout e textos não foram aprovados. Apenas as variáveis
 listadas na interface são resolvidas, e as demais aparecem como indisponíveis.
 Se outra sessão alterar o rascunho, reabra-o e confira a revisão. Os limites
 técnicos são 200 blocos, 8.000 caracteres por bloco e 20.000 no total.
+
+## Processo do rascunho
+
+O setup solicita, opcionalmente, máscaras de número de processo separadas por
+vírgula; deixá-las em branco desativa a inclusão e substituição do número. A
+definição do formato deve ser fornecida pela área responsável; nenhuma máscara
+vem predefinida. Na máscara, `#` representa um dígito, `@` uma letra ASCII e
+`*` uma letra ou dígito. Letras, números, espaços internos e `.` `/` `-` são
+literais. Por exemplo, `####/####` é apenas um formato sintético, não uma
+recomendação institucional. São aceitas até dez máscaras de até 100
+caracteres, sem partes opcionais ou repetição variável dentro de cada máscara.
+
+No rascunho, informe o processo compatível e um motivo. A gravação é cifrada e
+compartilha a revisão com cálculo e blocos. Para remover um processo incorreto,
+marque a confirmação e informe o motivo; a remoção permanece possível mesmo sem
+máscara configurada. O histórico de ajustes preserva os valores cifrados. A
+prévia usa o processo salvo, não o texto ainda em edição.
 
 ## Verificação de software
 

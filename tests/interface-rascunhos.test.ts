@@ -3,6 +3,8 @@ import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo'
 import {
   atualizarRascunhoDofSchema,
   atualizarBlocosDofSchema,
+  atualizarProcessoDofSchema,
+  processoCorrespondeMascara,
   criarRascunhoDofSchema,
   resultadoCalculoDofSchema,
   solicitarCalculoDofSchema,
@@ -153,7 +155,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           id: documentoId, pessoaId, vinculoId, nome, matricula, admissao: estado.admissao,
           revisao: 1, criadoEm: agora, atualizadoEm: agora, status: 'rascunho',
           entrada: dados.calculo, resultado: resultadoSintetico(dados.calculo, estado.admissao),
-          blocos: [],
+          blocos: [], processo: null, mascarasProcesso: ['####/####'],
         };
         estado.escritas += 1;
         return responder(rota, 201, estado.rascunho);
@@ -178,6 +180,24 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
         estado.rascunho = {
           ...estado.rascunho, revisao: estado.rascunho.revisao + 1,
           atualizadoEm: new Date().toISOString(), blocos: dados.blocos,
+        };
+        estado.escritas += 1;
+        return responder(rota, 200, estado.rascunho);
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/processo` && metodo === 'PATCH' && estado.rascunho) {
+        if (estado.falhaRede) return rota.abort('failed');
+        const dados = atualizarProcessoDofSchema.parse(requisicao.postDataJSON());
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao) {
+          return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
+        }
+        const processoNovo = dados.processo;
+        if (processoNovo !== null
+            && !estado.rascunho.mascarasProcesso.some((mascara) => processoCorrespondeMascara(processoNovo, mascara))) {
+          return responder(rota, 400, { detail: 'O número do processo não corresponde às máscaras configuradas.' });
+        }
+        estado.rascunho = {
+          ...estado.rascunho, revisao: estado.rascunho.revisao + 1,
+          atualizadoEm: new Date().toISOString(), processo: dados.processo,
         };
         estado.escritas += 1;
         return responder(rota, 200, estado.rascunho);
@@ -509,6 +529,60 @@ describe('interface de rascunhos com API sintética', () => {
     process.stdout.write(
       `Prévia sintética no limite (45 anos, 200 blocos, 20.000 caracteres): ${maiorDuracao.toFixed(1)} ms.\n`,
     );
+  });
+
+  it('valida e salva o processo somente com máscara configurada, preservando alterações pendentes', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    await pagina.getByLabel('Número do processo').fill('12345678');
+    await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
+    expect(await pagina.getByRole('button', { name: 'Adicionar bloco' }).isDisabled()).toBe(true);
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByRole('alert').getByText(/Confira o número do processo/).waitFor();
+    expect(estado.escritas).toBe(1);
+    await pagina.getByLabel('Número do processo').fill('1234/5678');
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByText('Processo salvo na revisão 2.', { exact: false }).waitFor();
+    expect(estado.rascunho?.processo).toBe('1234/5678');
+    expect(await pagina.getByRole('button', { name: 'Adicionar bloco' }).isDisabled()).toBe(false);
+    await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
+    await pagina.getByLabel('Texto do bloco 1').fill('Referência {{processo}}');
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]')
+      .getByText('Referência 1234/5678').waitFor();
+    await pagina.getByLabel('Motivo da alteração dos blocos').fill('Referência fictícia');
+    await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
+    await pagina.getByText('Blocos salvos na revisão 3.', { exact: false }).waitFor();
+
+    await pagina.getByLabel('Número do processo').fill('9999/9999');
+    await pagina.getByLabel('Motivo da alteração do processo').fill('Correção fictícia');
+    estado.conflito = true;
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByRole('alert').getByText(/O rascunho foi alterado/).waitFor();
+    expect(await pagina.getByLabel('Número do processo').inputValue()).toBe('9999/9999');
+    estado.conflito = false;
+    estado.falhaRede = true;
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByRole('alert').getByText(/Não foi possível confirmar a gravação/).waitFor();
+    expect(await pagina.getByLabel('Número do processo').inputValue()).toBe('9999/9999');
+    estado.falhaRede = false;
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByText('Processo salvo na revisão 4.', { exact: false }).waitFor();
+    if (!estado.rascunho) throw new Error('Rascunho sintético ausente.');
+    estado.rascunho = { ...estado.rascunho, mascarasProcesso: [] };
+    await abrirRascunho(pagina);
+    await pagina.getByText('Nenhuma máscara de processo está configurada.', { exact: false }).waitFor();
+    expect(await pagina.getByLabel('Número do processo').inputValue()).toBe('9999/9999');
+    expect(await pagina.getByLabel('Número do processo').isDisabled()).toBe(true);
+    await pagina.getByRole('checkbox', { name: 'Confirmo a remoção do número de processo.' }).check();
+    await pagina.getByLabel('Motivo da alteração do processo').fill('Remoção fictícia');
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByText('Processo salvo na revisão 5.', { exact: false }).waitFor();
+    expect(estado.rascunho?.processo).toBeNull();
   });
 
   it('restringe controles por perfil e apresenta falha de listagem com retentativa e paginação', async () => {

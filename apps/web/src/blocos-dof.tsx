@@ -110,8 +110,8 @@ export function BlocosDof({ rascunho, csrf, bloqueado, onAtualizar, onPendente, 
     <section className="separado" aria-labelledby="blocos-dof-titulo">
       <h4 id="blocos-dof-titulo">Blocos provisórios da DOF</h4>
       <p>Os blocos começam vazios; nenhum texto oficial foi aprovado. As alterações exigem motivo e ficam apenas no rascunho. Limites técnicos: 200 blocos, 8.000 caracteres por bloco e 20.000 no total.</p>
-      <p>Variáveis disponíveis: {'{{nome}}'}, {'{{matricula}}'}, {'{{admissao}}'}, {'{{inicio}}'}, {'{{fim}}'}, {'{{dias_periodo}}'}, {'{{tempo_contribuicao}}'} e {'{{efetivo_exercicio}}'}. Outras são destacadas como indisponíveis.</p>
-      {bloqueado && <p className="aviso erro">Salve ou descarte as alterações do cálculo antes de editar os blocos.</p>}
+      <p>Variáveis disponíveis: {'{{nome}}'}, {'{{matricula}}'}, {'{{processo}}'}, {'{{admissao}}'}, {'{{inicio}}'}, {'{{fim}}'}, {'{{dias_periodo}}'}, {'{{tempo_contribuicao}}'} e {'{{efetivo_exercicio}}'}. Outras são destacadas como indisponíveis.</p>
+      {bloqueado && <p className="aviso erro">Salve ou descarte as alterações do cálculo e do processo antes de editar os blocos.</p>}
       <div className="editor-previa">
         <form onSubmit={salvar}>
           <fieldset disabled={ocupado || bloqueado}>
@@ -154,7 +154,7 @@ export function BlocosDof({ rascunho, csrf, bloqueado, onAtualizar, onPendente, 
         </form>
         <div>
           <h5>Prévia provisória</h5>
-          <p>Usa o cálculo salvo e reflete os blocos locais, inclusive alterações ainda não salvas. Não possui validade oficial.</p>
+          <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Não possui validade oficial.</p>
           {previaAberta ? (
             <>
               <button type="button" className="secundario" onClick={() => setPreviaAberta(false)}>Fechar prévia</button>

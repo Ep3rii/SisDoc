@@ -1,6 +1,6 @@
 import { TITULOS_BLOCOS_DOF, type RascunhoDof } from '@sisdoc/contratos';
 
-type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resultado' | 'blocos'>;
+type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resultado' | 'blocos' | 'processo'>;
 
 function escapar(valor: string | number): string {
   return String(valor).replace(/[&<>"']/g, (caractere) => ({
@@ -18,6 +18,7 @@ export function renderizarPreviaDof(dados: DadosPreviaDof): string {
   const variaveis = new Map<string, string>([
     ['nome', dados.nome],
     ['matricula', dados.matricula],
+    ['processo', dados.processo ?? ''],
     ['admissao', data(resultado.admissaoConsiderada)],
     ['inicio', data(resultado.periodo.inicioEfetivo)],
     ['fim', data(resultado.periodo.fim)],
@@ -70,6 +71,7 @@ h1{font-size:1.25rem}h2{font-size:1rem;margin-top:1.4rem}
 <h1>PRÉVIA PROVISÓRIA — SEM VALIDADE OFICIAL</h1>
 <p class="aviso">Não é modelo aprovado, conferência nem emissão. Revisão salva de referência: ${escapar(dados.revisao)}.</p>
 <p>Nome: ${escapar(dados.nome)}. Matrícula: ${escapar(dados.matricula)}.</p>
+<p>Processo: ${dados.processo ? escapar(dados.processo) : 'não informado'}.</p>
 <p>Admissão considerada: ${escapar(data(resultado.admissaoConsiderada))}. Período efetivo: ${escapar(data(resultado.periodo.inicioEfetivo))} a ${escapar(data(resultado.periodo.fim))}.</p>
 <p>Regra provisória: ${escapar(resultado.regra.codigo)} — ${escapar(resultado.regra.versao)}.</p>
 ${avisos ? `<ul>${avisos}</ul>` : ''}

@@ -33,6 +33,7 @@ import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarBlocosDof } from '../apps/api/dist/migracoes/blocos-dof.js';
+import { aplicarProcessoDof } from '../apps/api/dist/migracoes/processo-dof.js';
 import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
 import { aplicarRascunhoDof } from '../apps/api/dist/migracoes/rascunho-dof.js';
 import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
@@ -408,6 +409,7 @@ describe('fundação em recursos descartáveis', () => {
       tls: { certificado, chave, ca, nome: nomeTls },
       sidServico: 'S-1-5-19',
       listaSenhas,
+      processos: { mascaras: ['####/####'] },
       administrador: { matricula: 'ADMIN-FICTICIO', nome: 'Operador Fictício', senha: senhaAdmin },
     };
   });
@@ -503,6 +505,7 @@ describe('fundação em recursos descartáveis', () => {
       { texto: 'Nome DNS presente no certificado: ', resposta: nomeTls },
       { texto: 'SID da conta Windows de serviço sem privilégios: ', resposta: opcoes.sidServico },
       { texto: 'Caminho absoluto da lista local de senhas comuns: ', resposta: opcoes.listaSenhas },
+      { texto: 'Máscaras de processo separadas por vírgula (vazio para não configurar): ', resposta: '####/####' },
       { texto: 'Matrícula do administrador inicial: ', resposta: opcoes.administrador.matricula },
       { texto: 'Nome do administrador inicial: ', resposta: opcoes.administrador.nome },
       { texto: 'Senha inicial do administrador (mínimo 12 caracteres): ', resposta: senhaAdmin },
@@ -671,11 +674,15 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarBlocosDof(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarProcessoDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarRascunhoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarBlocosDof(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarProcessoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -716,6 +723,7 @@ describe('fundação em recursos descartáveis', () => {
         publico_le_usuario: boolean; publico_usa_nucleo: boolean; alterar_matricula: boolean;
         alterar_rascunho: boolean; alterar_status: boolean; apagar_ajuste: boolean;
         alterar_bloco: boolean; apagar_bloco: boolean; alterar_versao_bloco: boolean;
+        alterar_processo_cifrado: boolean; alterar_processo_texto: boolean;
       }>(`
         SELECT has_any_column_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
                has_table_privilege(current_user, 'nucleo.pessoa', 'INSERT') AS inserir_pessoa,
@@ -730,6 +738,8 @@ describe('fundação em recursos descartáveis', () => {
                has_column_privilege(current_user, 'documentos.documento_bloco', 'texto_final_cifrado', 'UPDATE') AS alterar_bloco,
                has_table_privilege(current_user, 'documentos.documento_bloco', 'DELETE') AS apagar_bloco,
                has_table_privilege(current_user, 'documentos.bloco_versao', 'UPDATE') AS alterar_versao_bloco,
+               has_column_privilege(current_user, 'documentos.documento', 'processo_cifrado', 'UPDATE') AS alterar_processo_cifrado,
+               has_column_privilege(current_user, 'documentos.documento', 'processo_numero', 'UPDATE') AS alterar_processo_texto,
                EXISTS (
                  SELECT 1 FROM aclexplode((SELECT relacl FROM pg_class WHERE oid = 'seguranca.usuario'::regclass))
                  WHERE grantee = 0 AND privilege_type = 'SELECT'
@@ -744,6 +754,7 @@ describe('fundação em recursos descartáveis', () => {
         alterar_auditoria: false, apagar_auditoria: false, publico_le_usuario: false, publico_usa_nucleo: false,
         alterar_matricula: false, alterar_rascunho: true, alterar_status: false, apagar_ajuste: false,
         alterar_bloco: true, apagar_bloco: false, alterar_versao_bloco: false,
+        alterar_processo_cifrado: true, alterar_processo_texto: false,
       });
       await cliente.query('BEGIN');
       await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");
@@ -2295,6 +2306,137 @@ describe('fundação em recursos descartáveis', () => {
         ]));
         expect(JSON.stringify(eventosBlocos.rows)).not.toContain(motivoBlocos);
         expect(JSON.stringify(eventosBlocos.rows)).not.toContain(segundoBloco.texto);
+
+        const rotaProcesso = `/api/v1/documentos/${rascunhoBlocos.id}/processo`;
+        const pedidoProcesso = { revisao: 5, processo: '1234/5678', motivo: 'Processo fictício informado' };
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, cookie: analista.cookie,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...coordenador,
+        })).status).toBe(404);
+        for (const papel of ['secretario_adjunto', 'admin']) {
+          const sessao = sessoes.get(papel);
+          if (!sessao) throw new Error('Sessão sintética ausente.');
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...sessao,
+          })).status).toBe(403);
+        }
+        for (const invalido of [
+          { ...pedidoProcesso, processo: '12345678' },
+          { ...pedidoProcesso, processo: '<script>' },
+          { ...pedidoProcesso, motivo: ' ' },
+          { ...pedidoProcesso, processo: '1234/5678', status: 'conferido' },
+        ]) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: rotaProcesso, corpo: invalido, ...analista,
+          })).status).toBe(400);
+        }
+        const salvoProcesso = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...analista,
+        });
+        expect(salvoProcesso.status, salvoProcesso.corpo).toBe(200);
+        const documentoComProcesso = rascunhoDofSchema.parse(JSON.parse(salvoProcesso.corpo));
+        expect(documentoComProcesso).toMatchObject({
+          revisao: 6, processo: '1234/5678', mascarasProcesso: ['####/####'],
+        });
+        const protegidoProcesso = await cliente.query<{
+          processo_cifrado: Buffer; processo_numero: string | null;
+        }>('SELECT processo_cifrado, processo_numero FROM documentos.documento WHERE id = $1', [rascunhoBlocos.id]);
+        expect(protegidoProcesso.rows[0].processo_numero).toBeNull();
+        expect(protegidoProcesso.rows[0].processo_cifrado.includes(Buffer.from(pedidoProcesso.processo))).toBe(false);
+        expect(JSON.parse(protetor.decifrar(protegidoProcesso.rows[0].processo_cifrado, {
+          schema: 'documentos', tabela: 'documento', registroId: rascunhoBlocos.id, campo: 'processo_cifrado',
+        }).toString('utf8'))).toBe(pedidoProcesso.processo);
+        const ajusteProcesso = await cliente.query<{ id: string; valor_novo_cifrado: Buffer; motivo_cifrado: Buffer }>(`
+          SELECT id, valor_novo_cifrado, motivo_cifrado FROM documentos.ajuste_campo
+          WHERE documento_id = $1 AND campo = 'processo'
+        `, [rascunhoBlocos.id]);
+        expect(ajusteProcesso.rows).toHaveLength(1);
+        expect(ajusteProcesso.rows[0].valor_novo_cifrado.includes(Buffer.from(pedidoProcesso.processo))).toBe(false);
+        expect(ajusteProcesso.rows[0].motivo_cifrado.includes(Buffer.from(pedidoProcesso.motivo))).toBe(false);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...analista,
+        })).status).toBe(409);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaProcesso, corpo: { ...pedidoProcesso, revisao: 6 }, ...analista,
+        })).status).toBe(409);
+        const previaComProcesso = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaPrevia, cookie: analista.cookie,
+        });
+        expect(previaComProcesso.corpo).toContain(`Processo: ${pedidoProcesso.processo}.`);
+        const alteracoesProcesso = await Promise.all(['1111/1111', '2222/2222'].map((processo) =>
+          requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: rotaProcesso, corpo: { revisao: 6, processo, motivo: pedidoProcesso.motivo }, ...analista,
+          })));
+        expect(alteracoesProcesso.map((resposta) => resposta.status).sort()).toEqual([200, 409]);
+        const eventosProcesso = await cliente.query<{ acao: string; detalhes: unknown }>(`
+          SELECT acao, detalhes FROM seguranca.auditoria WHERE entidade_id = $1 AND acao = 'rascunho_processo_editado'
+        `, [rascunhoBlocos.id]);
+        expect(eventosProcesso.rows).toHaveLength(2);
+        expect(JSON.stringify(eventosProcesso.rows)).not.toContain(pedidoProcesso.processo);
+        const portaSemMascara = await portaLivre();
+        const arquivoSemMascara = path.join(temporario, 'config-sem-mascara-ficticia.json');
+        await writeFile(arquivoSemMascara, JSON.stringify({ ...config, porta: portaSemMascara, processos: undefined }));
+        const encerrarSemMascara = await iniciarServico(portaSemMascara, caPem, arquivoSemMascara);
+        try {
+          const loginSemMascara = await requisitarApi(portaSemMascara, caPem, {
+            metodo: 'POST', rota: '/api/v1/auth/login',
+            corpo: { matricula: 'CALCULO-ANALISTA-FICTICIO', senha },
+          });
+          expect(loginSemMascara.status, loginSemMascara.corpo).toBe(200);
+          const sessaoSemMascara = respostaSessaoSchema.parse(JSON.parse(loginSemMascara.corpo));
+          const cookieSemMascara = loginSemMascara.headers['set-cookie']?.[0].split(';')[0];
+          if (!cookieSemMascara) throw new Error('Cookie da sessão sintética sem máscara ausente.');
+          const semMascara = await requisitarApi(portaSemMascara, caPem, {
+            metodo: 'PATCH', rota: rotaProcesso,
+            corpo: { revisao: 7, processo: '3333/3333', motivo: pedidoProcesso.motivo },
+            cookie: cookieSemMascara, csrf: sessaoSemMascara.csrf,
+          });
+          expect(semMascara.status, semMascara.corpo).toBe(503);
+          expect(semMascara.corpo).toContain('Nenhuma máscara de processo foi configurada');
+          const remocaoSemConfirmacao = await requisitarApi(portaSemMascara, caPem, {
+            metodo: 'PATCH', rota: rotaProcesso,
+            corpo: { revisao: 7, processo: null, motivo: 'Remoção fictícia' },
+            cookie: cookieSemMascara, csrf: sessaoSemMascara.csrf,
+          });
+          expect(remocaoSemConfirmacao.status).toBe(400);
+          const remocao = await requisitarApi(portaSemMascara, caPem, {
+            metodo: 'PATCH', rota: rotaProcesso,
+            corpo: { revisao: 7, processo: null, motivo: 'Remoção fictícia', confirmarRemocao: true },
+            cookie: cookieSemMascara, csrf: sessaoSemMascara.csrf,
+          });
+          expect(remocao.status, remocao.corpo).toBe(200);
+          expect(rascunhoDofSchema.parse(JSON.parse(remocao.corpo))).toMatchObject({
+            revisao: 8, processo: null, mascarasProcesso: [],
+          });
+          const ultimoAjuste = await cliente.query<{
+            id: string; valor_original_cifrado: Buffer; valor_novo_cifrado: Buffer;
+          }>(`
+            SELECT id, valor_original_cifrado, valor_novo_cifrado FROM documentos.ajuste_campo
+            WHERE documento_id = $1 AND campo = 'processo' ORDER BY em DESC, id DESC LIMIT 1
+          `, [rascunhoBlocos.id]);
+          const ajusteRemocao = ultimoAjuste.rows[0];
+          expect(JSON.parse(protetor.decifrar(ajusteRemocao.valor_novo_cifrado, {
+            schema: 'documentos', tabela: 'ajuste_campo', registroId: ajusteRemocao.id, campo: 'valor_novo_cifrado',
+          }).toString('utf8'))).toBeNull();
+          expect(JSON.parse(protetor.decifrar(ajusteRemocao.valor_original_cifrado, {
+            schema: 'documentos', tabela: 'ajuste_campo', registroId: ajusteRemocao.id, campo: 'valor_original_cifrado',
+          }).toString('utf8'))).toMatch(/^(1111\/1111|2222\/2222)$/);
+        } finally {
+          await encerrarSemMascara();
+        }
+        await cliente.query('BEGIN');
+        try {
+          await cliente.query(`
+            UPDATE documentos.documento SET status = 'conferido', conferido_por = criado_por, conferido_em = now()
+            WHERE id = $1
+          `, [rascunhoBlocos.id]);
+          await rejeitarSql(cliente, 'UPDATE documentos.documento SET processo_cifrado = $1 WHERE id = $2',
+            [Buffer.from('alteração fictícia'), rascunhoBlocos.id], '55000');
+        } finally {
+          await cliente.query('ROLLBACK');
+        }
         expect((await cliente.query('SELECT count(*) FROM documentos.emissao')).rows[0].count)
           .toBe(estadoAntes.rows[0].emissoes);
       } finally {

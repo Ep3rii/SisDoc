@@ -10,6 +10,7 @@ import {
 } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { BlocosDof } from './blocos-dof';
+import { ProcessoDof } from './processo-dof';
 
 type Props = {
   pessoaId: string;
@@ -80,7 +81,8 @@ export function CalculoDof({
   const [ocupado, setOcupado] = useState(false);
   const [calculoPendente, setCalculoPendente] = useState(false);
   const [blocosPendentes, setBlocosPendentes] = useState(false);
-  const pendencias = useRef({ calculo: false, blocos: false });
+  const [processoPendente, setProcessoPendente] = useState(false);
+  const pendencias = useRef({ calculo: false, blocos: false, processo: false });
   const ativa = useRef(true);
   useEffect(() => {
     ativa.current = true;
@@ -90,13 +92,19 @@ export function CalculoDof({
   function marcarCalculo(valor: boolean) {
     pendencias.current.calculo = valor;
     setCalculoPendente(valor);
-    onPendente(valor || pendencias.current.blocos);
+    onPendente(valor || pendencias.current.blocos || pendencias.current.processo);
   }
 
   function marcarBlocos(valor: boolean) {
     pendencias.current.blocos = valor;
     setBlocosPendentes(valor);
-    onPendente(valor || pendencias.current.calculo);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.processo);
+  }
+
+  function marcarProcesso(valor: boolean) {
+    pendencias.current.processo = valor;
+    setProcessoPendente(valor);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos);
   }
 
   function invalidar() {
@@ -281,7 +289,7 @@ export function CalculoDof({
       <p className="etiqueta">Regra provisória (planilha). O cálculo não grava dados; salvar cria apenas um rascunho, sem conferir ou emitir.</p>
       <p>As ocorrências da fonte não são carregadas automaticamente. Confira os registros e informe os dias de cada intervalo; campos vazios serão tratados como zero somente após sua confirmação.</p>
       <form onSubmit={calcular}>
-        <fieldset disabled={ocupado || blocosPendentes || !admissaoAtual}>
+        <fieldset disabled={ocupado || blocosPendentes || processoPendente || !admissaoAtual}>
           <div className="grade">
             <label>Início do período<input type="date" value={inicio} required onChange={(evento) => { setInicio(evento.target.value); setTabela(null); invalidar(); }} /></label>
             <label>Fim do período<input type="date" value={fim} required onChange={(evento) => { setFim(evento.target.value); setTabela(null); invalidar(); }} /></label>
@@ -350,7 +358,7 @@ export function CalculoDof({
       )}
       {podeSalvar && resultado && pedidoCalculado && (
         <form className="separado" onSubmit={salvar}>
-          <fieldset disabled={ocupado || blocosPendentes}>
+          <fieldset disabled={ocupado || blocosPendentes || processoPendente}>
             {anosExcluidos.length > 0 && (
               <>
                 <p className="aviso erro">
@@ -372,7 +380,11 @@ export function CalculoDof({
         </form>
       )}
       {rascunho && podeSalvar && (
-        <BlocosDof rascunho={rascunho} csrf={csrf} bloqueado={calculoPendente || ocupado}
+        <ProcessoDof rascunho={rascunho} csrf={csrf} bloqueado={calculoPendente || blocosPendentes || ocupado}
+          onAtualizar={setRascunho} onPendente={marcarProcesso} onErro={onErro} onLimpar={onLimpar} />
+      )}
+      {rascunho && podeSalvar && (
+        <BlocosDof rascunho={rascunho} csrf={csrf} bloqueado={calculoPendente || processoPendente || ocupado}
           onAtualizar={setRascunho} onPendente={marcarBlocos} onErro={onErro} onLimpar={onLimpar} />
       )}
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}

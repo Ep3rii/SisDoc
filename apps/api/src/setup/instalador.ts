@@ -6,10 +6,11 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { Client } from 'pg';
 import { z } from 'zod';
-import { configuracaoSchema, type Configuracao } from '@sisdoc/contratos';
+import { configuracaoProcessosSchema, configuracaoSchema, type Configuracao } from '@sisdoc/contratos';
 import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
 import { aplicarAutenticacao } from '../migracoes/autenticacao';
 import { aplicarBlocosDof } from '../migracoes/blocos-dof';
+import { aplicarProcessoDof } from '../migracoes/processo-dof';
 import { aplicarConsulta } from '../migracoes/consulta';
 import { aplicarRascunhoDof } from '../migracoes/rascunho-dof';
 import { aplicarModelo } from '../migracoes/modelo';
@@ -38,6 +39,7 @@ const opcoesSchema = z.strictObject({
   }),
   sidServico: z.string().regex(/^S-1-(?:\d+-)+\d+$/i),
   listaSenhas: caminho,
+  processos: configuracaoProcessosSchema.optional(),
   administrador: z.strictObject({
     matricula: z.string().trim().min(1).max(100),
     nome: z.string().trim().min(3).max(200),
@@ -397,6 +399,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarConsulta(cliente, opcoes.banco.usuario);
     await aplicarRascunhoDof(cliente, opcoes.banco.usuario);
     await aplicarBlocosDof(cliente, opcoes.banco.usuario);
+    await aplicarProcessoDof(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,
@@ -410,6 +413,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
       tls,
       chaves: { cifra: randomBytes(32).toString('base64'), hmac: randomBytes(32).toString('base64') },
       seguranca: { listaSenhas },
+      ...(opcoes.processos ? { processos: opcoes.processos } : {}),
     });
     const arquivo = path.join(raiz, 'config', 'aplicacao.json');
     const handle = await open(arquivo, 'wx', 0o600);

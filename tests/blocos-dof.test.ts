@@ -61,7 +61,7 @@ describe('blocos e prévia provisória de DOF', () => {
   it('escapa dados e variáveis, destaca ausências e omite blocos inativos sem perder anos', () => {
     const html = renderizarPreviaDof({
       nome: 'Pessoa <img src=x onerror=alert(1)>', matricula: 'FICTICIA&1', revisao: 3,
-      resultado: resultadoSintetico(),
+      resultado: resultadoSintetico(), processo: null,
       blocos: [
         { ...bloco, texto: '</style><script>alert(1)</script> {{nome}} {{cargo}} {{constructor}} {{inicio}}' },
         { id: randomUUID(), codigo: 'complementares', ativo: false, texto: 'INATIVO-SINTETICO {{ausente}}' },
