@@ -210,7 +210,7 @@ fonte e precisa ter desempenho, falhas e ordenação reavaliados antes de
 importação ou sincronização.
 
 A pré-conferência agora verifica a integridade da cifra do nome da mãe e a
-validade técnica do texto, sem exibi-lo ou afirmar que corresponde à pessoa.
+validade técnica do texto, sem afirmar que corresponde à pessoa.
 Campo ausente continua como aviso, e cifra corrompida ou texto inválido geram
 bloqueio. O texto protegido usa UTF-8 diretamente no envelope cifrado; a
 importação futura deve observar esse contrato. `npm run typecheck` e os
@@ -231,6 +231,20 @@ incluindo autorização, integridade, escape de HTML, resposta obsoleta e
 concorrência. `npm run typecheck` passou e `npm audit` não apontou
 vulnerabilidades. Não houve conferência, aprovação de modelo ou emissão.
 
+O coordenador destinatário pode devolver o rascunho não conferido com motivo
+cifrado, visível apenas ao autor. A operação encerra o encaminhamento, cria
+nova revisão e não altera o status para conferido. A leitura do motivo e a
+devolução são auditadas sem o texto nos detalhes; conflitos, identidade do
+destinatário e concorrência com recolhimento são tratados explicitamente.
+Essa operação não substitui a futura devolução de documento conferido. A
+migração `010-devolucao-dof` só é aplicada em banco novo; não há procedimento
+aprovado para atualização de instalação existente. `npm run typecheck` e a
+suíte completa passaram (95 testes em 14 arquivos); `npm audit` não apontou
+vulnerabilidades. Os testes cobrem autorização, cifra, motivo inválido,
+revisão, concorrência e a interface com dados sintéticos. A prévia HTTPS de
+45 anos levou 11,7 ms; no navegador simulado, a atualização no limite dos
+blocos chegou a 87,3 ms, ou 167,7 ms com delimitadores malformados.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -250,4 +264,5 @@ Divergências e decisões estão em
 [011-preconferencia-dof.md](decisoes/011-preconferencia-dof.md) e
 [012-confirmacao-inicio-dof.md](decisoes/012-confirmacao-inicio-dof.md) e
 [013-identidade-fonte-dof.md](decisoes/013-identidade-fonte-dof.md) e
-[014-dados-fonte-previa-dof.md](decisoes/014-dados-fonte-previa-dof.md).
+[014-dados-fonte-previa-dof.md](decisoes/014-dados-fonte-previa-dof.md) e
+[015-devolucao-rascunho-dof.md](decisoes/015-devolucao-rascunho-dof.md).

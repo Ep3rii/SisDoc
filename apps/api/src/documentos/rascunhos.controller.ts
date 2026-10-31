@@ -2,7 +2,8 @@ import type { ServerResponse } from 'node:http';
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import {
   atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema,
-  confirmarInicioDofSchema, encaminharRascunhoDofSchema, paginaUuidQuerySchema, recolherRascunhoDofSchema,
+  confirmarInicioDofSchema, devolverRascunhoDofSchema, encaminharRascunhoDofSchema, paginaUuidQuerySchema,
+  recolherRascunhoDofSchema,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { z } from 'zod';
@@ -47,6 +48,12 @@ export class RascunhosController {
   @Get(':id')
   obter(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
     return this.rascunhos.obter(exigirSessao(req), ipRequisicao(req), idDocumento(id));
+  }
+
+  @ExigirAcao('criar_rascunho')
+  @Get(':id/ultima-devolucao')
+  ultimaDevolucao(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
+    return this.rascunhos.ultimaDevolucao(exigirSessao(req), ipRequisicao(req), idDocumento(id));
   }
 
   @ExigirAcao('criar_rascunho')
@@ -119,6 +126,14 @@ export class RascunhosController {
     const dados = encaminharRascunhoDofSchema.safeParse(corpo);
     if (!dados.success) throw new BadRequestException('Confira a revisão e o coordenador selecionado.');
     return this.rascunhos.encaminhar(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
+  }
+
+  @ExigirAcao('receber_encaminhamento')
+  @Post(':id/devolver')
+  devolver(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = devolverRascunhoDofSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira a revisão e informe o motivo da devolução.');
+    return this.rascunhos.devolver(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
   }
 
   @ExigirAcao('editar_rascunho')

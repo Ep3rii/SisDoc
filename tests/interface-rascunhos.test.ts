@@ -5,6 +5,7 @@ import {
   atualizarBlocosDofSchema,
   atualizarProcessoDofSchema,
   confirmarInicioDofSchema,
+  devolverRascunhoDofSchema,
   encaminharRascunhoDofSchema,
   processoCorrespondeMascara,
   criarRascunhoDofSchema,
@@ -35,6 +36,7 @@ type Simulacao = {
   papel: PapelTeste;
   admissao: string | null;
   rascunho: RascunhoDof | null;
+  autorId: string | null;
   conflito: boolean;
   falhaRede: boolean;
   falhaListagem: boolean;
@@ -47,6 +49,10 @@ type Simulacao = {
   liberarPrevia: (() => void) | null;
   adiarPreconferencia: boolean;
   liberarPreconferencia: (() => void) | null;
+  devolucao: { coordenadorNome: string; devolvidoEm: string; motivo: string } | null;
+  falhaConsultaDevolucao: boolean;
+  adiarConsultaDevolucao: boolean;
+  liberarConsultaDevolucao: (() => void) | null;
 };
 
 function resultadoSintetico(entrada: SolicitarCalculoDof, admissao: string): ResultadoCalculoDof {
@@ -99,10 +105,14 @@ async function responder(rota: Route, status: number, corpo: unknown) {
 
 async function simularApi(pagina: Page): Promise<Simulacao> {
   const estado: Simulacao = {
-    papel: 'analista', admissao: '1980-01-01', rascunho: null,
+    papel: 'analista', admissao: '1980-01-01', rascunho: null, autorId: null,
     conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [], previas: 0,
     adiarPrevia: false, liberarPrevia: null, adiarPreconferencia: false, liberarPreconferencia: null,
+    devolucao: null,
+    falhaConsultaDevolucao: false,
+    adiarConsultaDevolucao: false, liberarConsultaDevolucao: null,
   };
+  const usuarioAtual = () => estado.papel === 'coordenador' ? coordenadorId : usuarioId;
   await pagina.route('**/api/v1/**', async (rota) => {
     try {
       const requisicao = rota.request();
@@ -112,7 +122,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === '/api/v1/auth/me') {
         return responder(rota, 200, {
           usuario: {
-            id: estado.papel === 'coordenador' ? coordenadorId : usuarioId,
+            id: usuarioAtual(),
             matricula: 'OPERADOR-FICTICIO', nome: 'Operador Ficticio',
             papel: estado.papel, trocaSenhaObrigatoria: false,
           },
@@ -171,7 +181,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           pessoaId, vinculoId, nome: `Pessoa fictícia ${indice + 1}`, matricula,
           revisao: 1, atualizadoEm: '2026-01-01T12:00:00.000Z',
         }));
-        const itens = [...(estado.rascunho ? [resumo(estado.rascunho)] : []), ...extras]
+        const itens = [...(estado.rascunho && estado.autorId === usuarioAtual() ? [resumo(estado.rascunho)] : []), ...extras]
           .sort((a, b) => a.id.localeCompare(b.id));
         const cursor = endereco.searchParams.get('cursor');
         const seguintes = itens.filter((item) => !cursor || item.id > cursor);
@@ -193,11 +203,24 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           inicioAjustadoConfirmado: false, blocos: [], processo: null,
           mascarasProcesso: ['####/####'], encaminhamento: null,
         };
+        estado.autorId = usuarioAtual();
         estado.escritas += 1;
         return responder(rota, 201, estado.rascunho);
       }
       if (caminho === `/api/v1/documentos/${documentoId}` && metodo === 'GET' && estado.rascunho) {
+        if (estado.autorId !== usuarioAtual() && estado.rascunho.encaminhamento?.destinatarioId !== usuarioAtual()) {
+          return responder(rota, 404, { detail: 'Rascunho não encontrado.' });
+        }
         return responder(rota, 200, { ...estado.rascunho, admissao: estado.admissao });
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/ultima-devolucao` && metodo === 'GET' && estado.rascunho) {
+        if (estado.autorId !== usuarioAtual()) return responder(rota, 404, { detail: 'Rascunho não encontrado.' });
+        if (estado.falhaConsultaDevolucao) return responder(rota, 503, { detail: 'Falha sintética de devolução.' });
+        const resposta = { documentoId, revisao: estado.rascunho.revisao, devolucao: estado.devolucao };
+        if (estado.adiarConsultaDevolucao) {
+          await new Promise<void>((resolve) => { estado.liberarConsultaDevolucao = resolve; });
+        }
+        return responder(rota, 200, resposta);
       }
       if (caminho === `/api/v1/documentos/${documentoId}/dados-previa` && metodo === 'GET' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
@@ -280,6 +303,25 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
         };
         estado.escritas += 1;
         return responder(rota, 201, estado.rascunho);
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/devolver` && metodo === 'POST' && estado.rascunho) {
+        if (estado.falhaRede) return rota.abort('failed');
+        const dados = devolverRascunhoDofSchema.parse(requisicao.postDataJSON());
+        if (estado.papel !== 'coordenador' || estado.autorId === usuarioAtual()
+            || estado.rascunho.encaminhamento?.destinatarioId !== usuarioAtual()) {
+          return responder(rota, 404, { detail: 'Rascunho não encontrado.' });
+        }
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao) {
+          return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
+        }
+        const devolvidoEm = new Date().toISOString();
+        estado.devolucao = { coordenadorNome: 'Coordenador Ficticio', devolvidoEm, motivo: dados.motivo };
+        estado.rascunho = {
+          ...estado.rascunho, revisao: estado.rascunho.revisao + 1,
+          atualizadoEm: devolvidoEm, encaminhamento: null,
+        };
+        estado.escritas += 1;
+        return responder(rota, 201, { documentoId, revisao: estado.rascunho.revisao, devolvidoEm });
       }
       if (caminho === `/api/v1/documentos/${documentoId}/blocos` && metodo === 'PATCH' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
@@ -816,6 +858,71 @@ describe('interface de rascunhos com API sintética', () => {
     expect(estado.rascunho?.encaminhamento).toBeNull();
     expect(await pagina.getByLabel('Faltas em 1980').isEnabled()).toBe(true);
     expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
+  });
+
+  it('devolve rascunho com motivo e o apresenta somente ao autor sem interpretar HTML', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados fictícios');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByRole('button', { name: 'Escolher coordenador' }).click();
+    await pagina.getByLabel('Coordenador destinatário').selectOption(coordenadorId);
+    await pagina.getByRole('button', { name: 'Encaminhar rascunho' }).click();
+    await pagina.getByText('Rascunho encaminhado na revisão 2.', { exact: false }).waitFor();
+
+    estado.papel = 'coordenador';
+    await pagina.reload();
+    await pagina.getByRole('button', { name: 'Encaminhados a mim' }).click();
+    await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
+    await pagina.getByRole('heading', { name: 'Devolver para ajustes' }).waitFor();
+    expect(await pagina.getByRole('heading', { name: 'Última devolução para ajustes' }).count()).toBe(0);
+    const motivo = 'Ajustar dado fictício <img src="x" onerror="alert(1)">';
+    await pagina.getByLabel('Motivo da devolução').fill(motivo);
+    expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(1);
+    estado.conflito = true;
+    await pagina.getByRole('button', { name: 'Devolver rascunho' }).click();
+    await pagina.getByRole('alert').getByText(/O rascunho foi alterado/).waitFor();
+    expect(await pagina.getByLabel('Motivo da devolução').inputValue()).toBe(motivo);
+    estado.conflito = false;
+    estado.falhaRede = true;
+    await pagina.getByRole('button', { name: 'Devolver rascunho' }).click();
+    await pagina.getByRole('alert').getByText(/Não foi possível confirmar a devolução/).waitFor();
+    expect(estado.rascunho?.encaminhamento).not.toBeNull();
+    estado.falhaRede = false;
+    await pagina.getByRole('button', { name: 'Devolver rascunho' }).click();
+    await pagina.getByText('Rascunho devolvido para ajustes. Ele continua não conferido.').waitFor();
+    await pagina.getByText('Nenhum rascunho encontrado.').waitFor();
+    expect(estado.rascunho).toMatchObject({ revisao: 3, status: 'rascunho', encaminhamento: null });
+    expect(estado.devolucao?.motivo).toBe(motivo);
+    expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
+
+    estado.papel = 'analista';
+    await pagina.reload();
+    estado.falhaConsultaDevolucao = true;
+    await abrirRascunho(pagina);
+    await pagina.getByRole('alert').getByText('Falha sintética de devolução.').waitFor();
+    estado.falhaConsultaDevolucao = false;
+    await pagina.getByRole('button', { name: 'Tentar novamente', exact: true }).click();
+    await pagina.getByRole('heading', { name: 'Última devolução para ajustes' }).waitFor();
+    expect(await pagina.getByRole('alert').count()).toBe(0);
+    expect(await pagina.getByText(motivo, { exact: true }).count()).toBe(1);
+    expect(await pagina.locator('img[src="x"]').count()).toBe(0);
+    const armazenamentos = await pagina.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
+    expect(armazenamentos).not.toContain(motivo);
+    expect(await pagina.getByLabel('Faltas em 1980').isEnabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Conferir', exact: true }).count()).toBe(0);
+    estado.adiarConsultaDevolucao = true;
+    await pagina.getByLabel('Número do processo').fill('1234/5678');
+    await pagina.getByLabel('Motivo da alteração do processo').fill('Ajuste fictício após devolução');
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByText('Processo salvo na revisão 4.', { exact: false }).waitFor();
+    await expect.poll(() => estado.liberarConsultaDevolucao !== null).toBe(true);
+    expect(await pagina.getByText('Consultando devoluções...', { exact: true }).count()).toBe(1);
+    expect(await pagina.getByText(motivo, { exact: true }).count()).toBe(0);
+    estado.adiarConsultaDevolucao = false;
+    estado.liberarConsultaDevolucao?.();
+    await pagina.getByText(motivo, { exact: true }).waitFor();
   });
 
   it('mostra bloqueios preliminares e invalida o resultado diante de edições locais', async () => {

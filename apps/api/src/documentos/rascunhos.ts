@@ -9,7 +9,9 @@ import {
   processoCorrespondeMascara,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
+  resultadoDevolucaoDofSchema,
   solicitarCalculoDofSchema,
+  ultimaDevolucaoDofSchema,
   type AtualizarBlocosDof,
   type AtualizarProcessoDof,
   type AtualizarRascunhoDof,
@@ -19,6 +21,7 @@ import {
   type ConfirmarInicioDof,
   type CriarRascunhoDof,
   type DadosFontePreviaDof,
+  type DevolverRascunhoDof,
   type EncaminharRascunhoDof,
   type PaginaCoordenadoresDof,
   type PaginaEncaminhamentosDof,
@@ -26,7 +29,9 @@ import {
   type PreconferenciaDof,
   type RascunhoDof,
   type RecolherRascunhoDof,
+  type ResultadoDevolucaoDof,
   type SolicitarCalculoDof,
+  type UltimaDevolucaoDof,
 } from '@sisdoc/contratos';
 import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { z } from 'zod';
@@ -233,8 +238,8 @@ export class RascunhosService {
     bloquear?: 'leitura' | 'alteracao',
     permitirEncaminhado = false,
   ): Promise<LinhaRascunho | undefined> {
-    if (permitirEncaminhado && bloquear !== 'leitura') {
-      throw new Error('Acesso a encaminhamento requer bloqueio de leitura do rascunho.');
+    if (permitirEncaminhado && !bloquear) {
+      throw new Error('Acesso a encaminhamento requer bloqueio do rascunho.');
     }
     const consulta = await cliente.query<LinhaRascunho>(`
       SELECT d.id, d.pessoa_id, d.vinculo_id, d.criado_por, p.nome, v.matricula,
@@ -374,6 +379,55 @@ export class RascunhosService {
 
   async obter(sessao: SessaoAutenticada, ip: string, id: string): Promise<RascunhoDof> {
     return this.obterAuditado(sessao, ip, id);
+  }
+
+  async ultimaDevolucao(sessao: SessaoAutenticada, ip: string, id: string): Promise<UltimaDevolucaoDof> {
+    const tentativa = await transacao<Tentativa<UltimaDevolucaoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura');
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      const consulta = await cliente.query<{
+        id: string; coordenador_nome: string; recolhido_em: Date; motivo_cifrado: Buffer;
+      }>(`
+        SELECT e.id, u.nome AS coordenador_nome, e.recolhido_em, e.motivo_cifrado
+        FROM documentos.encaminhamento_dof e
+        JOIN seguranca.usuario u ON u.id = e.destinatario_id
+        WHERE e.documento_id = $1 AND e.recolhido_por = e.destinatario_id
+          AND e.recolhido_em IS NOT NULL
+        ORDER BY e.recolhido_em DESC, e.id DESC LIMIT 1
+      `, [id]);
+      const devolucao = consulta.rows[0];
+      let motivo: unknown = null;
+      if (devolucao) {
+        try {
+          motivo = this.ler('encaminhamento_dof', devolucao.id, 'motivo_cifrado', devolucao.motivo_cifrado);
+        } catch (erro) {
+          if (!(erro instanceof SyntaxError)
+              && (!(erro instanceof Error) || erro.message !== 'Dado protegido inválido ou corrompido.')) throw erro;
+          await auditarConsultaFuncional(cliente, sessao, 'devolucao_motivo_invalido', 'documento', id, linha.pessoa_id, ip);
+          return { falha: { tipo: 'conflito', mensagem: 'O motivo da devolução não pôde ser validado. Solicite a verificação de integridade e das chaves.' } };
+        }
+      }
+      const resultado = ultimaDevolucaoDofSchema.safeParse({
+        documentoId: id,
+        revisao: linha.revisao,
+        devolucao: devolucao ? {
+          coordenadorNome: devolucao.coordenador_nome,
+          devolvidoEm: devolucao.recolhido_em.toISOString(),
+          motivo,
+        } : null,
+      });
+      if (!resultado.success) {
+        await auditarConsultaFuncional(cliente, sessao, 'devolucao_motivo_invalido', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'O motivo da devolução não pôde ser validado. Solicite a verificação de integridade e das chaves.' } };
+      }
+      await auditarConsultaFuncional(cliente, sessao, 'devolucao_dof_consultada', 'documento', id, linha.pessoa_id, ip);
+      return { valor: resultado.data };
+    });
+    return concluir(tentativa);
   }
 
   async obterParaPrevia(
@@ -870,6 +924,42 @@ export class RascunhosService {
       const atualizado = await this.linha(cliente, id, sessao.usuario.id);
       if (!atualizado) throw new Error('Rascunho recolhido não pôde ser recuperado.');
       return { valor: await this.apresentar(cliente, atualizado) };
+    });
+    return concluir(tentativa);
+  }
+
+  async devolver(
+    sessao: SessaoAutenticada, ip: string, id: string, dados: DevolverRascunhoDof,
+  ): Promise<ResultadoDevolucaoDof> {
+    const tentativa = await transacao<Tentativa<ResultadoDevolucaoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('receber_encaminhamento'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao', true);
+      const encaminhamento = linha ? await this.encaminhamento(cliente, id) : undefined;
+      if (!linha || linha.criado_por === sessao.usuario.id || encaminhamento?.destinatario_id !== sessao.usuario.id) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
+      }
+      const encerrado = await cliente.query<{ recolhido_em: Date }>(`
+        UPDATE documentos.encaminhamento_dof
+        SET recolhido_por = $1, recolhido_em = now(), motivo_cifrado = $2
+        WHERE id = $3 RETURNING recolhido_em
+      `, [sessao.usuario.id, this.cifrar('encaminhamento_dof', encaminhamento.id, 'motivo_cifrado', dados.motivo),
+        encaminhamento.id]);
+      if (encerrado.rowCount !== 1) throw new Error('O encaminhamento não pôde ser devolvido.');
+      await cliente.query(`
+        UPDATE documentos.documento SET atualizado_por = $1, atualizado_em = now(), revisao = revisao + 1 WHERE id = $2
+      `, [sessao.usuario.id, id]);
+      await auditarConsultaFuncional(cliente, sessao, 'rascunho_devolvido', 'documento', id, linha.pessoa_id, ip,
+        { destinatarioId: sessao.usuario.id });
+      return {
+        valor: resultadoDevolucaoDofSchema.parse({
+          documentoId: id, revisao: linha.revisao + 1, devolvidoEm: encerrado.rows[0].recolhido_em.toISOString(),
+        }),
+      };
     });
     return concluir(tentativa);
   }

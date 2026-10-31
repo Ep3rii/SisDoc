@@ -3,6 +3,7 @@ import type { Client } from 'pg';
 const versoesConhecidas = [
   '000-fundacao', '001-modelo', '002-autenticacao', '003-consulta', '004-rascunho-dof', '005-blocos-dof',
   '006-processo-dof', '007-encaminhamento-dof', '008-preconferencia-dof', '009-confirmacao-inicio-dof',
+  '010-devolucao-dof',
 ] as const;
 export type VersaoMigracao = typeof versoesConhecidas[number];
 

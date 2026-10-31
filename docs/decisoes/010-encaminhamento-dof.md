@@ -12,13 +12,14 @@ registra conferência e não autoriza emissão.
 
 Enquanto o encaminhamento estiver ativo, o próprio autor também não pode
 alterar cálculo, período, processo ou blocos. Antes de editar ou trocar o
-destinatário, deve recolher o encaminhamento com um motivo. Há no máximo um
+destinatário, deve recolher o encaminhamento com um motivo ou receber a
+[devolução do destinatário](015-devolucao-rascunho-dof.md). Há no máximo um
 encaminhamento ativo por documento; revisões concorrentes são recusadas.
 Gatilhos do banco complementam as validações da API e bloqueiam alteração do
 conteúdo e dos itens enquanto houver encaminhamento ativo.
 
-Envio e recolhimento incrementam a revisão e são auditados, com o identificador
-do destinatário, sem texto do motivo. O motivo de recolhimento é cifrado e o
+Envio, recolhimento e devolução incrementam a revisão e são auditados, com o identificador
+do destinatário, sem texto do motivo. Os motivos de recolhimento e devolução são cifrados e o
 registro encerrado é imutável. A leitura do destinatário é revalidada depois de
 obter o bloqueio de leitura do documento, para impedir que uma consulta em
 espera aceite um encaminhamento já recolhido. Se o destinatário deixar de ser

@@ -11,7 +11,9 @@ import {
   detalheServidorSchema,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
+  resultadoDevolucaoDofSchema,
   respostaSessaoSchema,
+  ultimaDevolucaoDofSchema,
   usuarioAdministrativoSchema,
   type AtualizarUsuario,
   type AtualizarBlocosDof,
@@ -21,6 +23,7 @@ import {
   type CriarUsuario,
   type ConfirmarInicioDof,
   type DadosFontePreviaDof,
+  type DevolverRascunhoDof,
   type DetalheServidor,
   type PaginaAuditoria,
   type PaginaBuscaServidores,
@@ -33,11 +36,13 @@ import {
   type PreconferenciaDof,
   type RascunhoDof,
   type RecolherRascunhoDof,
+  type ResultadoDevolucaoDof,
   type RespostaSessao,
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
   type TipoBuscaServidor,
   type UsuarioAdministrativo,
+  type UltimaDevolucaoDof,
 } from '@sisdoc/contratos';
 
 export class ErroApi extends Error {
@@ -160,6 +165,9 @@ export const api = {
   async obterRascunhoDof(id: string): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}`));
   },
+  async ultimaDevolucaoDof(id: string): Promise<UltimaDevolucaoDof> {
+    return validar(ultimaDevolucaoDofSchema, await requisitar(`documentos/${id}/ultima-devolucao`));
+  },
   async criarRascunhoDof(csrf: string, dados: CriarRascunhoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar('documentos', 'POST', dados, csrf));
   },
@@ -177,6 +185,9 @@ export const api = {
   },
   async encaminharRascunhoDof(csrf: string, id: string, dados: EncaminharRascunhoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/encaminhar`, 'POST', dados, csrf));
+  },
+  async devolverRascunhoDof(csrf: string, id: string, dados: DevolverRascunhoDof): Promise<ResultadoDevolucaoDof> {
+    return validar(resultadoDevolucaoDofSchema, await requisitar(`documentos/${id}/devolver`, 'POST', dados, csrf));
   },
   async recolherRascunhoDof(csrf: string, id: string, dados: RecolherRascunhoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/recolher`, 'POST', dados, csrf));

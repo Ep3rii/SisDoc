@@ -11,6 +11,7 @@ import {
 import { api, ErroApi } from './api';
 import { BlocosDof } from './blocos-dof';
 import { ConfirmacaoInicioDof } from './confirmacao-inicio-dof';
+import { DevolverRascunhoDof, UltimaDevolucaoDof } from './devolucao-dof';
 import { EncaminhamentoDof } from './encaminhamento-dof';
 import { VerificacaoConferenciaDof } from './preconferencia-dof';
 import { ProcessoDof } from './processo-dof';
@@ -25,7 +26,7 @@ type Props = {
   podeSalvar: boolean;
   somenteLeitura?: boolean;
   rascunhoInicial?: RascunhoDof;
-  onFechar: () => void;
+  onFechar: (mensagem?: string) => void;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
@@ -293,6 +294,8 @@ export function CalculoDof({
       <h4 id="calculo-dof-titulo">Cálculo de referência — DOF</h4>
       <p>{rascunho?.nome ?? nome} — matrícula {rascunho?.matricula ?? matricula}. Admissão na fonte: {admissaoAtual ?? 'não informada'}.</p>
       {rascunho && <p>{somenteLeitura ? 'Rascunho encaminhado' : 'Rascunho próprio'} — revisão {rascunho.revisao}. Ainda não conferido nem emitido.</p>}
+      {rascunho && podeSalvar && !somenteLeitura
+        && <UltimaDevolucaoDof rascunho={rascunho} onErro={onErro} onLimpar={onLimpar} />}
       {rascunho && admissaoAtual !== rascunho.resultado.admissaoConsiderada && (
         <p className="aviso erro" role="alert">
           A admissão considerada no resultado salvo foi {rascunho.resultado.admissaoConsiderada}, diferente da fonte atual.
@@ -427,8 +430,14 @@ export function CalculoDof({
           onAtualizar={setRascunho} onPendente={marcarEncaminhamento} onOcupado={setOperacaoEncaminhamento}
           onErro={onErro} onLimpar={onLimpar} />
       )}
+      {rascunho && somenteLeitura && rascunho.encaminhamento && (
+        <DevolverRascunhoDof rascunho={rascunho} csrf={csrf}
+          bloqueado={ocupado} onPendente={marcarEncaminhamento} onOcupado={setOperacaoEncaminhamento}
+          onDevolvido={() => onFechar('Rascunho devolvido para ajustes. Ele continua não conferido.')}
+          onErro={onErro} onLimpar={onLimpar} />
+      )}
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
-      <div className="acoes"><button type="button" className="secundario" disabled={ocupado} onClick={() => {
+      <div className="acoes"><button type="button" className="secundario" disabled={ocupado || operacaoEncaminhamento} onClick={() => {
         if (confirmarSaida()) { onPendente(false); onFechar(); }
       }}>
         {somenteLeitura ? 'Voltar aos encaminhados' : rascunhoInicial ? 'Voltar aos meus rascunhos' : 'Fechar cálculo'}

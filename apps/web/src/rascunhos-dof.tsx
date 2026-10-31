@@ -18,6 +18,7 @@ export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPend
   const [rascunho, setRascunho] = useState<RascunhoDof | null>(null);
   const [abrindo, setAbrindo] = useState<string | null>(null);
   const [falhou, setFalhou] = useState(false);
+  const [mensagem, setMensagem] = useState('');
   const [versao, setVersao] = useState(0);
   const ativa = useRef(true);
 
@@ -42,6 +43,7 @@ export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPend
   async function abrir(id: string) {
     try {
       onLimpar();
+      setMensagem('');
       setAbrindo(id);
       const resultado = await api.obterRascunhoDof(id);
       if (ativa.current) setRascunho(resultado);
@@ -59,7 +61,7 @@ export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPend
         nome={rascunho.nome} matricula={rascunho.matricula} admissao={rascunho.admissao}
         csrf={csrf} podeSalvar={!recebidos} somenteLeitura={recebidos} rascunhoInicial={rascunho} onErro={onErro} onLimpar={onLimpar}
         onPendente={onPendente} confirmarSaida={confirmarSaida}
-        onFechar={() => { setRascunho(null); setVersao((atual) => atual + 1); onLimpar(); }}
+        onFechar={(aviso) => { setRascunho(null); setVersao((atual) => atual + 1); onLimpar(); setMensagem(aviso ?? ''); }}
       />
     );
   }
@@ -68,8 +70,9 @@ export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPend
     <section aria-labelledby="rascunhos-titulo">
       <h2 id="rascunhos-titulo">{recebidos ? 'Rascunhos encaminhados a mim' : 'Meus rascunhos de DOF'}</h2>
       <p>{recebidos
-        ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta. A conferência ainda não está disponível.'
+        ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta e devolução. A conferência ainda não está disponível.'
         : 'Somente rascunhos de sua autoria são exibidos. Você pode encaminhá-los a um coordenador para análise.'}</p>
+      {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {falhou ? (
         <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>
           Tentar carregar rascunhos novamente

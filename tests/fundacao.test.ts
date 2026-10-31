@@ -23,7 +23,9 @@ import {
   preconferenciaDofSchema,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
+  resultadoDevolucaoDofSchema,
   respostaSessaoSchema,
+  ultimaDevolucaoDofSchema,
   usuarioAdministrativoSchema,
 } from '@sisdoc/contratos';
 import { verify } from 'argon2';
@@ -38,6 +40,7 @@ import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarBlocosDof } from '../apps/api/dist/migracoes/blocos-dof.js';
 import { aplicarConfirmacaoInicioDof } from '../apps/api/dist/migracoes/confirmacao-inicio-dof.js';
+import { aplicarDevolucaoDof } from '../apps/api/dist/migracoes/devolucao-dof.js';
 import { aplicarEncaminhamentoDof } from '../apps/api/dist/migracoes/encaminhamento-dof.js';
 import { aplicarPreconferenciaDof, CHAVE_BLOQUEIO_FONTE_DOF } from '../apps/api/dist/migracoes/preconferencia-dof.js';
 import { aplicarProcessoDof } from '../apps/api/dist/migracoes/processo-dof.js';
@@ -693,6 +696,9 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarConfirmacaoInicioDof(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarDevolucaoDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
@@ -702,6 +708,7 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarEncaminhamentoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarPreconferenciaDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConfirmacaoInicioDof(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarDevolucaoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -2656,7 +2663,7 @@ describe('fundação em recursos descartáveis', () => {
     }
   });
 
-  it('encaminha DOF somente ao coordenador escolhido e recolhe sem permitir edição concorrente', async () => {
+  it('encaminha, recolhe ou devolve DOF com acesso e concorrência controlados', async () => {
     const config = await carregarConfiguracao(arquivoConfig);
     const protetor = new ProtetorDados(config.chaves);
     const cliente = new Client({
@@ -3437,6 +3444,228 @@ describe('fundação em recursos descartáveis', () => {
           await gravador.end();
           await encaminhador.end();
         }
+        const abertoParaDevolucao = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: autor.cookie });
+        const antesDeDevolver = rascunhoDofSchema.parse(JSON.parse(abertoParaDevolucao.corpo));
+        expect(antesDeDevolver.encaminhamento?.destinatarioId).toBe(destinatarioId);
+        const rotaUltimaDevolucao = `${rota}/ultima-devolucao`;
+        const semDevolucao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaUltimaDevolucao, cookie: autor.cookie,
+        });
+        expect(semDevolucao.status, semDevolucao.corpo).toBe(200);
+        expect(ultimaDevolucaoDofSchema.parse(JSON.parse(semDevolucao.corpo))).toEqual({
+          documentoId: rascunho.id, revisao: antesDeDevolver.revisao, devolucao: null,
+        });
+        expect(semDevolucao.headers['cache-control']).toContain('no-store');
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaUltimaDevolucao, cookie: primeiro.cookie,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaUltimaDevolucao, cookie: sessao('outro-analista').cookie,
+        })).status).toBe(404);
+        for (const chave of ['administrador', 'secretario']) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: rotaUltimaDevolucao, cookie: sessao(chave).cookie,
+          })).status).toBe(403);
+        }
+        const motivoDevolucao = 'Ajuste fictício: revisar a data e os lançamentos.';
+        const pedidoDevolucao = { revisao: antesDeDevolver.revisao, motivo: motivoDevolucao };
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...autor,
+        })).status).toBe(403);
+        for (const chave of ['administrador', 'secretario']) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...sessao(chave),
+          })).status).toBe(403);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...segundo,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, cookie: primeiro.cookie,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/devolver`,
+          corpo: { ...pedidoDevolucao, motivo: ' ' }, ...primeiro,
+        })).status).toBe(400);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/devolver`,
+          corpo: { ...pedidoDevolucao, revisao: antesDeDevolver.revisao - 1 }, ...primeiro,
+        })).status).toBe(409);
+
+        const encaminhamentoParaDevolver = await cliente.query<{ id: string }>(`
+          SELECT id FROM documentos.encaminhamento_dof WHERE documento_id = $1 AND recolhido_em IS NULL
+        `, [rascunho.id]);
+        const idEncaminhamento = encaminhamentoParaDevolver.rows[0].id;
+        const tentativaSql = `
+          UPDATE documentos.encaminhamento_dof
+          SET recolhido_por = $1, recolhido_em = now(), motivo_cifrado = $2 WHERE id = $3
+        `;
+        await cliente.query('BEGIN');
+        try {
+          await rejeitarSql(cliente, tentativaSql, [outroCoordenadorId, Buffer.from('teste'), idEncaminhamento], '55000');
+          await cliente.query("UPDATE seguranca.usuario SET papel = 'analista' WHERE id = $1", [destinatarioId]);
+          await rejeitarSql(cliente, tentativaSql, [destinatarioId, Buffer.from('teste'), idEncaminhamento], '23514');
+        } finally {
+          await cliente.query('ROLLBACK');
+        }
+
+        const devolvido = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...primeiro,
+        });
+        expect(devolvido.status, devolvido.corpo).toBe(201);
+        expect(resultadoDevolucaoDofSchema.parse(JSON.parse(devolvido.corpo))).toMatchObject({
+          documentoId: rascunho.id, revisao: antesDeDevolver.revisao + 1,
+        });
+        expect(devolvido.corpo).not.toContain(motivoDevolucao);
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: primeiro.cookie })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...primeiro,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/recolher`,
+          corpo: { revisao: antesDeDevolver.revisao + 1, motivo: 'Recolhimento tardio fictício' }, ...autor,
+        })).status).toBe(409);
+        const consultaDevolucao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaUltimaDevolucao, cookie: autor.cookie,
+        });
+        expect(consultaDevolucao.status, consultaDevolucao.corpo).toBe(200);
+        expect(ultimaDevolucaoDofSchema.parse(JSON.parse(consultaDevolucao.corpo))).toMatchObject({
+          documentoId: rascunho.id, revisao: antesDeDevolver.revisao + 1,
+          devolucao: { coordenadorNome: 'Usuário fictício primeiro-coordenador', motivo: motivoDevolucao },
+        });
+        const registroDevolucao = await cliente.query<{
+          recolhido_por: string; motivo_cifrado: Buffer;
+        }>('SELECT recolhido_por, motivo_cifrado FROM documentos.encaminhamento_dof WHERE id = $1', [idEncaminhamento]);
+        expect(registroDevolucao.rows[0].recolhido_por).toBe(destinatarioId);
+        expect(registroDevolucao.rows[0].motivo_cifrado.includes(Buffer.from(motivoDevolucao))).toBe(false);
+        expect(JSON.parse(protetor.decifrar(registroDevolucao.rows[0].motivo_cifrado, {
+          schema: 'documentos', tabela: 'encaminhamento_dof', registroId: idEncaminhamento, campo: 'motivo_cifrado',
+        }).toString('utf8'))).toBe(motivoDevolucao);
+        await cliente.query('BEGIN');
+        try {
+          await rejeitarSql(cliente, tentativaSql, [destinatarioId, Buffer.from('novo'), idEncaminhamento], '55000');
+        } finally {
+          await cliente.query('ROLLBACK');
+        }
+        const rascunhoDevolvido = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: autor.cookie });
+        expect(rascunhoDofSchema.parse(JSON.parse(rascunhoDevolvido.corpo))).toMatchObject({
+          revisao: antesDeDevolver.revisao + 1, status: 'rascunho', encaminhamento: null,
+        });
+        const alteradoDepois = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `${rota}/processo`,
+          corpo: { revisao: antesDeDevolver.revisao + 1, processo: '4321/8765', motivo: 'Ajuste fictício solicitado' },
+          ...autor,
+        });
+        expect(alteradoDepois.status, alteradoDepois.corpo).toBe(200);
+        const depoisDoAjuste = rascunhoDofSchema.parse(JSON.parse(alteradoDepois.corpo));
+        const reencaminhado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/encaminhar`,
+          corpo: { revisao: depoisDoAjuste.revisao, destinatarioId }, ...autor,
+        });
+        expect(reencaminhado.status, reencaminhado.corpo).toBe(201);
+        const paraCorrida = rascunhoDofSchema.parse(JSON.parse(reencaminhado.corpo));
+        const bloqueadorDevolucao = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await bloqueadorDevolucao.connect();
+        let recolhimentoConfirmado = false;
+        try {
+          await bloqueadorDevolucao.query('BEGIN');
+          await bloqueadorDevolucao.query('SELECT id FROM documentos.documento WHERE id = $1 FOR UPDATE', [rascunho.id]);
+          const atual = await bloqueadorDevolucao.query<{ id: string }>(`
+            SELECT id FROM documentos.encaminhamento_dof WHERE documento_id = $1 AND recolhido_em IS NULL
+          `, [rascunho.id]);
+          await bloqueadorDevolucao.query(tentativaSql, [
+            porChave('autor').id,
+            protetor.cifrar(Buffer.from(JSON.stringify('Recolhimento concorrente')), {
+              schema: 'documentos', tabela: 'encaminhamento_dof', registroId: atual.rows[0].id, campo: 'motivo_cifrado',
+            }),
+            atual.rows[0].id,
+          ]);
+          await bloqueadorDevolucao.query('UPDATE documentos.documento SET revisao = revisao + 1 WHERE id = $1', [rascunho.id]);
+          let finalizada = false;
+          const devolucaoConcorrente = requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/devolver`,
+            corpo: { revisao: paraCorrida.revisao, motivo: 'Devolução concorrente fictícia' }, ...primeiro,
+          });
+          void devolucaoConcorrente.then(() => { finalizada = true; }, () => { finalizada = true; });
+          await delay(200);
+          expect(finalizada).toBe(false);
+          await bloqueadorDevolucao.query('COMMIT');
+          recolhimentoConfirmado = true;
+          expect((await devolucaoConcorrente).status).toBe(404);
+        } finally {
+          if (!recolhimentoConfirmado) await bloqueadorDevolucao.query('ROLLBACK');
+          await bloqueadorDevolucao.end();
+        }
+        for (const defeito of ['cifra', 'texto'] as const) {
+          const antes = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: autor.cookie });
+          const atual = rascunhoDofSchema.parse(JSON.parse(antes.corpo));
+          const novoEncaminhamento = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/encaminhar`, corpo: { revisao: atual.revisao, destinatarioId }, ...autor,
+          });
+          expect(novoEncaminhamento.status, novoEncaminhamento.corpo).toBe(201);
+          await cliente.query('BEGIN');
+          try {
+            const registro = await cliente.query<{ id: string }>(`
+              SELECT id FROM documentos.encaminhamento_dof WHERE documento_id = $1 AND recolhido_em IS NULL
+            `, [rascunho.id]);
+            const registroId = registro.rows[0].id;
+            const conteudo = defeito === 'cifra' ? Buffer.from('cifra sintética inválida')
+              : protetor.cifrar(Buffer.from(JSON.stringify(' ')), {
+                schema: 'documentos', tabela: 'encaminhamento_dof', registroId, campo: 'motivo_cifrado',
+              });
+            await cliente.query(tentativaSql, [destinatarioId, conteudo, registroId]);
+            await cliente.query('UPDATE documentos.documento SET revisao = revisao + 1 WHERE id = $1', [rascunho.id]);
+            await cliente.query('COMMIT');
+          } catch (erro) {
+            await cliente.query('ROLLBACK');
+            throw erro;
+          }
+          const invalida = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: rotaUltimaDevolucao, cookie: autor.cookie,
+          });
+          expect(invalida.status, invalida.corpo).toBe(409);
+          expect(invalida.corpo).toContain('integridade');
+        }
+        const eventosDevolucao = await cliente.query<{ acao: string; detalhes: unknown }>(`
+          SELECT acao, detalhes FROM seguranca.auditoria WHERE entidade_id = $1
+        `, [rascunho.id]);
+        expect(eventosDevolucao.rows.map((evento) => evento.acao)).toEqual(expect.arrayContaining([
+          'rascunho_devolvido', 'devolucao_dof_consultada', 'devolucao_motivo_invalido',
+        ]));
+        expect(JSON.stringify(eventosDevolucao.rows)).not.toContain(motivoDevolucao);
+        expect(JSON.stringify(eventosDevolucao.rows)).not.toContain(cpf);
+        expect((await cliente.query('SELECT count(*) FROM documentos.emissao WHERE documento_id = $1', [rascunho.id])).rows[0].count).toBe('0');
+
+        const proprioCoordenador = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos',
+          corpo: { calculo, admissaoEsperada: '1980-01-01', motivo: 'Rascunho fictício do coordenador' }, ...primeiro,
+        });
+        expect(proprioCoordenador.status, proprioCoordenador.corpo).toBe(201);
+        const outroDocumento = rascunhoDofSchema.parse(JSON.parse(proprioCoordenador.corpo));
+        const outraRota = `/api/v1/documentos/${outroDocumento.id}`;
+        const enviadoOutro = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${outraRota}/encaminhar`,
+          corpo: { revisao: outroDocumento.revisao, destinatarioId: outroCoordenadorId }, ...primeiro,
+        });
+        expect(enviadoOutro.status, enviadoOutro.corpo).toBe(201);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${outraRota}/devolver`,
+          corpo: { revisao: outroDocumento.revisao + 1, motivo: 'Não sou o destinatário' }, ...primeiro,
+        })).status).toBe(404);
+        const segundaDevolucao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${outraRota}/devolver`,
+          corpo: { revisao: outroDocumento.revisao + 1, motivo: 'Ajuste ao autor coordenador' }, ...segundo,
+        });
+        expect(segundaDevolucao.status, segundaDevolucao.corpo).toBe(201);
+        const motivoAoCoordenador = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${outraRota}/ultima-devolucao`, cookie: primeiro.cookie,
+        });
+        expect(motivoAoCoordenador.status, motivoAoCoordenador.corpo).toBe(200);
+        expect(ultimaDevolucaoDofSchema.parse(JSON.parse(motivoAoCoordenador.corpo)).devolucao?.motivo)
+          .toBe('Ajuste ao autor coordenador');
       } finally {
         await encerrar();
       }

@@ -53,6 +53,7 @@ button.cabecalho-botao { color: #fff; background: transparent; border-color: #ff
 .marcador { display: flex !important; align-items: center; gap: .5rem; }
 .marcador input { width: 1.1rem; height: 1.1rem; }
 .aviso { padding: .8rem 1rem; border-left: .3rem solid; }
+.texto-devolucao { white-space: pre-wrap; overflow-wrap: anywhere; }
 .erro { color: #7d1717; background: #fff0ef; border-color: #a52a2a; }
 .sucesso { color: #14532d; background: #eaf7ed; border-color: #18753a; }
 .tabela { overflow-x: auto; background: #fff; }

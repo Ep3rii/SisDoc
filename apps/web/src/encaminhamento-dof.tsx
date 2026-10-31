@@ -96,11 +96,11 @@ export function EncaminhamentoDof({
   return (
     <section className="separado" aria-labelledby="encaminhamento-dof-titulo">
       <h4 id="encaminhamento-dof-titulo">Encaminhamento para análise</h4>
-      <p>O coordenador escolhido poderá somente consultar o rascunho e a prévia. A conferência e a emissão ainda não estão disponíveis.</p>
+      <p>O coordenador escolhido poderá consultar o rascunho e a prévia ou devolvê-lo para ajustes. A conferência e a emissão ainda não estão disponíveis.</p>
       {bloqueado && <p className="aviso erro">Salve ou descarte as alterações de cálculo, processo e blocos antes de encaminhar.</p>}
       {rascunho.encaminhamento ? (
         <form onSubmit={salvar}>
-          <p>Encaminhado a <strong>{rascunho.encaminhamento.destinatarioNome}</strong>. As edições estão bloqueadas até o recolhimento.</p>
+          <p>Encaminhado a <strong>{rascunho.encaminhamento.destinatarioNome}</strong>. As edições estão bloqueadas até o recolhimento ou a devolução.</p>
           {!rascunho.encaminhamento.destinatarioDisponivel && (
             <p className="aviso erro" role="alert">O destinatário deixou de ser coordenador ativo e não pode acessar o rascunho. Recolha e escolha outro.</p>
           )}

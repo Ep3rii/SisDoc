@@ -55,6 +55,6 @@ Na execução completa, a abertura auditada de 45 anos por HTTPS descartável
 levou 7,5 ms, e a maior das cinco edições no limite de 200 blocos e 20.000
 caracteres até aparecer no iframe levou 84,7 ms. O navegador simulado não
 comprova integração à CA operacional. Conferência,
-encaminhamento, numeração, snapshot, PDF, histórico, edição administrativa
+numeração, snapshot, PDF, histórico, edição administrativa
 de modelos e reconhecimento de todas as variáveis continuam pendentes. Não
 existe autorização para emissão ou uso operacional.

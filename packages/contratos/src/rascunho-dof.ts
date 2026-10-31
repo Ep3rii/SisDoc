@@ -58,6 +58,24 @@ export const recolherRascunhoDofSchema = z.strictObject({
   motivo: motivoSchema,
 });
 
+export const devolverRascunhoDofSchema = recolherRascunhoDofSchema;
+
+export const resultadoDevolucaoDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  devolvidoEm: z.iso.datetime(),
+});
+
+export const ultimaDevolucaoDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  devolucao: z.strictObject({
+    coordenadorNome: z.string().min(1),
+    devolvidoEm: z.iso.datetime(),
+    motivo: motivoSchema,
+  }).nullable(),
+});
+
 export const confirmarInicioDofSchema = z.strictObject({
   revisao: revisaoSchema,
   confirmar: z.literal(true),
@@ -210,6 +228,9 @@ export type CriarRascunhoDof = z.infer<typeof criarRascunhoDofSchema>;
 export type AtualizarRascunhoDof = z.infer<typeof atualizarRascunhoDofSchema>;
 export type EncaminharRascunhoDof = z.infer<typeof encaminharRascunhoDofSchema>;
 export type RecolherRascunhoDof = z.infer<typeof recolherRascunhoDofSchema>;
+export type DevolverRascunhoDof = z.infer<typeof devolverRascunhoDofSchema>;
+export type ResultadoDevolucaoDof = z.infer<typeof resultadoDevolucaoDofSchema>;
+export type UltimaDevolucaoDof = z.infer<typeof ultimaDevolucaoDofSchema>;
 export type ConfirmarInicioDof = z.infer<typeof confirmarInicioDofSchema>;
 export type PaginaCoordenadoresDof = z.infer<typeof paginaCoordenadoresDofSchema>;
 export type PaginaEncaminhamentosDof = z.infer<typeof paginaEncaminhamentosDofSchema>;
