@@ -1,7 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
-import { VERSAO_RASCUNHO_DOF } from './migracoes/rascunho-dof';
+import { VERSAO_BLOCOS_DOF } from './migracoes/blocos-dof';
 
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
@@ -18,7 +18,7 @@ async function iniciar(): Promise<void> {
   try {
     const resultado = await banco.query<{ atual: boolean }>(
       'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
-      [VERSAO_RASCUNHO_DOF],
+      [VERSAO_BLOCOS_DOF],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {
@@ -33,7 +33,7 @@ async function iniciar(): Promise<void> {
   }
   if (!migracaoAtual) {
     await banco.end();
-    throw new Error('O banco não possui a migração de rascunho DOF; atualizações existentes ainda exigem procedimento seguro.');
+    throw new Error('O banco não possui a migração de blocos DOF; atualizações existentes ainda exigem procedimento seguro.');
   }
   let app;
   try {

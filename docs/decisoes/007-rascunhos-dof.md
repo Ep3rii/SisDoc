@@ -31,7 +31,7 @@ referência incorreta.
 
 A migração `004-rascunho-dof` cria a revisão e referências técnicas
 provisórias para regra e template. O template é somente um marcador de que
-não existe modelo oficial aprovado; ele não permite prévia ou emissão. A conta
+não existe modelo oficial aprovado; ele não constitui modelo para emissão. A conta
 da aplicação recebe privilégios de colunas para rascunhos e inserção de
 ajustes, mas não para alterar status ou inserir emissões. O setup aplica a
 migração em banco vazio; não há procedimento autorizado para atualizar uma
@@ -53,6 +53,8 @@ reabrir. Antes de implementar sincronização concorrente, é necessária uma
 estratégia transacional testada que evite gravar um resultado já defasado sem
 conceder ao aplicativo privilégios de alteração da fonte.
 
-Faltam editor de blocos, prévia segura, conferência, numeração, snapshot,
-worker/PDF e histórico. A fatia 5 não cumpriu seu gate e nenhuma funcionalidade
-está autorizada para uso operacional.
+O editor e a prévia provisória posteriores estão descritos na
+[decisão 008](008-blocos-e-previa-dof.md); eles não alteram a condição do
+template. Faltam conferência, numeração, snapshot, worker/PDF e histórico.
+A fatia 5 não cumpriu seu gate e nenhuma funcionalidade está autorizada para
+uso operacional.

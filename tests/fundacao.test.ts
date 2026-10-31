@@ -32,6 +32,7 @@ import { HealthController } from '../apps/api/dist/app.module.js';
 import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
+import { aplicarBlocosDof } from '../apps/api/dist/migracoes/blocos-dof.js';
 import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
 import { aplicarRascunhoDof } from '../apps/api/dist/migracoes/rascunho-dof.js';
 import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
@@ -667,10 +668,14 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarRascunhoDof(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarBlocosDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarRascunhoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarBlocosDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -710,6 +715,7 @@ describe('fundação em recursos descartáveis', () => {
         inserir_auditoria: boolean; alterar_auditoria: boolean; apagar_auditoria: boolean;
         publico_le_usuario: boolean; publico_usa_nucleo: boolean; alterar_matricula: boolean;
         alterar_rascunho: boolean; alterar_status: boolean; apagar_ajuste: boolean;
+        alterar_bloco: boolean; apagar_bloco: boolean; alterar_versao_bloco: boolean;
       }>(`
         SELECT has_any_column_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
                has_table_privilege(current_user, 'nucleo.pessoa', 'INSERT') AS inserir_pessoa,
@@ -721,6 +727,9 @@ describe('fundação em recursos descartáveis', () => {
                has_column_privilege(current_user, 'documentos.documento', 'entrada_cifrada', 'UPDATE') AS alterar_rascunho,
                has_column_privilege(current_user, 'documentos.documento', 'status', 'UPDATE') AS alterar_status,
                has_table_privilege(current_user, 'documentos.ajuste_campo', 'DELETE') AS apagar_ajuste,
+               has_column_privilege(current_user, 'documentos.documento_bloco', 'texto_final_cifrado', 'UPDATE') AS alterar_bloco,
+               has_table_privilege(current_user, 'documentos.documento_bloco', 'DELETE') AS apagar_bloco,
+               has_table_privilege(current_user, 'documentos.bloco_versao', 'UPDATE') AS alterar_versao_bloco,
                EXISTS (
                  SELECT 1 FROM aclexplode((SELECT relacl FROM pg_class WHERE oid = 'seguranca.usuario'::regclass))
                  WHERE grantee = 0 AND privilege_type = 'SELECT'
@@ -734,6 +743,7 @@ describe('fundação em recursos descartáveis', () => {
         alterar_usuario: true, inserir_pessoa: false, inserir_emissao: false, inserir_auditoria: true,
         alterar_auditoria: false, apagar_auditoria: false, publico_le_usuario: false, publico_usa_nucleo: false,
         alterar_matricula: false, alterar_rascunho: true, alterar_status: false, apagar_ajuste: false,
+        alterar_bloco: true, apagar_bloco: false, alterar_versao_bloco: false,
       });
       await cliente.query('BEGIN');
       await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");
@@ -2093,6 +2103,200 @@ describe('fundação em recursos descartáveis', () => {
           'rascunho_criado', 'rascunho_aberto', 'rascunho_editado', 'rascunho_conflito',
           'rascunho_regra_incompativel', 'rascunho_admissao_alterada',
         ]));
+
+        const criacaoBlocos = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, motivo, admissaoEsperada }, ...analista,
+        });
+        expect(criacaoBlocos.status, criacaoBlocos.corpo).toBe(201);
+        const rascunhoBlocos = rascunhoDofSchema.parse(JSON.parse(criacaoBlocos.corpo));
+        expect(rascunhoBlocos.blocos).toEqual([]);
+        const rotaBlocos = `/api/v1/documentos/${rascunhoBlocos.id}/blocos`;
+        const rotaPrevia = `/api/v1/documentos/${rascunhoBlocos.id}/previa`;
+        const primeiroBloco = { id: randomUUID(), codigo: 'contratacao', ativo: true, texto: 'Texto contratual fictício' };
+        const segundoBloco = {
+          id: randomUUID(), codigo: 'progressao', ativo: true,
+          texto: '<script>window.top.intrusao=1</script> {{nome}} {{cargo}}',
+        };
+        const motivoBlocos = 'Motivo sintético dos blocos';
+        const proposta = { revisao: 1, motivo: motivoBlocos, blocos: [primeiroBloco, segundoBloco] };
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: rotaPrevia })).status).toBe(401);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaPrevia, cookie: coordenador.cookie,
+        })).status).toBe(404);
+        for (const papel of ['secretario_adjunto', 'admin']) {
+          const sessao = sessoes.get(papel);
+          if (!sessao) throw new Error('Sessão sintética ausente.');
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: rotaPrevia, cookie: sessao.cookie,
+          })).status).toBe(403);
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: rotaBlocos, corpo: proposta, ...sessao,
+          })).status).toBe(403);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos, corpo: proposta, cookie: analista.cookie,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos, corpo: proposta, ...analista, origem: 'https://origem-invalida.local',
+        })).status).toBe(403);
+        for (const invalido of [
+          { ...proposta, motivo: ' ' },
+          { ...proposta, blocos: [primeiroBloco, primeiroBloco] },
+          { ...proposta, blocos: [{ ...primeiroBloco, texto: 'inválido\u0000' }] },
+          { ...proposta, status: 'emitido' },
+        ]) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: rotaBlocos, corpo: invalido, ...analista,
+          })).status).toBe(400);
+        }
+        const blocosCriados = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos, corpo: proposta, ...analista,
+        });
+        expect(blocosCriados.status, blocosCriados.corpo).toBe(200);
+        const comBlocos = rascunhoDofSchema.parse(JSON.parse(blocosCriados.corpo));
+        expect(comBlocos.revisao).toBe(2);
+        expect(comBlocos.blocos).toEqual([primeiroBloco, segundoBloco]);
+        const protegidos = await cliente.query<{ id: string; texto_final_cifrado: Buffer }>(`
+          SELECT id, texto_final_cifrado FROM documentos.documento_bloco WHERE documento_id = $1 ORDER BY ordem
+        `, [rascunhoBlocos.id]);
+        expect(protegidos.rows).toHaveLength(2);
+        for (const [indice, protegido] of protegidos.rows.entries()) {
+          const esperado = proposta.blocos[indice];
+          expect(protegido.texto_final_cifrado.includes(Buffer.from(esperado.texto))).toBe(false);
+          expect(JSON.parse(protetor.decifrar(protegido.texto_final_cifrado, {
+            schema: 'documentos', tabela: 'documento_bloco', registroId: protegido.id, campo: 'texto_final_cifrado',
+          }).toString('utf8'))).toBe(esperado.texto);
+        }
+        const ajustesBlocos = await cliente.query<{
+          id: string; campo: string; valor_novo_cifrado: Buffer; motivo_cifrado: Buffer;
+        }>(`
+          SELECT id, campo, valor_novo_cifrado, motivo_cifrado FROM documentos.ajuste_campo
+          WHERE documento_id = $1 AND campo LIKE 'blocos.%'
+        `, [rascunhoBlocos.id]);
+        expect(ajustesBlocos.rows).toHaveLength(2);
+        for (const ajuste of ajustesBlocos.rows) {
+          expect(ajuste.motivo_cifrado.includes(Buffer.from(motivoBlocos))).toBe(false);
+          expect(ajuste.valor_novo_cifrado.includes(Buffer.from('texto'))).toBe(false);
+          expect(JSON.parse(protetor.decifrar(ajuste.motivo_cifrado, {
+            schema: 'documentos', tabela: 'ajuste_campo', registroId: ajuste.id, campo: 'motivo_cifrado',
+          }).toString('utf8'))).toBe(motivoBlocos);
+        }
+        const reordenados = [segundoBloco, { ...primeiroBloco, ativo: false }];
+        const reordenacao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos, corpo: { revisao: 2, motivo: motivoBlocos, blocos: reordenados }, ...analista,
+        });
+        expect(reordenacao.status, reordenacao.corpo).toBe(200);
+        expect(rascunhoDofSchema.parse(JSON.parse(reordenacao.corpo))).toMatchObject({ revisao: 3, blocos: reordenados });
+        for (const invalido of [
+          { revisao: 3, motivo: motivoBlocos, blocos: [segundoBloco] },
+          { revisao: 3, motivo: motivoBlocos, blocos: [{ ...segundoBloco, codigo: 'complementares' }, reordenados[1]] },
+        ]) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: rotaBlocos, corpo: invalido, ...analista,
+          })).status).toBe(400);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos, corpo: { ...proposta, revisao: 2 }, ...analista,
+        })).status).toBe(409);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos, corpo: { revisao: 3, motivo: motivoBlocos, blocos: reordenados }, ...analista,
+        })).status).toBe(409);
+        const lotacao = {
+          revisao: 999, motivo: '界'.repeat(2000),
+          blocos: Array.from({ length: 200 }, (_, indice) => ({
+            id: randomUUID(), codigo: 'complementares', ativo: true,
+            texto: '界'.repeat(indice === 0 || indice === 1 ? 7000 : indice === 2 ? 6000 : 0),
+          })),
+        };
+        expect(Buffer.byteLength(JSON.stringify(lotacao), 'utf8')).toBeLessThan(100 * 1024);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos, corpo: lotacao, ...analista,
+        })).status).toBe(409);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunhoPosterior.id}/blocos`,
+          corpo: { revisao: 2, motivo: motivoBlocos, blocos: [primeiroBloco] }, ...analista,
+        })).status).toBe(409);
+        const inicioPrevia = performance.now();
+        const previa = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaPrevia, cookie: analista.cookie,
+        });
+        const duracaoPrevia = performance.now() - inicioPrevia;
+        expect(duracaoPrevia).toBeLessThan(1000);
+        process.stdout.write(`Prévia sintética HTTPS de 45 anos: abertura em ${duracaoPrevia.toFixed(1)} ms.\n`);
+        expect(previa.status, previa.corpo).toBe(200);
+        expect(previa.headers['content-type']).toContain('text/html');
+        expect(previa.headers['content-security-policy']).toContain("default-src 'none'");
+        expect(previa.headers['content-security-policy']).toContain("frame-ancestors 'self'");
+        expect(previa.headers['content-security-policy']).toContain('sandbox');
+        expect(previa.headers['cache-control']).toBe('no-store');
+        expect(previa.headers['x-sisdoc-revisao']).toBe('3');
+        expect(previa.corpo).toContain('PRÉVIA PROVISÓRIA — SEM VALIDADE OFICIAL');
+        expect(previa.corpo).toContain('&lt;script&gt;window.top.intrusao=1&lt;/script&gt;');
+        expect(previa.corpo).toContain('Pessoa DOF fictícia');
+        expect(previa.corpo).toContain('Variável não disponível: cargo');
+        expect(previa.corpo).not.toContain('<script>');
+        expect(previa.corpo).not.toContain(primeiroBloco.texto);
+        expect(previa.corpo.match(/<tr>/g)).toHaveLength(46);
+
+        const concorrentes = await Promise.all(['A', 'B'].map((valor) => requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: rotaBlocos,
+          corpo: {
+            revisao: 3, motivo: motivoBlocos,
+            blocos: [{ ...segundoBloco, texto: `Alteração concorrente ${valor}` }, reordenados[1]],
+          },
+          ...analista,
+        })));
+        expect(concorrentes.map((resposta) => resposta.status).sort()).toEqual([200, 409]);
+        const abertoBlocos = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${rascunhoBlocos.id}`, cookie: analista.cookie,
+        });
+        const aposConcorrencia = rascunhoDofSchema.parse(JSON.parse(abertoBlocos.corpo));
+        expect(aposConcorrencia.revisao).toBe(4);
+        expect(aposConcorrencia.blocos[0].texto).toMatch(/^Alteração concorrente [AB]$/);
+        const bloqueador = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await bloqueador.connect();
+        let confirmado = false;
+        try {
+          await bloqueador.query('BEGIN');
+          await bloqueador.query('SELECT id FROM documentos.documento WHERE id = $1 FOR UPDATE', [rascunhoBlocos.id]);
+          let leituraFinalizada = false;
+          const leituraBloqueada = requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: rotaPrevia, cookie: analista.cookie,
+          });
+          void leituraBloqueada.then(() => { leituraFinalizada = true; }, () => { leituraFinalizada = true; });
+          await delay(200);
+          expect(leituraFinalizada).toBe(false);
+          const textoConcorrente = 'Conteúdo sintético da revisão cinco';
+          const textoProtegido = protetor.cifrar(Buffer.from(JSON.stringify(textoConcorrente)), {
+            schema: 'documentos', tabela: 'documento_bloco', registroId: segundoBloco.id, campo: 'texto_final_cifrado',
+          });
+          await bloqueador.query('UPDATE documentos.documento_bloco SET texto_final_cifrado = $1 WHERE id = $2', [
+            textoProtegido, segundoBloco.id,
+          ]);
+          await bloqueador.query('UPDATE documentos.documento SET revisao = 5 WHERE id = $1', [rascunhoBlocos.id]);
+          await bloqueador.query('COMMIT');
+          confirmado = true;
+          const leituraCoerente = await leituraBloqueada;
+          expect(leituraCoerente.status, leituraCoerente.corpo).toBe(200);
+          expect(leituraCoerente.headers['x-sisdoc-revisao']).toBe('5');
+          expect(leituraCoerente.corpo).toContain(textoConcorrente);
+        } finally {
+          if (!confirmado) await bloqueador.query('ROLLBACK');
+          await bloqueador.end();
+        }
+        const eventosBlocos = await cliente.query<{ acao: string; detalhes: unknown }>(`
+          SELECT acao, detalhes FROM seguranca.auditoria WHERE entidade_id = $1
+        `, [rascunhoBlocos.id]);
+        expect(eventosBlocos.rows.map((evento) => evento.acao)).toEqual(expect.arrayContaining([
+          'rascunho_blocos_editados', 'previa_dof_aberta', 'rascunho_conflito',
+        ]));
+        expect(JSON.stringify(eventosBlocos.rows)).not.toContain(motivoBlocos);
+        expect(JSON.stringify(eventosBlocos.rows)).not.toContain(segundoBloco.texto);
+        expect((await cliente.query('SELECT count(*) FROM documentos.emissao')).rows[0].count)
+          .toBe(estadoAntes.rows[0].emissoes);
       } finally {
         await encerrar();
       }

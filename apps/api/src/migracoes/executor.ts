@@ -1,6 +1,8 @@
 import type { Client } from 'pg';
 
-const versoesConhecidas = ['000-fundacao', '001-modelo', '002-autenticacao', '003-consulta', '004-rascunho-dof'] as const;
+const versoesConhecidas = [
+  '000-fundacao', '001-modelo', '002-autenticacao', '003-consulta', '004-rascunho-dof', '005-blocos-dof',
+] as const;
 export type VersaoMigracao = typeof versoesConhecidas[number];
 
 export async function executarMigracao(

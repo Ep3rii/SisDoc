@@ -1,9 +1,10 @@
 # Operação — aplicação ainda não autorizada
 
 O login, a administração e a consulta de servidores existem para verificação
-em recursos descartáveis. Há cálculo e rascunho provisórios de DOF pela
-interface, mas **não há prévia de documento, conferência, emissão, importação,
-backup ou serviço Windows implementados**. Não instalar ou usar operacionalmente até a
+em recursos descartáveis. Há cálculo, rascunho, blocos e prévia provisórios de
+DOF pela interface, mas **não há conferência, emissão, importação, backup ou
+serviço Windows implementados**. A prévia não é um modelo oficial. Não instalar
+ou usar operacionalmente até a
 conclusão das demais fatias, revisão e autorização formal.
 
 ## Pré-requisitos para uma futura instalação
@@ -65,12 +66,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 004, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 005, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `004-rascunho-dof` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `005-blocos-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -123,6 +124,21 @@ Se ela mudar, prepare a tabela e confira novamente; se estiver ausente, a
 edição fica indisponível, embora o resultado salvo possa ser consultado.
 Uma versão de regra diferente da disponível bloqueia a edição. A interface não
 altera dados funcionais da fonte e o rascunho não é conferência nem emissão.
+
+## Blocos e prévia provisória
+
+Após salvar um rascunho próprio, adicione blocos vazios, edite seu texto,
+reordene e ative/desative conforme necessário. Salve com motivo; blocos já
+salvos não são apagados, mas podem ser desativados. A revisão protege as
+alterações de cálculo e blocos em conjunto. Salve ou descarte uma categoria
+antes de editar a outra.
+
+**Abrir prévia** registra a consulta e mostra o cálculo salvo com as alterações
+locais dos blocos, mesmo antes de salvá-las. A prévia é isolada e não tem
+validade oficial; seu layout e textos não foram aprovados. Apenas as variáveis
+listadas na interface são resolvidas, e as demais aparecem como indisponíveis.
+Se outra sessão alterar o rascunho, reabra-o e confira a revisão. Os limites
+técnicos são 200 blocos, 8.000 caracteres por bloco e 20.000 no total.
 
 ## Verificação de software
 

@@ -2,19 +2,24 @@ import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
+  blocoRascunhoDofSchema,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
   solicitarCalculoDofSchema,
+  type AtualizarBlocosDof,
   type AtualizarRascunhoDof,
+  type BlocoRascunhoDof,
+  type CodigoBlocoDof,
   type Configuracao,
   type CriarRascunhoDof,
   type PaginaRascunhosDof,
   type RascunhoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
-import type { Pool, PoolClient } from 'pg';
+import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { transacao } from '../banco';
 import { calcularDofNaTransacao } from '../calculos/calculos';
+import { VERSAO_BLOCO_VAZIO } from '../migracoes/blocos-dof';
 import { TEMPLATE_DOF_PROVISORIO } from '../migracoes/rascunho-dof';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
@@ -92,7 +97,28 @@ export class RascunhosService {
     }).toString('utf8'));
   }
 
-  private apresentar(linha: LinhaRascunho): RascunhoDof {
+  private async blocos(cliente: PoolClient, documentoId: string): Promise<BlocoRascunhoDof[]> {
+    const consulta = await cliente.query<{
+      id: string; codigo: string; ordem: number; ativo: boolean; texto_final_cifrado: Buffer | null;
+    }>(`
+      SELECT b.id, t.codigo, b.ordem, b.ativo, b.texto_final_cifrado
+      FROM documentos.documento_bloco b
+      JOIN documentos.bloco_versao v ON v.id = b.bloco_versao_id
+      JOIN documentos.bloco_texto t ON t.id = v.bloco_id
+      WHERE b.documento_id = $1 ORDER BY b.ordem
+    `, [documentoId]);
+    return consulta.rows.map((linha, indice) => {
+      if (linha.ordem !== indice + 1 || !linha.texto_final_cifrado) {
+        throw new Error('Conteúdo ou ordem dos blocos do rascunho é inconsistente.');
+      }
+      return blocoRascunhoDofSchema.parse({
+        id: linha.id, codigo: linha.codigo, ativo: linha.ativo,
+        texto: this.ler('documento_bloco', linha.id, 'texto_final_cifrado', linha.texto_final_cifrado),
+      });
+    });
+  }
+
+  private async apresentar(cliente: PoolClient, linha: LinhaRascunho): Promise<RascunhoDof> {
     if (!linha.resultado_calculo_cifrado) throw new Error('Rascunho sem resultado de cálculo protegido.');
     const entrada = solicitarCalculoDofSchema.parse(this.ler('documento', linha.id, 'entrada_cifrada', linha.entrada_cifrada));
     if (entrada.pessoaId !== linha.pessoa_id || entrada.vinculoId !== linha.vinculo_id) {
@@ -122,6 +148,7 @@ export class RascunhosService {
       status: 'rascunho',
       entrada,
       resultado,
+      blocos: await this.blocos(cliente, linha.id),
     });
   }
 
@@ -129,7 +156,7 @@ export class RascunhosService {
     cliente: PoolClient,
     id: string,
     autorId: string,
-    bloquear = false,
+    bloquear?: 'leitura' | 'alteracao',
   ): Promise<LinhaRascunho | undefined> {
     const consulta = await cliente.query<LinhaRascunho>(`
       SELECT d.id, d.pessoa_id, d.vinculo_id, p.nome, v.matricula,
@@ -141,7 +168,7 @@ export class RascunhosService {
       JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
       JOIN documentos.regra_versao r ON r.id = d.regra_versao_id
       WHERE d.id = $1 AND d.criado_por = $2 AND d.tipo = 'DOF' AND d.status = 'rascunho'
-      ${bloquear ? 'FOR UPDATE OF d' : ''}
+      ${bloquear === 'alteracao' ? 'FOR UPDATE OF d' : bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
     `, [id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA)]);
     return consulta.rows[0];
   }
@@ -192,16 +219,26 @@ export class RascunhosService {
     });
   }
 
-  async obter(sessao: SessaoAutenticada, ip: string, id: string): Promise<RascunhoDof> {
+  private async obterAuditado(
+    sessao: SessaoAutenticada, ip: string, id: string, acao: 'rascunho_aberto' | 'previa_dof_aberta',
+  ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
-      const linha = await this.linha(cliente, id, sessao.usuario.id);
-      await auditarConsultaFuncional(cliente, sessao, linha ? 'rascunho_aberto' : 'rascunho_nao_encontrado',
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura');
+      await auditarConsultaFuncional(cliente, sessao, linha ? acao : 'rascunho_nao_encontrado',
         'documento', id, linha?.pessoa_id ?? null, ip);
       if (!linha) return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
-      return { valor: this.apresentar(linha) };
+      return { valor: await this.apresentar(cliente, linha) };
     });
     return concluir(tentativa);
+  }
+
+  async obter(sessao: SessaoAutenticada, ip: string, id: string): Promise<RascunhoDof> {
+    return this.obterAuditado(sessao, ip, id, 'rascunho_aberto');
+  }
+
+  async obterParaPrevia(sessao: SessaoAutenticada, ip: string, id: string): Promise<RascunhoDof> {
+    return this.obterAuditado(sessao, ip, id, 'previa_dof_aberta');
   }
 
   async criar(sessao: SessaoAutenticada, ip: string, dados: CriarRascunhoDof): Promise<RascunhoDof> {
@@ -241,7 +278,7 @@ export class RascunhosService {
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_criado', 'documento', id, entrada.pessoaId, ip);
       const linha = await this.linha(cliente, id, sessao.usuario.id);
       if (!linha) throw new Error('Rascunho recém-criado não pôde ser recuperado.');
-      return { valor: this.apresentar(linha) };
+      return { valor: await this.apresentar(cliente, linha) };
     });
     return concluir(tentativa);
   }
@@ -249,7 +286,7 @@ export class RascunhosService {
   async atualizar(sessao: SessaoAutenticada, ip: string, id: string, dados: AtualizarRascunhoDof): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      const linha = await this.linha(cliente, id, sessao.usuario.id, true);
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -262,7 +299,7 @@ export class RascunhosService {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_regra_incompativel', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A versão de regra deste rascunho não é a versão disponível para cálculo. Contate o administrador.' } };
       }
-      const anterior = this.apresentar(linha);
+      const anterior = await this.apresentar(cliente, linha);
       const entrada = entradaOrdenada(dados.calculo);
       if (entrada.pessoaId !== linha.pessoa_id || entrada.vinculoId !== linha.vinculo_id) {
         return { falha: { tipo: 'invalido', mensagem: 'Pessoa e vínculo do rascunho não podem ser alterados.' } };
@@ -303,7 +340,92 @@ export class RascunhosService {
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_editado', 'documento', id, entrada.pessoaId, ip);
       const atualizado = await this.linha(cliente, id, sessao.usuario.id);
       if (!atualizado) throw new Error('Rascunho atualizado não pôde ser recuperado.');
-      return { valor: this.apresentar(atualizado) };
+      return { valor: await this.apresentar(cliente, atualizado) };
+    });
+    return concluir(tentativa);
+  }
+
+  async atualizarBlocos(
+    sessao: SessaoAutenticada,
+    ip: string,
+    id: string,
+    dados: AtualizarBlocosDof,
+  ): Promise<RascunhoDof> {
+    const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
+      }
+      const anterior = await this.apresentar(cliente, linha);
+      const antigos = new Map(anterior.blocos.map((bloco, indice) => [bloco.id, { ...bloco, ordem: indice + 1 }]));
+      const novos = new Map(dados.blocos.map((bloco) => [bloco.id, bloco]));
+      if ([...antigos.keys()].some((blocoId) => !novos.has(blocoId))) {
+        return { falha: { tipo: 'invalido', mensagem: 'Blocos existentes não podem ser apagados; desative-os para preservá-los.' } };
+      }
+      if (dados.blocos.some((bloco) => antigos.has(bloco.id) && antigos.get(bloco.id)?.codigo !== bloco.codigo)) {
+        return { falha: { tipo: 'invalido', mensagem: 'O tipo de um bloco existente não pode ser alterado.' } };
+      }
+      const alteracoes: Mudanca[] = [];
+      for (const [indice, bloco] of dados.blocos.entries()) {
+        const antigo = antigos.get(bloco.id) ?? null;
+        const novo = { ...bloco, ordem: indice + 1 };
+        if (JSON.stringify(antigo) !== JSON.stringify(novo)) {
+          alteracoes.push({ campo: `blocos.${bloco.id}`, anterior: antigo, novo });
+        }
+      }
+      if (alteracoes.length === 0) return { falha: { tipo: 'conflito', mensagem: 'Nenhuma alteração foi identificada nos blocos.' } };
+      const criados = dados.blocos.filter((bloco) => !antigos.has(bloco.id));
+      const codigos = [...new Set(criados.map((bloco) => bloco.codigo))];
+      const catalogo = await cliente.query<{ id: string; codigo: CodigoBlocoDof }>(`
+        SELECT v.id, t.codigo FROM documentos.bloco_texto t
+        JOIN documentos.bloco_versao v ON v.bloco_id = t.id
+        WHERE t.ativo AND t.codigo = ANY($1::text[]) AND v.versao = $2
+          AND t.tipos_documento @> ARRAY['DOF']::text[]
+      `, [codigos, VERSAO_BLOCO_VAZIO]);
+      if (catalogo.rows.length !== codigos.length) {
+        throw new ServiceUnavailableException('As versões provisórias dos blocos não estão disponíveis.');
+      }
+      const versoes = new Map(catalogo.rows.map((item) => [item.codigo, item.id]));
+      const alterados = new Set(alteracoes.map((alteracao) => alteracao.campo));
+      for (const [indice, bloco] of dados.blocos.entries()) {
+        if (!alterados.has(`blocos.${bloco.id}`)) continue;
+        const texto = this.cifrar('documento_bloco', bloco.id, 'texto_final_cifrado', bloco.texto);
+        if (antigos.has(bloco.id)) {
+          await cliente.query(`
+            UPDATE documentos.documento_bloco SET ordem = $1, ativo = $2, texto_final_cifrado = $3
+            WHERE id = $4 AND documento_id = $5
+          `, [indice + 1, bloco.ativo, texto, bloco.id, id]);
+        } else {
+          const versao = versoes.get(bloco.codigo);
+          if (!versao) throw new Error('Versão de bloco provisório ausente.');
+          try {
+            await cliente.query(`
+              INSERT INTO documentos.documento_bloco
+                (id, documento_id, bloco_versao_id, ordem, ativo, texto_final_cifrado)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [bloco.id, id, versao, indice + 1, bloco.ativo, texto]);
+          } catch (erro) {
+            if (erro instanceof DatabaseError && erro.code === '23505' && erro.constraint === 'documento_bloco_pkey') {
+              throw new ConflictException('Identificador de bloco já utilizado; reabra e adicione o bloco novamente.');
+            }
+            throw erro;
+          }
+        }
+      }
+      await cliente.query(`
+        UPDATE documentos.documento SET atualizado_por = $1, atualizado_em = now(), revisao = revisao + 1 WHERE id = $2
+      `, [sessao.usuario.id, id]);
+      await this.registrarAjustes(cliente, id, sessao.usuario.id, dados.motivo, alteracoes);
+      await auditarConsultaFuncional(cliente, sessao, 'rascunho_blocos_editados', 'documento', id, linha.pessoa_id, ip);
+      const atualizado = await this.linha(cliente, id, sessao.usuario.id);
+      if (!atualizado) throw new Error('Rascunho com blocos atualizados não pôde ser recuperado.');
+      return { valor: await this.apresentar(cliente, atualizado) };
     });
     return concluir(tentativa);
   }

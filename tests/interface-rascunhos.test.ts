@@ -2,6 +2,7 @@ import path from 'node:path';
 import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
   atualizarRascunhoDofSchema,
+  atualizarBlocosDofSchema,
   criarRascunhoDofSchema,
   resultadoCalculoDofSchema,
   solicitarCalculoDofSchema,
@@ -9,6 +10,7 @@ import {
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
+import { renderizarPreviaDof } from '@sisdoc/templates';
 import { chromium, type Browser, type Page, type Route } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -33,6 +35,7 @@ type Simulacao = {
   erros: string[];
   escritas: number;
   anosConfirmados: number[];
+  previas: number;
 };
 
 function resultadoSintetico(entrada: SolicitarCalculoDof, admissao: string): ResultadoCalculoDof {
@@ -76,7 +79,7 @@ async function responder(rota: Route, status: number, corpo: unknown) {
 async function simularApi(pagina: Page): Promise<Simulacao> {
   const estado: Simulacao = {
     papel: 'analista', admissao: '1980-01-01', rascunho: null,
-    conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [],
+    conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [], previas: 0,
   };
   await pagina.route('**/api/v1/**', async (rota) => {
     try {
@@ -150,12 +153,34 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           id: documentoId, pessoaId, vinculoId, nome, matricula, admissao: estado.admissao,
           revisao: 1, criadoEm: agora, atualizadoEm: agora, status: 'rascunho',
           entrada: dados.calculo, resultado: resultadoSintetico(dados.calculo, estado.admissao),
+          blocos: [],
         };
         estado.escritas += 1;
         return responder(rota, 201, estado.rascunho);
       }
       if (caminho === `/api/v1/documentos/${documentoId}` && metodo === 'GET' && estado.rascunho) {
         return responder(rota, 200, { ...estado.rascunho, admissao: estado.admissao });
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/previa` && metodo === 'GET' && estado.rascunho) {
+        estado.previas += 1;
+        return rota.fulfill({
+          status: 200, contentType: 'text/html; charset=utf-8',
+          headers: { 'X-Sisdoc-Revisao': String(estado.rascunho.revisao) },
+          body: renderizarPreviaDof(estado.rascunho),
+        });
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/blocos` && metodo === 'PATCH' && estado.rascunho) {
+        if (estado.falhaRede) return rota.abort('failed');
+        const dados = atualizarBlocosDofSchema.parse(requisicao.postDataJSON());
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao) {
+          return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
+        }
+        estado.rascunho = {
+          ...estado.rascunho, revisao: estado.rascunho.revisao + 1,
+          atualizadoEm: new Date().toISOString(), blocos: dados.blocos,
+        };
+        estado.escritas += 1;
+        return responder(rota, 200, estado.rascunho);
       }
       if (caminho === `/api/v1/documentos/${documentoId}` && metodo === 'PATCH' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
@@ -289,8 +314,10 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar alterações' }).click();
     await pagina.getByRole('alert').getByText(/O rascunho foi alterado/).waitFor();
     expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('3');
-    pagina.once('dialog', (dialogo) => void dialogo.dismiss());
+    let avisoSaida = '';
+    pagina.once('dialog', (dialogo) => { avisoSaida = dialogo.message(); void dialogo.dismiss(); });
     await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).click();
+    expect(avisoSaida).toContain('gravação estiver em andamento');
     expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('3');
     pagina.once('dialog', (dialogo) => void dialogo.accept());
     await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).click();
@@ -365,6 +392,123 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Rascunho salvo na revisão 2.', { exact: false }).waitFor();
     expect(estado.anosConfirmados).toEqual([2024]);
     expect(estado.rascunho?.entrada.anos).toHaveLength(44);
+  });
+
+  it('edita blocos com prévia isolada e atualizada, preservando alterações e conflitos', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+
+    await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
+    const textoInicial = '<script>window.top.intrusao=1</script> {{nome}} {{cargo}}';
+    await pagina.getByLabel('Texto do bloco 1').fill(textoInicial);
+    expect(await pagina.getByLabel('Fim do período').isDisabled()).toBe(true);
+    expect(await pagina.getByText('Há alterações não salvas.').isVisible()).toBe(true);
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    expect(estado.previas).toBe(1);
+    const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
+    await quadro.getByText('Variável não disponível: cargo').waitFor();
+    expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').getAttribute('sandbox')).toBe('');
+    expect(await quadro.locator('script').count()).toBe(0);
+    expect(await quadro.getByText('Pessoa Ficticia', { exact: false }).count()).toBeGreaterThan(0);
+    expect(await pagina.evaluate(() => Reflect.has(window, 'intrusao'))).toBe(false);
+
+    const duracoes: number[] = [];
+    for (let indice = 0; indice < 5; indice += 1) {
+      const inicio = await pagina.evaluate(() => performance.now());
+      await pagina.getByLabel('Texto do bloco 1').fill(`${'X'.repeat(7900)} MARCADOR-PREVIA-${indice}`);
+      await quadro.getByText(`MARCADOR-PREVIA-${indice}`, { exact: false }).waitFor();
+      duracoes.push(await pagina.evaluate(() => performance.now()) - inicio);
+    }
+    const maiorDuracao = Math.max(...duracoes);
+    expect(maiorDuracao).toBeLessThan(1000);
+    process.stdout.write(`Prévia sintética de 45 anos: maior tempo edição-exibição ${maiorDuracao.toFixed(1)} ms.\n`);
+
+    await pagina.getByLabel('Tipo de bloco').selectOption('progressao');
+    await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
+    await pagina.getByLabel('Texto do bloco 2').fill('Segundo bloco fictício');
+    await pagina.getByRole('button', { name: 'Subir bloco 2' }).click();
+    expect(await pagina.getByLabel('Texto do bloco 1').inputValue()).toBe('Segundo bloco fictício');
+    await pagina.getByRole('checkbox', { name: 'Ativar bloco 2' }).uncheck();
+    await quadro.getByText('Segundo bloco fictício').waitFor();
+    expect(await quadro.getByText('MARCADOR-PREVIA-4', { exact: false }).count()).toBe(0);
+    await pagina.getByLabel('Motivo da alteração dos blocos').fill('Edição fictícia de blocos');
+    await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
+    await pagina.getByText('Blocos salvos na revisão 2.', { exact: false }).waitFor();
+    expect(estado.rascunho?.blocos.map((bloco) => [bloco.codigo, bloco.ativo])).toEqual([
+      ['progressao', true], ['contratacao', false],
+    ]);
+    expect(await pagina.getByLabel('Fim do período').isDisabled()).toBe(false);
+    expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
+
+    await pagina.getByLabel('Texto do bloco 1').fill('Alteração que deve ser preservada');
+    await pagina.getByLabel('Motivo da alteração dos blocos').fill('Tentativa fictícia');
+    estado.conflito = true;
+    await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
+    await pagina.getByRole('alert').getByText(/O rascunho foi alterado/).waitFor();
+    expect(await pagina.getByLabel('Texto do bloco 1').inputValue()).toBe('Alteração que deve ser preservada');
+    estado.conflito = false;
+    estado.falhaRede = true;
+    await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
+    await pagina.getByRole('alert').getByText(/Não foi possível confirmar a gravação/).waitFor();
+    expect(await pagina.getByLabel('Texto do bloco 1').inputValue()).toBe('Alteração que deve ser preservada');
+    expect(await pagina.evaluate(() => {
+      const evento = new Event('beforeunload', { cancelable: true });
+      window.dispatchEvent(evento);
+      return evento.defaultPrevented;
+    })).toBe(true);
+    estado.falhaRede = false;
+    await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
+    await pagina.getByText('Blocos salvos na revisão 3.', { exact: false }).waitFor();
+    await abrirRascunho(pagina);
+    expect(await pagina.getByLabel('Texto do bloco 1').inputValue()).toBe('Alteração que deve ser preservada');
+    expect(await pagina.getByRole('checkbox', { name: 'Ativar bloco 2' }).isChecked()).toBe(false);
+
+    await pagina.setViewportSize({ width: 375, height: 812 });
+    const medidas = await pagina.evaluate(() => ({
+      tela: document.documentElement.clientWidth, conteudo: document.documentElement.scrollWidth,
+      local: localStorage.length, sessao: sessionStorage.length,
+    }));
+    expect(medidas.conteudo).toBeLessThanOrEqual(medidas.tela);
+    expect(medidas.local).toBe(0);
+    expect(medidas.sessao).toBe(0);
+  });
+
+  it('mantém a prévia abaixo de um segundo no limite técnico de blocos', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    if (!estado.rascunho) throw new Error('Rascunho sintético ausente.');
+    estado.rascunho = {
+      ...estado.rascunho,
+      blocos: Array.from({ length: 200 }, (_, indice) => ({
+        id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(indice + 1).padStart(12, '0')}`,
+        codigo: 'complementares', ativo: true, texto: `BLOCO-${indice + 1}-`.padEnd(100, 'x'),
+      })),
+    };
+    await abrirRascunho(pagina);
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
+    await quadro.getByText('BLOCO-200-', { exact: false }).waitFor();
+    expect(await quadro.locator('tbody tr').count()).toBe(45);
+    const duracoes: number[] = [];
+    for (let indice = 0; indice < 5; indice += 1) {
+      const inicio = await pagina.evaluate(() => performance.now());
+      await pagina.getByLabel('Texto do bloco 200').fill(`LIMITE-${indice}-`.padEnd(100, 'x'));
+      await quadro.getByText(`LIMITE-${indice}-`, { exact: false }).waitFor();
+      duracoes.push(await pagina.evaluate(() => performance.now()) - inicio);
+    }
+    const maiorDuracao = Math.max(...duracoes);
+    expect(maiorDuracao).toBeLessThan(1000);
+    process.stdout.write(
+      `Prévia sintética no limite (45 anos, 200 blocos, 20.000 caracteres): ${maiorDuracao.toFixed(1)} ms.\n`,
+    );
   });
 
   it('restringe controles por perfil e apresenta falha de listagem com retentativa e paginação', async () => {

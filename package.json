@@ -10,8 +10,8 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @sisdoc/contratos && npm run build --workspace @sisdoc/calculo && npm run build --workspace @sisdoc/web && npm run build --workspace @sisdoc/api",
-    "typecheck": "npm run build --workspace @sisdoc/contratos && npm run build --workspace @sisdoc/calculo && npm run typecheck --workspace @sisdoc/web && npm run build --workspace @sisdoc/api && tsc -p tsconfig.tests.json --noEmit",
+    "build": "npm run build --workspace @sisdoc/contratos && npm run build --workspace @sisdoc/calculo && npm run build --workspace @sisdoc/templates && npm run build --workspace @sisdoc/web && npm run build --workspace @sisdoc/api",
+    "typecheck": "npm run build --workspace @sisdoc/contratos && npm run build --workspace @sisdoc/calculo && npm run build --workspace @sisdoc/templates && npm run typecheck --workspace @sisdoc/web && npm run build --workspace @sisdoc/api && tsc -p tsconfig.tests.json --noEmit",
     "setup": "npm run build && node apps/api/dist/setup/cli.js",
     "start": "node apps/api/dist/main.js",
     "usuario": "node apps/api/dist/seguranca/usuarios.cli.js",

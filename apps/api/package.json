@@ -12,6 +12,7 @@
     "@nestjs/platform-express": "12.3.2",
     "@sisdoc/calculo": "0.0.0",
     "@sisdoc/contratos": "0.0.0",
+    "@sisdoc/templates": "0.0.0",
     "argon2": "0.45.1",
     "pg": "8.23.1",
     "reflect-metadata": "0.2.2",

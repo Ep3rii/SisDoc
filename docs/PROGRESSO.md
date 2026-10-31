@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo de referência e rascunhos próprios cifrados; editor de blocos, prévia, conferência, emissão e PDF ainda não implementados |
+| 5 — DOF | parcial | cálculo, rascunhos cifrados, blocos e prévia provisória; conferência, emissão e PDF ainda não implementados |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -110,8 +110,25 @@ integrado de navegador com CA operacional e a revisão humana continuam
 pendentes. A concorrência entre sincronização futura da admissão e gravação
 do rascunho ainda exige solução e testes antes de implementar sincronização.
 
+Na continuação da fatia 5, foram adicionados blocos manuais, versões técnicas
+vazias e prévia não oficial. Os blocos são cifrados, ordenáveis e desativáveis;
+alterações exigem motivo e usam a revisão do rascunho. A abertura da prévia é
+auditada; o conteúdo é escapado e exibido em iframe isolado. Variáveis não
+disponíveis são destacadas, mas a conferência que deverá bloqueá-las ainda não
+existe. A migração `005-blocos-dof` é aplicada apenas em banco novo.
+
+`npm run typecheck`, `npm test` (78 testes em nove arquivos) e `npm audit`
+passaram; a auditoria de dependências não apontou vulnerabilidades. Na
+execução completa, a abertura auditada de uma prévia de 45 anos por HTTPS
+descartável levou 7,5 ms. Em Chromium com API simulada, o máximo observado em
+cinco edições até a exibição foi 33,7 ms com um bloco e 84,7 ms no limite de
+200 blocos e 20.000 caracteres. A atualização local não usa rede nem debounce.
+São medições locais, sem garantia de capacidade operacional ou integração do
+navegador à CA operacional. O bundle principal ainda ultrapassa 500 kB.
+O gate da fatia 5 continua **não cumprido**.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
-possui prévia de documento, emissão, importação ou instalação como
+possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
 conta de serviço, proxy, backup e suporte do sistema operacional permanecem
 sem aceite.
@@ -122,4 +139,5 @@ Divergências e decisões estão em
 [004-autenticacao.md](decisoes/004-autenticacao.md) e
 [005-consulta-servidores.md](decisoes/005-consulta-servidores.md) e
 [006-calculo-interativo-dof.md](decisoes/006-calculo-interativo-dof.md) e
-[007-rascunhos-dof.md](decisoes/007-rascunhos-dof.md).
+[007-rascunhos-dof.md](decisoes/007-rascunhos-dof.md) e
+[008-blocos-e-previa-dof.md](decisoes/008-blocos-e-previa-dof.md).

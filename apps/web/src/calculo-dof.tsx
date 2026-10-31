@@ -9,6 +9,7 @@ import {
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
+import { BlocosDof } from './blocos-dof';
 
 type Props = {
   pessoaId: string;
@@ -77,14 +78,29 @@ export function CalculoDof({
   const [confirmouRemocao, setConfirmouRemocao] = useState(false);
   const [mensagem, setMensagem] = useState('');
   const [ocupado, setOcupado] = useState(false);
+  const [calculoPendente, setCalculoPendente] = useState(false);
+  const [blocosPendentes, setBlocosPendentes] = useState(false);
+  const pendencias = useRef({ calculo: false, blocos: false });
   const ativa = useRef(true);
   useEffect(() => {
     ativa.current = true;
     return () => { ativa.current = false; };
   }, []);
 
+  function marcarCalculo(valor: boolean) {
+    pendencias.current.calculo = valor;
+    setCalculoPendente(valor);
+    onPendente(valor || pendencias.current.blocos);
+  }
+
+  function marcarBlocos(valor: boolean) {
+    pendencias.current.blocos = valor;
+    setBlocosPendentes(valor);
+    onPendente(valor || pendencias.current.calculo);
+  }
+
   function invalidar() {
-    onPendente(true);
+    marcarCalculo(true);
     setConfirmado(false);
     setResultado(null);
     setPedidoCalculado(null);
@@ -217,7 +233,7 @@ export function CalculoDof({
         : await api.criarRascunhoDof(csrf, validacao.data);
       if (ativa.current) {
         setRascunho(salvo);
-        onPendente(false);
+        marcarCalculo(false);
         setAdmissaoAtual(salvo.admissao);
         setResultado(salvo.resultado);
         setResultadoSalvo(true);
@@ -265,7 +281,7 @@ export function CalculoDof({
       <p className="etiqueta">Regra provisória (planilha). O cálculo não grava dados; salvar cria apenas um rascunho, sem conferir ou emitir.</p>
       <p>As ocorrências da fonte não são carregadas automaticamente. Confira os registros e informe os dias de cada intervalo; campos vazios serão tratados como zero somente após sua confirmação.</p>
       <form onSubmit={calcular}>
-        <fieldset disabled={ocupado || !admissaoAtual}>
+        <fieldset disabled={ocupado || blocosPendentes || !admissaoAtual}>
           <div className="grade">
             <label>Início do período<input type="date" value={inicio} required onChange={(evento) => { setInicio(evento.target.value); setTabela(null); invalidar(); }} /></label>
             <label>Fim do período<input type="date" value={fim} required onChange={(evento) => { setFim(evento.target.value); setTabela(null); invalidar(); }} /></label>
@@ -307,7 +323,7 @@ export function CalculoDof({
                 <button type="button" className="secundario" disabled={(pagina + 1) * tamanhoPagina >= tabela.anos.length} onClick={() => setPagina((atual) => atual + 1)}>Próximos anos</button>
               </div>
               <label className="marcador"><input type="checkbox" checked={confirmado} required onChange={(evento) => {
-                if (evento.target.checked) { setConfirmado(true); onPendente(true); }
+                if (evento.target.checked) { setConfirmado(true); marcarCalculo(true); }
                 else invalidar();
               }} />
                 Confirmei todos os anos e intervalos parciais; campos vazios representam zero.</label>
@@ -334,7 +350,7 @@ export function CalculoDof({
       )}
       {podeSalvar && resultado && pedidoCalculado && (
         <form className="separado" onSubmit={salvar}>
-          <fieldset disabled={ocupado}>
+          <fieldset disabled={ocupado || blocosPendentes}>
             {anosExcluidos.length > 0 && (
               <>
                 <p className="aviso erro">
@@ -343,17 +359,21 @@ export function CalculoDof({
                 </p>
                 <label className="marcador">
                   <input type="checkbox" checked={confirmouRemocao} required
-                    onChange={(evento) => { setConfirmouRemocao(evento.target.checked); onPendente(true); }} />
+                    onChange={(evento) => { setConfirmouRemocao(evento.target.checked); marcarCalculo(true); }} />
                   Confirmo a remoção desses anos do rascunho.
                 </label>
               </>
             )}
             <label>Motivo dos lançamentos ou da alteração
-              <textarea value={motivo} onChange={(evento) => { setMotivo(evento.target.value); onPendente(true); }} maxLength={2000} required />
+              <textarea value={motivo} onChange={(evento) => { setMotivo(evento.target.value); marcarCalculo(true); }} maxLength={2000} required />
             </label>
             <button type="submit">{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>
           </fieldset>
         </form>
+      )}
+      {rascunho && podeSalvar && (
+        <BlocosDof rascunho={rascunho} csrf={csrf} bloqueado={calculoPendente || ocupado}
+          onAtualizar={setRascunho} onPendente={marcarBlocos} onErro={onErro} onLimpar={onLimpar} />
       )}
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       <div className="acoes"><button type="button" className="secundario" disabled={ocupado} onClick={() => {

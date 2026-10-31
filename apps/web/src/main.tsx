@@ -88,7 +88,7 @@ function App() {
     setAlteracoesPendentes(valor);
   }, []);
   const confirmarSaida = useCallback(() => !pendencias.current
-    || window.confirm('Há alterações não salvas. Deseja descartá-las?'), []);
+    || window.confirm('Há alterações não salvas. Se uma gravação estiver em andamento, ela ainda poderá ser concluída. Deseja sair mesmo assim?'), []);
   const tratarErro = useCallback((problema: unknown) => {
     setMensagem('');
     if (problema instanceof ErroApi && problema.status === 401) {
@@ -178,7 +178,7 @@ function App() {
       <div className="conteudo">
         <p className="etiqueta">Sistema em construção — não autorizado para uso operacional</p>
         <h1>DOF e DTC</h1>
-        <p>O cálculo de referência da DOF é provisório. Prévia, conferência e emissão ainda não estão disponíveis.</p>
+        <p>O cálculo e a prévia da DOF são provisórios e não têm validade oficial. Conferência e emissão ainda não estão disponíveis.</p>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
