@@ -1,0 +1,35 @@
+# Secrets and operational data
+.env
+.env.*
+!.env.example
+dados-reais/
+**/dados-reais/
+backup/
+**/backup/
+*.pdf
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+chaves/
+**/chaves/
+certificados/
+**/certificados/
+
+# Sensitive source workbooks and document samples
+Modelos e Documentação/*.xlsx
+Modelos e Documentação/*.docx
+Modelos e Documentação/*.jpeg
+
+# Generated files
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+coverage/
+**/coverage/
+playwright-report/
+test-results/
+*.log
