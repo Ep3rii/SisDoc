@@ -18,6 +18,7 @@ import {
   type AtualizarRascunhoDof,
   type CriarRascunhoDof,
   type CriarUsuario,
+  type ConfirmarInicioDof,
   type DetalheServidor,
   type PaginaAuditoria,
   type PaginaBuscaServidores,
@@ -168,6 +169,9 @@ export const api = {
   },
   async atualizarProcessoDof(csrf: string, id: string, dados: AtualizarProcessoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/processo`, 'PATCH', dados, csrf));
+  },
+  async confirmarInicioDof(csrf: string, id: string, dados: ConfirmarInicioDof): Promise<RascunhoDof> {
+    return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/confirmar-inicio`, 'POST', dados, csrf));
   },
   async encaminharRascunhoDof(csrf: string, id: string, dados: EncaminharRascunhoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/encaminhar`, 'POST', dados, csrf));

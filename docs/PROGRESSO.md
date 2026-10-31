@@ -181,6 +181,21 @@ representam desempenho operacional nem substituem a revisão humana.
 correspondentes foram 8,2 ms, 84,2 ms e 158,1 ms, respectivamente; o bundle
 principal ainda excede 500 kB.
 
+O autor pode confirmar expressamente o ajuste de início anterior à admissão,
+com revisão, confirmação cifrada e auditoria. Essa confirmação é invalidada
+quando o cálculo é editado e não é considerada válida enquanto a admissão da
+fonte divergir. Não pode ser alterada em documento encaminhado ou conferido.
+Na consulta preliminar, sua ausência permanece um bloqueio; sua presença não
+representa conferência nem aprovação. A migração `009-confirmacao-inicio-dof`
+é aplicada apenas a banco novo. Não há procedimento autorizado para atualizar
+uma instalação existente. Testes direcionados passaram (34 testes em três
+arquivos), com permissões, CSRF, cifra, alterações da fonte e concorrência em
+PostgreSQL/HTTPS descartáveis e navegador com API simulada. `npm run typecheck`
+passou, `npm test` passou com 90 testes em 13 arquivos e `npm audit` não
+apontou vulnerabilidades. Na suíte completa, a prévia HTTPS de 45 anos levou
+7,8 ms e a atualização local no limite de blocos chegou a 84,9 ms, ou 159,3 ms
+com milhares de delimitadores malformados.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -197,4 +212,5 @@ Divergências e decisões estão em
 [008-blocos-e-previa-dof.md](decisoes/008-blocos-e-previa-dof.md) e
 [009-processo-dof.md](decisoes/009-processo-dof.md) e
 [010-encaminhamento-dof.md](decisoes/010-encaminhamento-dof.md) e
-[011-preconferencia-dof.md](decisoes/011-preconferencia-dof.md).
+[011-preconferencia-dof.md](decisoes/011-preconferencia-dof.md) e
+[012-confirmacao-inicio-dof.md](decisoes/012-confirmacao-inicio-dof.md).

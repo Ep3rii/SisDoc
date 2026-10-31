@@ -167,10 +167,10 @@ export async function verificarPreconferenciaDof(
       });
     }
   }
-  if (rascunho.entrada.inicio < rascunho.resultado.admissaoConsiderada) {
+  if (rascunho.entrada.inicio < rascunho.resultado.admissaoConsiderada && !rascunho.inicioAjustadoConfirmado) {
     bloqueios.push({
       codigo: 'inicio_ajustado_sem_confirmacao',
-      mensagem: 'O início foi ajustado à admissão; a confirmação específica para conferência ainda não está disponível.',
+      mensagem: 'O início foi ajustado à admissão; o autor deve confirmar explicitamente o ajuste.',
     });
   }
   if (!rascunho.processo) {

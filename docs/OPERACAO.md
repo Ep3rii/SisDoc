@@ -67,12 +67,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 008, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 009, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `008-preconferencia-dof` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `009-confirmacao-inicio-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -126,6 +126,15 @@ Se ela mudar, prepare a tabela e confira novamente; se estiver ausente, a
 edição fica indisponível, embora o resultado salvo possa ser consultado.
 Uma versão de regra diferente da disponível bloqueia a edição. A interface não
 altera dados funcionais da fonte e o rascunho não é conferência nem emissão.
+
+Quando o início informado anteceder a admissão considerada, o cálculo usa a
+admissão como início efetivo. No rascunho salvo e sem alterações pendentes, o
+autor deve marcar a confirmação específica e selecionar **Confirmar ajuste do
+início** antes do encaminhamento. A confirmação fica cifrada e auditada, cria
+uma nova revisão e não constitui conferência nem emissão. Ao alterar o
+cálculo, confirme novamente; se a admissão atual divergir da considerada, a
+confirmação deixa de valer enquanto houver divergência. Se a fonte estiver
+sendo atualizada, aguarde e tente novamente.
 
 ## Blocos e prévia provisória
 

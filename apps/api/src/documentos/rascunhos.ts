@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, NotFoundException, ServiceUnava
 import { REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
   blocoRascunhoDofSchema,
+  dataFuncionalSchema,
   numeroProcessoSchema,
   processoCorrespondeMascara,
   rascunhoDofSchema,
@@ -14,6 +15,7 @@ import {
   type BlocoRascunhoDof,
   type CodigoBlocoDof,
   type Configuracao,
+  type ConfirmarInicioDof,
   type CriarRascunhoDof,
   type EncaminharRascunhoDof,
   type PaginaCoordenadoresDof,
@@ -25,6 +27,7 @@ import {
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
 import { DatabaseError, type Pool, type PoolClient } from 'pg';
+import { z } from 'zod';
 import { transacao } from '../banco';
 import { calcularDofNaTransacao } from '../calculos/calculos';
 import { VERSAO_BLOCO_VAZIO } from '../migracoes/blocos-dof';
@@ -51,6 +54,7 @@ type LinhaRascunho = {
   entrada_cifrada: Buffer;
   resultado_calculo_cifrado: Buffer | null;
   processo_cifrado: Buffer | null;
+  confirmacao_inicio_cifrada: Buffer | null;
   regra_codigo: string;
   regra_versao: string;
   regra_atual: boolean;
@@ -66,6 +70,12 @@ type LinhaEncaminhamento = {
   destinatario_disponivel: boolean;
   encaminhado_em: Date;
 };
+const confirmacaoInicioProtegidaSchema = z.strictObject({
+  inicio: dataFuncionalSchema,
+  admissao: dataFuncionalSchema,
+  confirmadoPor: z.uuid(),
+  confirmadoEm: z.iso.datetime(),
+});
 
 function concluir<T>(tentativa: Tentativa<T>): T {
   if ('valor' in tentativa) return tentativa.valor;
@@ -167,6 +177,13 @@ export class RascunhosService {
         || resultado.periodo.fim !== entrada.fim) {
       throw new Error('Período calculado do rascunho é inconsistente.');
     }
+    const confirmacaoInicio = linha.confirmacao_inicio_cifrada
+      ? confirmacaoInicioProtegidaSchema.parse(
+        this.ler('documento', linha.id, 'confirmacao_inicio_cifrada', linha.confirmacao_inicio_cifrada),
+      ) : null;
+    if (confirmacaoInicio && confirmacaoInicio.confirmadoPor !== linha.criado_por) {
+      throw new Error('Autor da confirmação do início é inconsistente.');
+    }
     const encaminhamento = await this.encaminhamento(cliente, linha.id);
     return rascunhoDofSchema.parse({
       id: linha.id,
@@ -181,6 +198,11 @@ export class RascunhosService {
       status: 'rascunho',
       entrada,
       resultado,
+      inicioAjustadoConfirmado: Boolean(confirmacaoInicio
+        && entrada.inicio < resultado.admissaoConsiderada
+        && confirmacaoInicio.inicio === entrada.inicio
+        && confirmacaoInicio.admissao === resultado.admissaoConsiderada
+        && linha.admissao === confirmacaoInicio.admissao),
       blocos: await this.blocos(cliente, linha.id),
       processo: linha.processo_cifrado
         ? numeroProcessoSchema.parse(this.ler('documento', linha.id, 'processo_cifrado', linha.processo_cifrado)) : null,
@@ -207,7 +229,7 @@ export class RascunhosService {
     const consulta = await cliente.query<LinhaRascunho>(`
       SELECT d.id, d.pessoa_id, d.vinculo_id, d.criado_por, p.nome, v.matricula,
         to_char(v.admissao, 'YYYY-MM-DD') AS admissao, d.revisao, d.criado_em, d.atualizado_em,
-        d.entrada_cifrada, d.resultado_calculo_cifrado, d.processo_cifrado,
+        d.entrada_cifrada, d.resultado_calculo_cifrado, d.processo_cifrado, d.confirmacao_inicio_cifrada,
         r.codigo AS regra_codigo, r.versao AS regra_versao,
         (r.codigo = $3 AND r.versao = $4 AND r.configuracao = $5::jsonb) AS regra_atual
       FROM documentos.documento d
@@ -463,7 +485,7 @@ export class RascunhosService {
         return { falha: { tipo: 'conflito', mensagem: calculo.conflito } };
       }
       await cliente.query(`
-        UPDATE documentos.documento SET entrada_cifrada = $1, resultado_calculo_cifrado = $2,
+        UPDATE documentos.documento SET entrada_cifrada = $1, resultado_calculo_cifrado = $2, confirmacao_inicio_cifrada = NULL,
           atualizado_por = $3, atualizado_em = now(), revisao = revisao + 1 WHERE id = $4
       `, [
         this.cifrar('documento', id, 'entrada_cifrada', entrada),
@@ -612,6 +634,61 @@ export class RascunhosService {
       const atualizado = await this.linha(cliente, id, sessao.usuario.id);
       if (!atualizado) throw new Error('Rascunho com processo atualizado não pôde ser recuperado.');
       return { valor: await this.apresentar(cliente, atualizado) };
+    });
+    return concluir(tentativa);
+  }
+
+  async confirmarInicio(
+    sessao: SessaoAutenticada, ip: string, id: string, dados: ConfirmarInicioDof,
+  ): Promise<RascunhoDof> {
+    const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
+      }
+      const bloqueio = await cliente.query<{ obtido: boolean }>(
+        'SELECT pg_try_advisory_xact_lock_shared($1, $2) AS obtido', [...CHAVE_BLOQUEIO_FONTE_DOF],
+      );
+      if (!bloqueio.rows[0].obtido) {
+        await auditarConsultaFuncional(cliente, sessao, 'confirmacao_inicio_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente confirmar novamente.' } };
+      }
+      const atual = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a confirmação do início.');
+      const rascunho = await this.apresentar(cliente, atual);
+      if (rascunho.encaminhamento) {
+        return { falha: { tipo: 'conflito', mensagem: 'Recolha o encaminhamento antes de confirmar o ajuste do início.' } };
+      }
+      if (!atual.regra_atual || !rascunho.admissao || rascunho.admissao !== rascunho.resultado.admissaoConsiderada) {
+        return { falha: { tipo: 'conflito', mensagem: 'A admissão ou a regra do rascunho mudou. Reabra e confira o cálculo antes de confirmar.' } };
+      }
+      if (rascunho.entrada.inicio >= rascunho.admissao) {
+        return { falha: { tipo: 'invalido', mensagem: 'Este rascunho não possui início ajustado à admissão.' } };
+      }
+      if (rascunho.inicioAjustadoConfirmado) {
+        return { falha: { tipo: 'conflito', mensagem: 'O ajuste do início já foi confirmado nesta versão do cálculo.' } };
+      }
+      const tempo = await cliente.query<{ confirmado_em: Date }>('SELECT now() AS confirmado_em');
+      const confirmacao = confirmacaoInicioProtegidaSchema.parse({
+        inicio: rascunho.entrada.inicio,
+        admissao: rascunho.admissao,
+        confirmadoPor: sessao.usuario.id,
+        confirmadoEm: tempo.rows[0].confirmado_em.toISOString(),
+      });
+      await cliente.query(`
+        UPDATE documentos.documento SET confirmacao_inicio_cifrada = $1, atualizado_por = $2,
+          atualizado_em = now(), revisao = revisao + 1 WHERE id = $3
+      `, [this.cifrar('documento', id, 'confirmacao_inicio_cifrada', confirmacao), sessao.usuario.id, id]);
+      await auditarConsultaFuncional(cliente, sessao, 'inicio_ajustado_confirmado', 'documento', id, atual.pessoa_id, ip);
+      const confirmado = await this.linha(cliente, id, sessao.usuario.id);
+      if (!confirmado) throw new Error('Rascunho com início confirmado não pôde ser recuperado.');
+      return { valor: await this.apresentar(cliente, confirmado) };
     });
     return concluir(tentativa);
   }

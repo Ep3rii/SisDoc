@@ -10,6 +10,7 @@ import {
 } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { BlocosDof } from './blocos-dof';
+import { ConfirmacaoInicioDof } from './confirmacao-inicio-dof';
 import { EncaminhamentoDof } from './encaminhamento-dof';
 import { VerificacaoConferenciaDof } from './preconferencia-dof';
 import { ProcessoDof } from './processo-dof';
@@ -394,6 +395,13 @@ export function CalculoDof({
             <button type="submit">{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>
           </fieldset>
         </form>
+      )}
+      {rascunho && (podeSalvar || somenteLeitura) && (
+        <ConfirmacaoInicioDof rascunho={rascunho} csrf={csrf}
+          bloqueado={calculoPendente || blocosPendentes || processoPendente || encaminhamentoPendente
+            || operacaoEncaminhamento || ocupado}
+          somenteLeitura={edicaoIndisponivel}
+          onAtualizar={setRascunho} onOcupado={setOcupado} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && (podeSalvar || somenteLeitura) && (
         <ProcessoDof rascunho={rascunho} csrf={csrf}

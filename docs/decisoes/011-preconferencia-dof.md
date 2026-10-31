@@ -14,8 +14,8 @@ São verificadas a integridade e consistência do CPF protegido e de seu HMAC,
 a matrícula normalizada e a duplicidade entre vínculos ativos, situação de
 remoção, admissão, nascimento posterior à admissão, período persistido,
 versão de regra, recálculo, processo e máscaras atuais. Início anterior à
-admissão permanece bloqueado porque ainda não existe confirmação específica
-para conferência. O parser usado pela prévia também detecta variáveis sem
+admissão permanece bloqueado sem a confirmação específica descrita na
+[decisão 012](012-confirmacao-inicio-dof.md). O parser usado pela prévia também detecta variáveis sem
 valor e expressões malformadas em blocos ativos. Campos presentes na
 referência, mas ainda sem obrigatoriedade institucional definida, geram aviso.
 Para o nome da mãe é verificada somente a presença do campo cifrado; seu

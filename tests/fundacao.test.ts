@@ -36,6 +36,7 @@ import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarBlocosDof } from '../apps/api/dist/migracoes/blocos-dof.js';
+import { aplicarConfirmacaoInicioDof } from '../apps/api/dist/migracoes/confirmacao-inicio-dof.js';
 import { aplicarEncaminhamentoDof } from '../apps/api/dist/migracoes/encaminhamento-dof.js';
 import { aplicarPreconferenciaDof, CHAVE_BLOQUEIO_FONTE_DOF } from '../apps/api/dist/migracoes/preconferencia-dof.js';
 import { aplicarProcessoDof } from '../apps/api/dist/migracoes/processo-dof.js';
@@ -688,6 +689,9 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarPreconferenciaDof(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarConfirmacaoInicioDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
@@ -696,6 +700,7 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarProcessoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarEncaminhamentoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarPreconferenciaDof(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarConfirmacaoInicioDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -1011,6 +1016,8 @@ describe('fundação em recursos descartáveis', () => {
       await cliente.query(`
         UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = now() WHERE id = $1
       `, [dof, usuario]);
+      await rejeitarSql(cliente, 'UPDATE documentos.documento SET confirmacao_inicio_cifrada = $2 WHERE id = $1',
+        [dof, conteudo], '55000');
       await rejeitarSql(cliente, "UPDATE documentos.documento SET status = 'rascunho' WHERE id = $1", [dof], '23514');
       await cliente.query(`
         UPDATE documentos.documento SET status = 'rascunho', conferido_por = NULL, conferido_em = NULL WHERE id = $1
@@ -2615,6 +2622,167 @@ describe('fundação em recursos descartáveis', () => {
         expect(preconferenciaDofSchema.parse(JSON.parse(relatorioAjustado.corpo)).bloqueios.map((item) => item.codigo))
           .toContain('inicio_ajustado_sem_confirmacao');
 
+        const rotaConfirmarInicio = `/api/v1/documentos/${idAjustado}/confirmar-inicio`;
+        const confirmacaoInicial = { revisao: 1, confirmar: true };
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial,
+        })).status).toBe(401);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, cookie: autor.cookie,
+        })).status).toBe(403);
+        for (const chave of ['secretario', 'administrador']) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...sessao(chave),
+          })).status).toBe(403);
+        }
+        for (const chave of ['outro-analista', 'primeiro-coordenador']) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...sessao(chave),
+          })).status).toBe(404);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: { revisao: 1, confirmar: false }, ...autor,
+        })).status).toBe(400);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/confirmar-inicio`, corpo: { revisao: 3, confirmar: true }, ...autor,
+        })).status).toBe(400);
+        await cliente.query("UPDATE nucleo.vinculo SET admissao = '1981-01-01' WHERE id = $1", [vinculoId]);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...autor,
+        })).status).toBe(409);
+        await cliente.query("UPDATE nucleo.vinculo SET admissao = '1980-01-01' WHERE id = $1", [vinculoId]);
+        const escritaDuranteConfirmacao = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await escritaDuranteConfirmacao.connect();
+        try {
+          await escritaDuranteConfirmacao.query('BEGIN');
+          await escritaDuranteConfirmacao.query('UPDATE nucleo.vinculo SET cargo = cargo WHERE id = $1', [vinculoId]);
+          const ocupada = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...autor,
+          });
+          expect(ocupada.status, ocupada.corpo).toBe(409);
+        } finally {
+          await escritaDuranteConfirmacao.query('ROLLBACK');
+          await escritaDuranteConfirmacao.end();
+        }
+        const confirmacoes = await Promise.all([1, 2].map(() => requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...autor,
+        })));
+        expect(confirmacoes.map((item) => item.status).sort()).toEqual([201, 409]);
+        const confirmada = confirmacoes.find((item) => item.status === 201);
+        if (!confirmada) throw new Error('Confirmação sintética ausente.');
+        expect(rascunhoDofSchema.parse(JSON.parse(confirmada.corpo))).toMatchObject({
+          revisao: 2, inicioAjustadoConfirmado: true, status: 'rascunho',
+        });
+        const confirmadoJson = JSON.parse(confirmada.corpo);
+        expect(rascunhoDofSchema.safeParse({ ...confirmadoJson, admissao: '1981-01-01' }).success).toBe(false);
+        expect(rascunhoDofSchema.safeParse({
+          ...confirmadoJson, entrada: { ...confirmadoJson.entrada, inicio: '1980-01-01' },
+        }).success).toBe(false);
+        const confirmacaoProtegida = await cliente.query<{ confirmacao_inicio_cifrada: Buffer }>(
+          'SELECT confirmacao_inicio_cifrada FROM documentos.documento WHERE id = $1', [idAjustado],
+        );
+        const cifraInicio = confirmacaoProtegida.rows[0].confirmacao_inicio_cifrada;
+        expect(cifraInicio.includes(Buffer.from('1979-01-01'))).toBe(false);
+        const confirmacaoDecifrada = JSON.parse(protetor.decifrar(cifraInicio, {
+          schema: 'documentos', tabela: 'documento', registroId: idAjustado, campo: 'confirmacao_inicio_cifrada',
+        }).toString('utf8'));
+        expect(confirmacaoDecifrada).toMatchObject({
+          inicio: '1979-01-01', admissao: '1980-01-01', confirmadoPor: porChave('autor').id,
+        });
+        try {
+          const autorIncorreto = protetor.cifrar(Buffer.from(JSON.stringify({
+            ...confirmacaoDecifrada, confirmadoPor: porChave('outro-analista').id,
+          })), { schema: 'documentos', tabela: 'documento', registroId: idAjustado, campo: 'confirmacao_inicio_cifrada' });
+          await cliente.query('UPDATE documentos.documento SET confirmacao_inicio_cifrada = $1 WHERE id = $2',
+            [autorIncorreto, idAjustado]);
+          const inconsistente = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `/api/v1/documentos/${idAjustado}`, cookie: autor.cookie,
+          });
+          expect(inconsistente.status, inconsistente.corpo).toBe(500);
+          expect(inconsistente.corpo).not.toContain('1979-01-01');
+        } finally {
+          await cliente.query('UPDATE documentos.documento SET confirmacao_inicio_cifrada = $1 WHERE id = $2',
+            [cifraInicio, idAjustado]);
+        }
+        const semBloqueioInicio = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${idAjustado}/preconferencia`, cookie: autor.cookie,
+        });
+        expect(semBloqueioInicio.status, semBloqueioInicio.corpo).toBe(200);
+        expect(preconferenciaDofSchema.parse(JSON.parse(semBloqueioInicio.corpo)).bloqueios.map((item) => item.codigo))
+          .not.toContain('inicio_ajustado_sem_confirmacao');
+        await cliente.query("UPDATE nucleo.vinculo SET admissao = '1981-01-01' WHERE id = $1", [vinculoId]);
+        const fonteDivergente = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${idAjustado}`, cookie: autor.cookie,
+        });
+        expect(rascunhoDofSchema.parse(JSON.parse(fonteDivergente.corpo)).inicioAjustadoConfirmado).toBe(false);
+        await cliente.query("UPDATE nucleo.vinculo SET admissao = '1980-01-01' WHERE id = $1", [vinculoId]);
+        const processoAjustado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${idAjustado}/processo`,
+          corpo: { revisao: 2, processo: '1234/5678', motivo: 'Processo fictício' }, ...autor,
+        });
+        expect(processoAjustado.status, processoAjustado.corpo).toBe(200);
+        expect(rascunhoDofSchema.parse(JSON.parse(processoAjustado.corpo)).inicioAjustadoConfirmado).toBe(true);
+        const alterarAjustado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${idAjustado}`,
+          corpo: {
+            revisao: 3,
+            calculo: { ...calculo, inicio: '1979-01-01', anos: anos.map((item, indice) => indice === 0 ? { ...item, faltas: 1 } : item) },
+            admissaoEsperada: '1980-01-01',
+            motivo: 'Correção sintética',
+          },
+          ...autor,
+        });
+        expect(alterarAjustado.status, alterarAjustado.corpo).toBe(200);
+        expect(rascunhoDofSchema.parse(JSON.parse(alterarAjustado.corpo))).toMatchObject({
+          revisao: 4, inicioAjustadoConfirmado: false,
+        });
+        expect((await cliente.query('SELECT confirmacao_inicio_cifrada FROM documentos.documento WHERE id = $1', [idAjustado]))
+          .rows[0].confirmacao_inicio_cifrada).toBeNull();
+        const aposEdicao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${idAjustado}/preconferencia`, cookie: autor.cookie,
+        });
+        expect(preconferenciaDofSchema.parse(JSON.parse(aposEdicao.corpo)).bloqueios.map((item) => item.codigo))
+          .toContain('inicio_ajustado_sem_confirmacao');
+        const reconfirmacao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: { revisao: 4, confirmar: true }, ...autor,
+        });
+        expect(reconfirmacao.status, reconfirmacao.corpo).toBe(201);
+        const ajustadoEncaminhado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `/api/v1/documentos/${idAjustado}/encaminhar`,
+          corpo: { revisao: 5, destinatarioId }, ...autor,
+        });
+        expect(ajustadoEncaminhado.status, ajustadoEncaminhado.corpo).toBe(201);
+        expect(rascunhoDofSchema.parse(JSON.parse(ajustadoEncaminhado.corpo))).toMatchObject({
+          revisao: 6, inicioAjustadoConfirmado: true,
+        });
+        const recebidoAjustado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${idAjustado}`, cookie: primeiro.cookie,
+        });
+        expect(rascunhoDofSchema.parse(JSON.parse(recebidoAjustado.corpo)).inicioAjustadoConfirmado).toBe(true);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: { revisao: 6, confirmar: true }, ...autor,
+        })).status).toBe(409);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: rotaConfirmarInicio, corpo: { revisao: 6, confirmar: true }, ...primeiro,
+        })).status).toBe(404);
+        const ajustadoRecolhido = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `/api/v1/documentos/${idAjustado}/recolher`,
+          corpo: { revisao: 6, motivo: 'Recolhimento fictício' }, ...autor,
+        });
+        expect(ajustadoRecolhido.status, ajustadoRecolhido.corpo).toBe(201);
+        expect(rascunhoDofSchema.parse(JSON.parse(ajustadoRecolhido.corpo))).toMatchObject({
+          revisao: 7, inicioAjustadoConfirmado: true, encaminhamento: null,
+        });
+        const eventosInicio = await cliente.query<{ acao: string }>(
+          'SELECT acao FROM seguranca.auditoria WHERE entidade_id = $1', [idAjustado],
+        );
+        expect(eventosInicio.rows.map((item) => item.acao)).toEqual(expect.arrayContaining([
+          'inicio_ajustado_confirmado', 'confirmacao_inicio_fonte_ocupada',
+        ]));
+
         const cifraCpf = protetor.cifrar(Buffer.from(cpf, 'ascii'), {
           schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'cpf_cifrado',
         });
@@ -2870,6 +3038,8 @@ describe('fundação em recursos descartáveis', () => {
             [Buffer.from('alteração fictícia'), rascunho.id], '55000');
           await rejeitarSql(aplicativo, 'UPDATE documentos.documento SET processo_cifrado = $1 WHERE id = $2',
             [Buffer.from('alteração fictícia'), rascunho.id], '55000');
+          await rejeitarSql(aplicativo, 'UPDATE documentos.documento SET confirmacao_inicio_cifrada = $1 WHERE id = $2',
+            [Buffer.from('confirmação fictícia'), rascunho.id], '55000');
           await rejeitarSql(aplicativo, 'UPDATE documentos.documento_periodo SET fim = fim WHERE documento_id = $1',
             [rascunho.id], '55000');
           await rejeitarSql(aplicativo, 'UPDATE documentos.documento_bloco SET ativo = false WHERE id = $1',

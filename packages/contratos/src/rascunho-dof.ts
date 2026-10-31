@@ -58,6 +58,11 @@ export const recolherRascunhoDofSchema = z.strictObject({
   motivo: motivoSchema,
 });
 
+export const confirmarInicioDofSchema = z.strictObject({
+  revisao: revisaoSchema,
+  confirmar: z.literal(true),
+});
+
 export const criarRascunhoDofSchema = z.strictObject({
   calculo: solicitarCalculoDofSchema,
   admissaoEsperada: dataFuncionalSchema,
@@ -155,6 +160,7 @@ export const rascunhoDofSchema = resumoRascunhoDofSchema.extend({
   criadoEm: z.iso.datetime(),
   entrada: solicitarCalculoDofSchema,
   resultado: resultadoCalculoDofSchema,
+  inicioAjustadoConfirmado: z.boolean(),
   blocos: blocosDofSchema,
   processo: numeroProcessoSchema.nullable(),
   mascarasProcesso: z.array(mascaraProcessoSchema).max(10),
@@ -164,6 +170,15 @@ export const rascunhoDofSchema = resumoRascunhoDofSchema.extend({
     destinatarioDisponivel: z.boolean(),
     encaminhadoEm: z.iso.datetime(),
   }).nullable(),
+}).superRefine((rascunho, contexto) => {
+  if (rascunho.inicioAjustadoConfirmado
+      && (rascunho.entrada.inicio >= rascunho.resultado.admissaoConsiderada
+        || rascunho.admissao !== rascunho.resultado.admissaoConsiderada)) {
+    contexto.addIssue({
+      code: 'custom', path: ['inicioAjustadoConfirmado'],
+      message: 'A confirmação exige início anterior à admissão atual utilizada no cálculo.',
+    });
+  }
 });
 
 export type AtualizarProcessoDof = z.infer<typeof atualizarProcessoDofSchema>;
@@ -173,6 +188,7 @@ export type CriarRascunhoDof = z.infer<typeof criarRascunhoDofSchema>;
 export type AtualizarRascunhoDof = z.infer<typeof atualizarRascunhoDofSchema>;
 export type EncaminharRascunhoDof = z.infer<typeof encaminharRascunhoDofSchema>;
 export type RecolherRascunhoDof = z.infer<typeof recolherRascunhoDofSchema>;
+export type ConfirmarInicioDof = z.infer<typeof confirmarInicioDofSchema>;
 export type PaginaCoordenadoresDof = z.infer<typeof paginaCoordenadoresDofSchema>;
 export type PaginaEncaminhamentosDof = z.infer<typeof paginaEncaminhamentosDofSchema>;
 export type PaginaRascunhosDof = z.infer<typeof paginaRascunhosDofSchema>;

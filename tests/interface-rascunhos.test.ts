@@ -4,6 +4,7 @@ import {
   atualizarRascunhoDofSchema,
   atualizarBlocosDofSchema,
   atualizarProcessoDofSchema,
+  confirmarInicioDofSchema,
   encaminharRascunhoDofSchema,
   processoCorrespondeMascara,
   criarRascunhoDofSchema,
@@ -176,7 +177,8 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           id: documentoId, pessoaId, vinculoId, nome, matricula, admissao: estado.admissao,
           revisao: 1, criadoEm: agora, atualizadoEm: agora, status: 'rascunho',
           entrada: dados.calculo, resultado: resultadoSintetico(dados.calculo, estado.admissao),
-          blocos: [], processo: null, mascarasProcesso: ['####/####'], encaminhamento: null,
+          inicioAjustadoConfirmado: false, blocos: [], processo: null,
+          mascarasProcesso: ['####/####'], encaminhamento: null,
         };
         estado.escritas += 1;
         return responder(rota, 201, estado.rascunho);
@@ -203,6 +205,9 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
             ...(!estado.rascunho.processo ? [{ codigo: 'processo_ausente', mensagem: 'Informe o número do processo.' }] : []),
             ...(variaveis.indisponiveis.length ? [{ codigo: 'variaveis_ausentes', mensagem: 'Há variáveis indisponíveis.' }] : []),
             ...(variaveis.malformadas ? [{ codigo: 'variaveis_malformadas', mensagem: 'Há expressões malformadas.' }] : []),
+            ...(estado.rascunho.entrada.inicio < estado.rascunho.resultado.admissaoConsiderada
+              && !estado.rascunho.inicioAjustadoConfirmado
+              ? [{ codigo: 'inicio_ajustado_sem_confirmacao', mensagem: 'Confirme o ajuste do início.' }] : []),
           ],
           avisos: [{ codigo: 'regra_provisoria', mensagem: 'A regra é provisória.' }],
         };
@@ -210,6 +215,23 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           await new Promise<void>((resolve) => { estado.liberarPreconferencia = resolve; });
         }
         return responder(rota, 200, resposta);
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/confirmar-inicio` && metodo === 'POST' && estado.rascunho) {
+        if (estado.falhaRede) return rota.abort('failed');
+        const dados = confirmarInicioDofSchema.parse(requisicao.postDataJSON());
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao || estado.rascunho.encaminhamento
+            || estado.admissao !== estado.rascunho.resultado.admissaoConsiderada) {
+          return responder(rota, 409, { detail: 'O rascunho ou a admissão mudou; reabra antes de confirmar.' });
+        }
+        if (estado.rascunho.entrada.inicio >= estado.rascunho.resultado.admissaoConsiderada) {
+          return responder(rota, 400, { detail: 'Este rascunho não possui início ajustado.' });
+        }
+        estado.rascunho = {
+          ...estado.rascunho, revisao: estado.rascunho.revisao + 1,
+          atualizadoEm: new Date().toISOString(), inicioAjustadoConfirmado: true,
+        };
+        estado.escritas += 1;
+        return responder(rota, 201, estado.rascunho);
       }
       if (caminho === `/api/v1/documentos/${documentoId}/encaminhar` && metodo === 'POST' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
@@ -294,7 +316,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
         estado.rascunho = {
           ...estado.rascunho, admissao: estado.admissao, revisao: estado.rascunho.revisao + 1,
           atualizadoEm: new Date().toISOString(), entrada: dados.calculo,
-          resultado: resultadoSintetico(dados.calculo, estado.admissao),
+          resultado: resultadoSintetico(dados.calculo, estado.admissao), inicioAjustadoConfirmado: false,
         };
         estado.escritas += 1;
         return responder(rota, 200, estado.rascunho);
@@ -791,6 +813,29 @@ describe('interface de rascunhos com API sintética', () => {
     estado.liberarPreconferencia?.();
     await pagina.getByRole('alert').getByText(/O rascunho mudou durante a verificação/).waitFor();
     expect(await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).count()).toBe(0);
+  });
+
+  it('exige confirmação explícita do início ajustado sem conferir o rascunho', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await pagina.getByLabel('Início do período').fill('1979-01-01');
+    await pagina.getByRole('button', { name: 'Preparar tabela anual' }).click();
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    const botao = pagina.getByRole('button', { name: 'Confirmar ajuste do início' });
+    expect(await botao.isDisabled()).toBe(true);
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Confirme o ajuste do início.').waitFor();
+    await pagina.getByRole('checkbox', { name: 'Confirmei que o início efetivo deve ser ajustado à admissão informada.' }).check();
+    await botao.click();
+    await pagina.getByText('O autor confirmou o ajuste para este cálculo.', { exact: false }).waitFor();
+    expect(estado.rascunho).toMatchObject({ revisao: 2, inicioAjustadoConfirmado: true, status: 'rascunho' });
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
+    expect(await pagina.getByText('Confirme o ajuste do início.').count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Conferir', exact: true }).count()).toBe(0);
   });
 
   it('restringe controles por perfil e apresenta falha de listagem com retentativa e paginação', async () => {

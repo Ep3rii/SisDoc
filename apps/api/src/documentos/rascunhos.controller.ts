@@ -2,7 +2,7 @@ import type { ServerResponse } from 'node:http';
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import {
   atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema,
-  encaminharRascunhoDofSchema, paginaUuidQuerySchema, recolherRascunhoDofSchema,
+  confirmarInicioDofSchema, encaminharRascunhoDofSchema, paginaUuidQuerySchema, recolherRascunhoDofSchema,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { z } from 'zod';
@@ -96,6 +96,14 @@ export class RascunhosController {
     const dados = atualizarProcessoDofSchema.safeParse(corpo);
     if (!dados.success) throw new BadRequestException('Confira a revisão, o número do processo e o motivo da alteração.');
     return this.rascunhos.atualizarProcesso(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
+  }
+
+  @ExigirAcao('editar_rascunho')
+  @Post(':id/confirmar-inicio')
+  confirmarInicio(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = confirmarInicioDofSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira a revisão e confirme explicitamente o ajuste do início.');
+    return this.rascunhos.confirmarInicio(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
   }
 
   @ExigirAcao('editar_rascunho')
