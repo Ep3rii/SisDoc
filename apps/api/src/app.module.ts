@@ -5,6 +5,8 @@ import type { Pool } from 'pg';
 import { BANCO, CONFIGURACAO } from './injecao';
 import { CalculosController } from './calculos/calculos.controller';
 import { CalculosService } from './calculos/calculos';
+import { RascunhosController } from './documentos/rascunhos.controller';
+import { RascunhosService } from './documentos/rascunhos';
 import { AutenticacaoService } from './seguranca/autenticacao';
 import { AutenticacaoController } from './seguranca/autenticacao.controller';
 import { GuardaAcesso, Publica } from './seguranca/guarda';
@@ -39,7 +41,7 @@ export class AppModule {
   static registrar(banco: Pool, configuracao: Configuracao): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController],
+      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController, RascunhosController],
       providers: [
         { provide: BANCO, useValue: banco },
         { provide: CONFIGURACAO, useValue: configuracao },
@@ -62,6 +64,11 @@ export class AppModule {
           provide: CalculosService,
           useFactory: (pool: Pool) => new CalculosService(pool),
           inject: [BANCO],
+        },
+        {
+          provide: RascunhosService,
+          useFactory: (pool: Pool, config: Configuracao) => new RascunhosService(pool, config),
+          inject: [BANCO, CONFIGURACAO],
         },
         { provide: APP_GUARD, useClass: GuardaAcesso },
         { provide: 'ENCERRAR_BANCO', useValue: { onApplicationShutdown: () => banco.end() } },

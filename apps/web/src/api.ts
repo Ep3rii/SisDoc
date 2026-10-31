@@ -2,18 +2,24 @@ import {
   paginaAuditoriaSchema,
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
+  paginaRascunhosDofSchema,
   paginaUsuariosSchema,
   detalheServidorSchema,
+  rascunhoDofSchema,
   resultadoCalculoDofSchema,
   respostaSessaoSchema,
   usuarioAdministrativoSchema,
   type AtualizarUsuario,
+  type AtualizarRascunhoDof,
+  type CriarRascunhoDof,
   type CriarUsuario,
   type DetalheServidor,
   type PaginaAuditoria,
   type PaginaBuscaServidores,
   type PaginaEventosServidor,
+  type PaginaRascunhosDof,
   type PaginaUsuarios,
+  type RascunhoDof,
   type RespostaSessao,
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
@@ -128,5 +134,17 @@ export const api = {
   },
   async calcularDof(csrf: string, dados: SolicitarCalculoDof): Promise<ResultadoCalculoDof> {
     return validar(resultadoCalculoDofSchema, await requisitar('calculos', 'POST', dados, csrf));
+  },
+  async listarRascunhosDof(cursor?: string): Promise<PaginaRascunhosDof> {
+    return validar(paginaRascunhosDofSchema, await requisitar(`documentos?${parametros(cursor)}`));
+  },
+  async obterRascunhoDof(id: string): Promise<RascunhoDof> {
+    return validar(rascunhoDofSchema, await requisitar(`documentos/${id}`));
+  },
+  async criarRascunhoDof(csrf: string, dados: CriarRascunhoDof): Promise<RascunhoDof> {
+    return validar(rascunhoDofSchema, await requisitar('documentos', 'POST', dados, csrf));
+  },
+  async atualizarRascunhoDof(csrf: string, id: string, dados: AtualizarRascunhoDof): Promise<RascunhoDof> {
+    return validar(rascunhoDofSchema, await requisitar(`documentos/${id}`, 'PATCH', dados, csrf));
   },
 };

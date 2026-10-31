@@ -50,6 +50,9 @@ try {
       env: {
         ...env,
         SISDOC_TEST_TEMP: temporario,
+        TEMP: temporario,
+        TMP: temporario,
+        TMPDIR: temporario,
         NODE_OPTIONS: [process.env.NODE_OPTIONS, '--preserve-symlinks'].filter(Boolean).join(' '),
       },
       stdio: 'inherit',

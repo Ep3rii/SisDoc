@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo de referência por vínculo, com lançamento anual confirmado; rascunho, prévia, emissão e PDF ainda não implementados |
+| 5 — DOF | parcial | cálculo de referência e rascunhos próprios cifrados; editor de blocos, prévia, conferência, emissão e PDF ainda não implementados |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -78,7 +78,7 @@ revisão de acessibilidade ou revisão humana. O gerador atual atende à aferiç
 da consulta, mas ainda não cobre todos os cenários necessários à importação
 e sincronização da fatia 7.
 
-Na fatia 5, o cálculo interativo da DOF usa a admissão do vínculo local e o
+Na primeira entrega da fatia 5, o cálculo interativo da DOF usa a admissão do vínculo local e o
 motor de regra provisória no servidor. A interface permite informar deduções e
 incorporações por ano, inclusive períodos com mais de 41 anos; exige confirmar
 os valores e informa que os registros da fonte ainda não são carregados
@@ -89,8 +89,29 @@ API simulada, inclusive paginação e telas de 1366 e 375 pixels. `npm test`
 passou com 69 testes, `npm run typecheck` passou e `npm audit` não apontou
 vulnerabilidades. O gate da fatia 5 permanece **não cumprido**.
 
+Na continuação da fatia 5, analista e coordenador podem salvar, listar,
+reabrir e editar seus próprios rascunhos de DOF. Entradas, resultados,
+valores de ajustes e motivos são cifrados; a fonte não é alterada. A revisão
+impede sobrescritas concorrentes, a remoção de anos exige confirmação, e a
+interface avisa antes de descartar alterações. Mudança da admissão é sinalizada
+e uma regra incompatível bloqueia a edição. A migração `004-rascunho-dof` é
+aplicada somente pelo setup em banco novo; não há atualização autorizada de
+instalação existente.
+
+Os testes direcionados de contratos, PostgreSQL/HTTPS e Playwright passaram
+(35 testes); `npm test` passou com 74 testes em oito arquivos,
+`npm run typecheck` passou e `npm audit` não apontou vulnerabilidades. Na
+execução completa, os máximos locais de consulta foram 26,9 ms para nome,
+7,1 ms para CPF, 6,7 ms para matrícula e 56,6 ms para página ampla.
+O navegador usa API simulada e dados fictícios; os testes de backend usam
+HTTPS com CA e PostgreSQL descartáveis, em execução separada.
+Playwright 1.64.1 e Chromium 156.0.8078.4 foram usados nesta máquina. O teste
+integrado de navegador com CA operacional e a revisão humana continuam
+pendentes. A concorrência entre sincronização futura da admissão e gravação
+do rascunho ainda exige solução e testes antes de implementar sincronização.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
-possui rascunho, prévia de documento, emissão, importação ou instalação como
+possui prévia de documento, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
 conta de serviço, proxy, backup e suporte do sistema operacional permanecem
 sem aceite.
@@ -100,4 +121,5 @@ Divergências e decisões estão em
 [003-motor-calculo.md](decisoes/003-motor-calculo.md) e
 [004-autenticacao.md](decisoes/004-autenticacao.md) e
 [005-consulta-servidores.md](decisoes/005-consulta-servidores.md) e
-[006-calculo-interativo-dof.md](decisoes/006-calculo-interativo-dof.md).
+[006-calculo-interativo-dof.md](decisoes/006-calculo-interativo-dof.md) e
+[007-rascunhos-dof.md](decisoes/007-rascunhos-dof.md).

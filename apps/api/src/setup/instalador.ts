@@ -10,6 +10,7 @@ import { configuracaoSchema, type Configuracao } from '@sisdoc/contratos';
 import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
 import { aplicarAutenticacao } from '../migracoes/autenticacao';
 import { aplicarConsulta } from '../migracoes/consulta';
+import { aplicarRascunhoDof } from '../migracoes/rascunho-dof';
 import { aplicarModelo } from '../migracoes/modelo';
 import { ErroPoliticaSenha, gerarHashSenha, verificarSenha } from '../seguranca/senhas';
 
@@ -393,6 +394,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarModelo(cliente, opcoes.banco.usuario);
     await aplicarAutenticacao(cliente, opcoes.banco.usuario);
     await aplicarConsulta(cliente, opcoes.banco.usuario);
+    await aplicarRascunhoDof(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

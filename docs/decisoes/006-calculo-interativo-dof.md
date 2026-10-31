@@ -7,7 +7,9 @@ documentos. Para expor a parte independente sem simular uma emissão, a API
 calcula somente para uma pessoa e vínculo locais relacionados. A admissão é
 lida da fonte e a data de referência é a data atual em `America/Sao_Paulo`;
 nenhuma delas, nem a versão da regra, é escolhida pelo cliente. Uma admissão
-ausente impede o cálculo com mensagem explícita.
+ausente impede o cálculo com mensagem explícita. Esta decisão descreve a
+primeira entrega do cálculo; o salvamento posterior está em
+[007-rascunhos-dof.md](007-rascunhos-dof.md).
 
 A interface não presume que registros de afastamento ou incorporação estejam
 ausentes: informa que eles ainda não são carregados e exige conferência dos

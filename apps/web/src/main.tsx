@@ -1,8 +1,9 @@
-import { StrictMode, useCallback, useEffect, useState, type FormEvent } from 'react';
+import { StrictMode, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { RespostaSessao } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { Auditoria } from './auditoria';
+import { RascunhosDof } from './rascunhos-dof';
 import { Servidores } from './servidores';
 import { nomesPerfis, Usuarios } from './usuarios';
 import './estilos.css';
@@ -78,13 +79,38 @@ function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca'>('busca');
+  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos'>('busca');
+  const [chaveTela, setChaveTela] = useState(0);
+  const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
+  const pendencias = useRef(false);
+  const registrarPendencia = useCallback((valor: boolean) => {
+    pendencias.current = valor;
+    setAlteracoesPendentes(valor);
+  }, []);
+  const confirmarSaida = useCallback(() => !pendencias.current
+    || window.confirm('Há alterações não salvas. Deseja descartá-las?'), []);
   const tratarErro = useCallback((problema: unknown) => {
     setMensagem('');
     if (problema instanceof ErroApi && problema.status === 401) {
       setSessao(null);
+      if (pendencias.current) {
+        registrarPendencia(false);
+        setErro('A sessão terminou. As alterações não salvas foram descartadas; entre novamente.');
+        return;
+      }
     }
     setErro(problema instanceof Error ? problema.message : 'Erro inesperado. Contate o administrador.');
+  }, [registrarPendencia]);
+
+  useEffect(() => {
+    function antesDeSair(evento: BeforeUnloadEvent) {
+      if (pendencias.current) {
+        evento.preventDefault();
+        evento.returnValue = '';
+      }
+    }
+    window.addEventListener('beforeunload', antesDeSair);
+    return () => window.removeEventListener('beforeunload', antesDeSair);
   }, []);
 
   useEffect(() => {
@@ -103,10 +129,11 @@ function App() {
   }, [tratarErro]);
 
   async function sair() {
-    if (!sessao) return;
+    if (!sessao || !confirmarSaida()) return;
     try {
       await api.sair(sessao.csrf);
       setSessao(null);
+      registrarPendencia(false);
       setErro('');
       setMensagem('Sessão encerrada.');
     } catch (problema) {
@@ -132,7 +159,15 @@ function App() {
     setErro('');
     setMensagem('');
   };
+  const navegar = (destino: typeof tela) => {
+    if (!confirmarSaida()) return;
+    registrarPendencia(false);
+    limparMensagens();
+    setChaveTela((atual) => atual + 1);
+    setTela(destino);
+  };
   const funcional = sessao && sessao.usuario.papel !== 'admin';
+  const podeSalvar = sessao?.usuario.papel === 'analista' || sessao?.usuario.papel === 'coordenador';
 
   return (
     <main className="pagina">
@@ -143,7 +178,7 @@ function App() {
       <div className="conteudo">
         <p className="etiqueta">Sistema em construção — não autorizado para uso operacional</p>
         <h1>DOF e DTC</h1>
-        <p>O cálculo de referência da DOF é provisório. Documentos e emissão ainda não estão disponíveis.</p>
+        <p>O cálculo de referência da DOF é provisório. Prévia, conferência e emissão ainda não estão disponíveis.</p>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
@@ -153,14 +188,19 @@ function App() {
         ) : (
           <>
             <p>Conectado como <strong>{sessao.usuario.nome}</strong> — {nomesPerfis[sessao.usuario.papel]}.</p>
+            {alteracoesPendentes && <p className="etiqueta" role="status">Há alterações não salvas.</p>}
             <nav className="acoes" aria-label="Navegação">
-              {funcional && <button type="button" className="secundario" onClick={() => setTela('busca')}>Buscar servidores</button>}
-              {sessao.usuario.papel === 'admin' && <button type="button" className="secundario" onClick={() => setTela('usuarios')}>Usuários</button>}
+              {funcional && <button type="button" className="secundario" onClick={() => navegar('busca')}>Buscar servidores</button>}
+              {podeSalvar && <button type="button" className="secundario" onClick={() => navegar('rascunhos')}>Meus rascunhos</button>}
+              {sessao.usuario.papel === 'admin' && <button type="button" className="secundario" onClick={() => navegar('usuarios')}>Usuários</button>}
               {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && (
-                <button type="button" className="secundario" onClick={() => setTela('auditoria')}>Auditoria</button>
+                <button type="button" className="secundario" onClick={() => navegar('auditoria')}>Auditoria</button>
               )}
             </nav>
-            {funcional && tela === 'busca' && <Servidores csrf={sessao.csrf} onErro={tratarErro} onLimpar={limparMensagens} />}
+            {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf} podeSalvar={podeSalvar}
+              onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
+            {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf}
+              onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
               <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />
             )}

@@ -10,6 +10,7 @@ import { api, ErroApi } from './api';
 import { CalculoDof } from './calculo-dof';
 
 type Props = { onErro: (erro: unknown) => void; onLimpar: () => void };
+type ProtecaoEdicao = { onPendente: (valor: boolean) => void; confirmarSaida: () => boolean };
 type Consulta = { q: string; tipo: TipoBuscaServidor };
 
 function Eventos({ pessoaId, vinculoId, onErro, onLimpar }: Props & { pessoaId: string; vinculoId: string }) {
@@ -56,13 +57,18 @@ function Eventos({ pessoaId, vinculoId, onErro, onLimpar }: Props & { pessoaId: 
   );
 }
 
-function Detalhe({ pessoaId, csrf, onFechar, onErro, onLimpar }: Props & { pessoaId: string; csrf: string; onFechar: () => void }) {
+function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
+  pessoaId: string; csrf: string; podeSalvar: boolean; onFechar: () => void;
+}) {
   const [detalhe, setDetalhe] = useState<DetalheServidor | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [vinculoId, setVinculoId] = useState<string | null>(null);
   const [vinculoCalculo, setVinculoCalculo] = useState<{ id: string; matricula: string; admissao: string } | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
+  const trocarContexto = (acao: () => void) => {
+    if (confirmarSaida()) { onPendente(false); acao(); }
+  };
   useEffect(() => {
     let ativa = true;
     setDetalhe(null);
@@ -79,7 +85,7 @@ function Detalhe({ pessoaId, csrf, onFechar, onErro, onLimpar }: Props & { pesso
   return (
     <section className="painel separado" aria-labelledby="detalhe-titulo">
       <h3 id="detalhe-titulo">Detalhes do servidor</h3>
-      <div className="acoes"><button type="button" className="secundario" onClick={onFechar}>Fechar detalhes</button></div>
+      <div className="acoes"><button type="button" className="secundario" onClick={() => trocarContexto(onFechar)}>Fechar detalhes</button></div>
       {falhou ? <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>Tentar carregar detalhes novamente</button> : !detalhe ? <p role="status">Carregando detalhes...</p> : (
         <>
           <h4>{detalhe.pessoa.nome}</h4>
@@ -98,12 +104,17 @@ function Detalhe({ pessoaId, csrf, onFechar, onErro, onLimpar }: Props & { pesso
                   <td>{[vinculo.orgao, vinculo.setor].filter(Boolean).join(' / ') || 'Não informado'}</td>
                   <td>{vinculo.admissao ?? 'Não informada'} / {vinculo.desligamento ?? 'Não informado'}</td>
                   <td>{anterior?.matricula ?? (vinculo.matriculaAnteriorId ? 'Vínculo não visível nesta página' : '—')}</td>
-                  <td><button type="button" className="secundario" onClick={() => { onLimpar(); setVinculoCalculo(null); setVinculoId(vinculo.id); }}>Eventos <span className="sr-only">da matrícula {vinculo.matricula}</span></button></td>
+                  <td><button type="button" className="secundario" onClick={() => trocarContexto(() => {
+                    onLimpar(); setVinculoCalculo(null); setVinculoId(vinculo.id);
+                  })}>Eventos <span className="sr-only">da matrícula {vinculo.matricula}</span></button></td>
                   <td>{admissao ? (
                     <button type="button" className="secundario" onClick={() => {
-                      onLimpar();
-                      setVinculoId(null);
-                      setVinculoCalculo({ id: vinculo.id, matricula: vinculo.matricula, admissao });
+                      if (vinculoCalculo?.id === vinculo.id) return;
+                      trocarContexto(() => {
+                        onLimpar();
+                        setVinculoId(null);
+                        setVinculoCalculo({ id: vinculo.id, matricula: vinculo.matricula, admissao });
+                      });
                     }}>Calcular DOF <span className="sr-only">da matrícula {vinculo.matricula}</span></button>
                   ) : 'Admissão ausente na fonte'}</td>
                 </tr>
@@ -111,14 +122,16 @@ function Detalhe({ pessoaId, csrf, onFechar, onErro, onLimpar }: Props & { pesso
             })}</tbody>
           </table></div>
           <div className="acoes">
-            <button type="button" className="secundario" disabled={!cursor} onClick={() => setCursor(undefined)}>Primeira página de vínculos</button>
-            <button type="button" className="secundario" disabled={!detalhe.proximoCursor} onClick={() => setCursor(detalhe.proximoCursor ?? undefined)}>Próxima página de vínculos</button>
+            <button type="button" className="secundario" disabled={!cursor} onClick={() => trocarContexto(() => setCursor(undefined))}>Primeira página de vínculos</button>
+            <button type="button" className="secundario" disabled={!detalhe.proximoCursor}
+              onClick={() => trocarContexto(() => setCursor(detalhe.proximoCursor ?? undefined))}>Próxima página de vínculos</button>
           </div>
           {vinculoId && <Eventos key={vinculoId} pessoaId={pessoaId} vinculoId={vinculoId} onErro={onErro} onLimpar={onLimpar} />}
           {vinculoCalculo && (
             <CalculoDof key={vinculoCalculo.id} pessoaId={pessoaId} vinculoId={vinculoCalculo.id}
               nome={detalhe.pessoa.nome} matricula={vinculoCalculo.matricula} admissao={vinculoCalculo.admissao}
-              csrf={csrf} onFechar={() => setVinculoCalculo(null)} onErro={onErro} onLimpar={onLimpar} />
+              csrf={csrf} podeSalvar={podeSalvar} onFechar={() => setVinculoCalculo(null)} onErro={onErro} onLimpar={onLimpar}
+              onPendente={onPendente} confirmarSaida={confirmarSaida} />
           )}
         </>
       )}
@@ -126,13 +139,18 @@ function Detalhe({ pessoaId, csrf, onFechar, onErro, onLimpar }: Props & { pesso
   );
 }
 
-export function Servidores({ csrf, onErro, onLimpar }: Props & { csrf: string }) {
+export function Servidores({ csrf, podeSalvar, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
+  csrf: string; podeSalvar: boolean;
+}) {
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [pagina, setPagina] = useState<PaginaBuscaServidores | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [pessoaId, setPessoaId] = useState<string | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
+  const trocarContexto = (acao: () => void) => {
+    if (confirmarSaida()) { onPendente(false); acao(); }
+  };
   useEffect(() => {
     if (!consulta) return;
     let ativa = true;
@@ -148,6 +166,8 @@ export function Servidores({ csrf, onErro, onLimpar }: Props & { csrf: string })
 
   function buscar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+    if (!confirmarSaida()) return;
+    onPendente(false);
     const valores = new FormData(evento.currentTarget);
     const resultado = buscarServidoresQuerySchema.safeParse({ q: valores.get('q'), tipo: valores.get('tipo') });
     if (!resultado.success || !resultado.data.tipo) {
@@ -185,18 +205,25 @@ export function Servidores({ csrf, onErro, onLimpar }: Props & { csrf: string })
                 <tr key={item.vinculoId}>
                   <td>{item.nome}</td><td>{item.matricula}{item.removidoNaFonte ? ' — removido na fonte' : ''}</td>
                   <td>{item.orgao ?? 'Não informado'}</td><td>{item.sistemaOrigem}</td>
-                  <td><button type="button" className="secundario" onClick={() => { onLimpar(); setPessoaId(item.pessoaId); }}>Ver vínculos <span className="sr-only">de {item.nome}, matrícula {item.matricula}</span></button></td>
+                  <td><button type="button" className="secundario" onClick={() => {
+                    if (pessoaId === item.pessoaId) return;
+                    trocarContexto(() => { onLimpar(); setPessoaId(item.pessoaId); });
+                  }}>Ver vínculos <span className="sr-only">de {item.nome}, matrícula {item.matricula}</span></button></td>
                 </tr>
               ))}</tbody>
             </table></div>
           )}
           <div className="acoes">
-            <button type="button" className="secundario" disabled={!cursor} onClick={() => { setPessoaId(null); setCursor(undefined); }}>Primeira página de resultados</button>
-            <button type="button" className="secundario" disabled={!pagina.proximoCursor} onClick={() => { setPessoaId(null); setCursor(pagina.proximoCursor ?? undefined); }}>Próxima página de resultados</button>
+            <button type="button" className="secundario" disabled={!cursor}
+              onClick={() => trocarContexto(() => { setPessoaId(null); setCursor(undefined); })}>Primeira página de resultados</button>
+            <button type="button" className="secundario" disabled={!pagina.proximoCursor}
+              onClick={() => trocarContexto(() => { setPessoaId(null); setCursor(pagina.proximoCursor ?? undefined); })}>Próxima página de resultados</button>
           </div>
         </>
       )}
-      {pessoaId && <Detalhe key={pessoaId} pessoaId={pessoaId} csrf={csrf} onFechar={() => setPessoaId(null)} onErro={onErro} onLimpar={onLimpar} />}
+      {pessoaId && <Detalhe key={pessoaId} pessoaId={pessoaId} csrf={csrf} podeSalvar={podeSalvar}
+        onFechar={() => setPessoaId(null)} onErro={onErro} onLimpar={onLimpar}
+        onPendente={onPendente} confirmarSaida={confirmarSaida} />}
     </section>
   );
 }

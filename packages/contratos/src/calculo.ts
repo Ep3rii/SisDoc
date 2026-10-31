@@ -67,6 +67,7 @@ const totaisSchema = z.strictObject({
 });
 
 export const resultadoCalculoDofSchema = z.strictObject({
+  admissaoConsiderada: dataFuncionalSchema,
   regra: z.strictObject({
     codigo: z.string().min(1),
     versao: z.string().min(1),

@@ -1,9 +1,9 @@
 # Operação — aplicação ainda não autorizada
 
 O login, a administração e a consulta de servidores existem para verificação
-em recursos descartáveis. Há cálculo provisório de DOF pela interface, mas
-**não há rascunho, prévia de documento, emissão, importação, backup ou serviço
-Windows implementados**. Não instalar ou usar operacionalmente até a
+em recursos descartáveis. Há cálculo e rascunho provisórios de DOF pela
+interface, mas **não há prévia de documento, conferência, emissão, importação,
+backup ou serviço Windows implementados**. Não instalar ou usar operacionalmente até a
 conclusão das demais fatias, revisão e autorização formal.
 
 ## Pré-requisitos para uma futura instalação
@@ -65,12 +65,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 003, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 004, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica `003-consulta` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `004-rascunho-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -104,12 +104,29 @@ tabela, campos vazios representam zero, inclusive nas páginas não exibidas.
 Para início após a admissão, informe também os acumulados anteriores de T/S e
 P/F e sua origem. Datas anteriores à admissão geram aviso de ajuste.
 
-O cálculo usa a regra provisória no servidor e não grava rascunho ou emissão.
-Se a admissão estiver ausente, o cálculo é indisponível até a correção pela
-fonte autorizada. A interface não permite alterar dados funcionais da fonte.
+O cálculo usa a regra provisória no servidor; calcular não grava rascunho nem
+emissão. Analista e coordenador podem salvar o resultado como rascunho com
+motivo e reabri-lo em **Meus rascunhos**. Cada perfil vê e edita somente seus
+próprios rascunhos; encaminhamento ainda não existe. Alterar valores exige
+nova confirmação, cálculo e motivo. Antes de excluir anos por alteração do
+período, confira e confirme os anos exibidos; os valores anteriores permanecem
+cifrados no registro de ajustes.
+
+A revisão impede sobrescrita concorrente. Em conflito, preserve os valores
+anotados, reabra o rascunho e confira a versão salva. Se a comunicação falhar
+ao salvar, consulte a lista antes de tentar novamente: a gravação pode ter
+sido concluída. A interface avisa antes de descartar alterações não salvas,
+mas uma sessão expirada encerra o acesso e essas alterações são perdidas.
+
+A admissão usada no resultado é registrada e comparada com a fonte atual.
+Se ela mudar, prepare a tabela e confira novamente; se estiver ausente, a
+edição fica indisponível, embora o resultado salvo possa ser consultado.
+Uma versão de regra diferente da disponível bloqueia a edição. A interface não
+altera dados funcionais da fonte e o rascunho não é conferência nem emissão.
 
 ## Verificação de software
 
+Após `npm ci`, instale o navegador de testes com `npx playwright install chromium`.
 `npm test` usa PostgreSQL 16.15, contas, banco, certificados e arquivos
 inteiramente descartáveis. Não usa a instalação configurada. O teste Windows
 exige caminhos ASCII ou 8.3 para o checkout e a pasta temporária, mantendo o
@@ -117,10 +134,11 @@ banco em UTF-8. Se necessário, defina `SISDOC_TEST_TEMP` para um diretório
 temporário existente, externo ao checkout e à instalação operacional. Não há
 ambiente permanente de teste. `npm run typecheck` verifica os tipos.
 
-Os testes HTTPS verificam CA e nome contra PostgreSQL temporário. A interface
-também foi exercitada no navegador com API simulada e dados sintéticos; isso
-não substitui um teste de navegador integrado ao serviço HTTPS com a CA
-operacional confiável.
+Os testes HTTPS verificam CA e nome contra PostgreSQL temporário. Os testes
+Playwright usam Chromium instalado no cache local e uma prévia HTTP em loopback
+com API inteiramente simulada e dados sintéticos; não reduzem os controles da
+API HTTPS. Eles não substituem o teste do navegador integrado ao serviço com a
+CA operacional confiável, nem uma revisão humana de acessibilidade.
 
 Backup, restauração, atualização de instalações existentes e recuperação das
 chaves ainda não estão implementados. A migração de uma fundação anterior foi

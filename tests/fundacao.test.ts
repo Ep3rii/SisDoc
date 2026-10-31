@@ -16,6 +16,8 @@ import {
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
   paginaUsuariosSchema,
+  paginaRascunhosDofSchema,
+  rascunhoDofSchema,
   resultadoCalculoDofSchema,
   respostaSessaoSchema,
   usuarioAdministrativoSchema,
@@ -31,6 +33,7 @@ import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
+import { aplicarRascunhoDof } from '../apps/api/dist/migracoes/rascunho-dof.js';
 import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
 import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
 import { gerarHashSenha } from '../apps/api/dist/seguranca/senhas.js';
@@ -661,9 +664,13 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarRascunhoDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarRascunhoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -702,6 +709,7 @@ describe('fundação em recursos descartáveis', () => {
         alterar_usuario: boolean; inserir_pessoa: boolean; inserir_emissao: boolean;
         inserir_auditoria: boolean; alterar_auditoria: boolean; apagar_auditoria: boolean;
         publico_le_usuario: boolean; publico_usa_nucleo: boolean; alterar_matricula: boolean;
+        alterar_rascunho: boolean; alterar_status: boolean; apagar_ajuste: boolean;
       }>(`
         SELECT has_any_column_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
                has_table_privilege(current_user, 'nucleo.pessoa', 'INSERT') AS inserir_pessoa,
@@ -710,6 +718,9 @@ describe('fundação em recursos descartáveis', () => {
                has_table_privilege(current_user, 'seguranca.auditoria', 'UPDATE') AS alterar_auditoria,
                has_table_privilege(current_user, 'seguranca.auditoria', 'DELETE') AS apagar_auditoria,
                has_column_privilege(current_user, 'seguranca.usuario', 'matricula', 'UPDATE') AS alterar_matricula,
+               has_column_privilege(current_user, 'documentos.documento', 'entrada_cifrada', 'UPDATE') AS alterar_rascunho,
+               has_column_privilege(current_user, 'documentos.documento', 'status', 'UPDATE') AS alterar_status,
+               has_table_privilege(current_user, 'documentos.ajuste_campo', 'DELETE') AS apagar_ajuste,
                EXISTS (
                  SELECT 1 FROM aclexplode((SELECT relacl FROM pg_class WHERE oid = 'seguranca.usuario'::regclass))
                  WHERE grantee = 0 AND privilege_type = 'SELECT'
@@ -722,7 +733,7 @@ describe('fundação em recursos descartáveis', () => {
       expect(privilegios.rows[0]).toEqual({
         alterar_usuario: true, inserir_pessoa: false, inserir_emissao: false, inserir_auditoria: true,
         alterar_auditoria: false, apagar_auditoria: false, publico_le_usuario: false, publico_usa_nucleo: false,
-        alterar_matricula: false,
+        alterar_matricula: false, alterar_rascunho: true, alterar_status: false, apagar_ajuste: false,
       });
       await cliente.query('BEGIN');
       await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");
@@ -1770,6 +1781,7 @@ describe('fundação em recursos descartáveis', () => {
           const resultado = resultadoCalculoDofSchema.parse(JSON.parse(resposta.corpo));
           expect(resultado.periodo.linhas).toHaveLength(45);
           expect(resultado.periodo.linhas.at(-1)?.ano).toBe(2024);
+          expect(resultado.admissaoConsiderada).toBe('1980-01-01');
           expect(resultado.totais).toMatchObject({
             diasBrutos: 16437, contribuicaoMunicipio: 16436, efetivoExercicio: 16436,
           });
@@ -1822,6 +1834,265 @@ describe('fundação em recursos descartáveis', () => {
                  (SELECT to_char(admissao, 'YYYY-MM-DD') FROM nucleo.vinculo WHERE id = $1) AS admissao
         `, [vinculoId]);
         expect(estadoDepois.rows).toEqual(estadoAntes.rows);
+
+        const motivo = 'Conferência fictícia das ocorrências por ano';
+        const admissaoEsperada = '1980-01-01';
+        for (const papel of ['secretario_adjunto', 'admin']) {
+          const sessao = sessoes.get(papel);
+          if (!sessao) throw new Error('Sessão sintética ausente.');
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, motivo, admissaoEsperada }, ...sessao,
+          })).status).toBe(403);
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: '/api/v1/documentos', cookie: sessao.cookie,
+          })).status).toBe(403);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, admissaoEsperada, motivo: ' ' }, ...analista,
+        })).status).toBe(400);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos',
+          corpo: { calculo: entrada, motivo, admissaoEsperada: '1979-01-01' }, ...analista,
+        })).status).toBe(409);
+        const criacao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, motivo, admissaoEsperada }, ...analista,
+        });
+        expect(criacao.status, criacao.corpo).toBe(201);
+        const rascunho = rascunhoDofSchema.parse(JSON.parse(criacao.corpo));
+        expect(rascunho).toMatchObject({
+          pessoaId, vinculoId, status: 'rascunho', revisao: 1,
+          entrada: { inicio: '1980-01-01', fim: '2024-12-31' },
+        });
+        expect(rascunho.resultado.periodo.linhas).toHaveLength(45);
+        expect(criacao.corpo).not.toContain(cpf);
+        expect(criacao.corpo).not.toContain(motivo);
+        const listagem = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/documentos', cookie: analista.cookie,
+        });
+        expect(paginaRascunhosDofSchema.parse(JSON.parse(listagem.corpo)).itens.map((item) => item.id)).toContain(rascunho.id);
+        const abertura = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${rascunho.id}`, cookie: analista.cookie,
+        });
+        expect(abertura.status, abertura.corpo).toBe(200);
+        expect(rascunhoDofSchema.parse(JSON.parse(abertura.corpo)).entrada.anos).toHaveLength(45);
+        const coordenador = sessoes.get('coordenador');
+        if (!coordenador) throw new Error('Sessão sintética de coordenador ausente.');
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${rascunho.id}`, cookie: coordenador.cookie,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: entrada, motivo, admissaoEsperada, revisao: 1 }, ...coordenador,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${rascunho.id}`, cookie: admin.cookie,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: entrada, motivo, admissaoEsperada, revisao: 1 }, cookie: analista.cookie,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: entrada, motivo, admissaoEsperada, revisao: 1, status: 'emitido' }, ...analista,
+        })).status).toBe(400);
+
+        const alterada = {
+          ...entrada, anos: anos.map((item, indice) => indice === 1 ? { ...item, faltas: 2 } : item),
+        };
+        const edicao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: alterada, admissaoEsperada, motivo: 'Correção sintética', revisao: 1 }, ...analista,
+        });
+        expect(edicao.status, edicao.corpo).toBe(200);
+        const revisado = rascunhoDofSchema.parse(JSON.parse(edicao.corpo));
+        expect(revisado.revisao).toBe(2);
+        expect(revisado.resultado.totais.contribuicaoMunicipio).toBe(16435);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: entrada, motivo, admissaoEsperada, revisao: 1 }, ...analista,
+        })).status).toBe(409);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: { ...alterada, vinculoId: semAdmissaoId }, motivo, admissaoEsperada, revisao: 2 }, ...analista,
+        })).status).toBe(400);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: entrada, motivo, admissaoEsperada: '1979-01-01', revisao: 2 }, ...analista,
+        })).status).toBe(409);
+        await cliente.query("UPDATE nucleo.vinculo SET admissao = '1981-01-01' WHERE id = $1", [vinculoId]);
+        try {
+          const fonteAlterada = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `/api/v1/documentos/${rascunho.id}`, cookie: analista.cookie,
+          });
+          const abertoComFonteAlterada = rascunhoDofSchema.parse(JSON.parse(fonteAlterada.corpo));
+          expect(abertoComFonteAlterada.admissao).toBe('1981-01-01');
+          expect(abertoComFonteAlterada.resultado.admissaoConsiderada).toBe('1980-01-01');
+          const conflitoAdmissao = await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+            corpo: { calculo: entrada, motivo, admissaoEsperada, revisao: 2 }, ...analista,
+          });
+          expect(conflitoAdmissao.status, conflitoAdmissao.corpo).toBe(409);
+        } finally {
+          await cliente.query("UPDATE nucleo.vinculo SET admissao = '1980-01-01' WHERE id = $1", [vinculoId]);
+        }
+        const entradaPosterior = {
+          ...entrada, inicio: '2000-01-01', fim: '2000-12-31', anos: [anos[20]],
+          acumuladoAnterior: { ts: 0, pf: 0, origem: 'Conferência sintética' },
+        };
+        const criadoPosterior = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos',
+          corpo: { calculo: entradaPosterior, motivo, admissaoEsperada }, ...analista,
+        });
+        expect(criadoPosterior.status, criadoPosterior.corpo).toBe(201);
+        const rascunhoPosterior = rascunhoDofSchema.parse(JSON.parse(criadoPosterior.corpo));
+        await cliente.query("UPDATE nucleo.vinculo SET admissao = '1981-01-01' WHERE id = $1", [vinculoId]);
+        try {
+          const atualizacaoAdmissao = await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: `/api/v1/documentos/${rascunhoPosterior.id}`,
+            corpo: {
+              calculo: entradaPosterior, motivo: 'Revisão da admissão fictícia',
+              admissaoEsperada: '1981-01-01', revisao: 1,
+            },
+            ...analista,
+          });
+          expect(atualizacaoAdmissao.status, atualizacaoAdmissao.corpo).toBe(200);
+          const atualizado = rascunhoDofSchema.parse(JSON.parse(atualizacaoAdmissao.corpo));
+          expect(atualizado.revisao).toBe(2);
+          expect(atualizado.resultado.admissaoConsiderada).toBe('1981-01-01');
+          const ajusteAdmissao = await cliente.query<{ valor_original_cifrado: Buffer; valor_novo_cifrado: Buffer }>(`
+            SELECT valor_original_cifrado, valor_novo_cifrado FROM documentos.ajuste_campo
+            WHERE documento_id = $1 AND campo = 'admissao_considerada'
+          `, [rascunhoPosterior.id]);
+          expect(ajusteAdmissao.rowCount).toBe(1);
+          expect(ajusteAdmissao.rows[0].valor_original_cifrado.includes(Buffer.from('1980-01-01'))).toBe(false);
+          expect(ajusteAdmissao.rows[0].valor_novo_cifrado.includes(Buffer.from('1981-01-01'))).toBe(false);
+        } finally {
+          await cliente.query("UPDATE nucleo.vinculo SET admissao = '1980-01-01' WHERE id = $1", [vinculoId]);
+        }
+        const simultaneas = await Promise.all([3, 4].map((faltas) => requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: {
+            calculo: { ...entrada, anos: anos.map((item, indice) => indice === 1 ? { ...item, faltas } : item) },
+            motivo: 'Concorrência sintética', admissaoEsperada, revisao: 2,
+          },
+          ...analista,
+        })));
+        expect(simultaneas.map((resposta) => resposta.status).sort()).toEqual([200, 409]);
+        const persistido = await cliente.query<{
+          status: string; revisao: number; entrada_cifrada: Buffer; resultado_calculo_cifrado: Buffer;
+        }>(`
+          SELECT status, revisao, entrada_cifrada, resultado_calculo_cifrado
+          FROM documentos.documento WHERE id = $1
+        `, [rascunho.id]);
+        expect(persistido.rows[0]).toMatchObject({ status: 'rascunho', revisao: 3 });
+        expect(persistido.rows[0].entrada_cifrada.includes(Buffer.from('faltas'))).toBe(false);
+        expect(persistido.rows[0].resultado_calculo_cifrado.includes(Buffer.from('contribuicaoMunicipio'))).toBe(false);
+        const ajustes = await cliente.query<{ id: string; campo: string; motivo_cifrado: Buffer }>(`
+          SELECT id, campo, motivo_cifrado FROM documentos.ajuste_campo WHERE documento_id = $1
+        `, [rascunho.id]);
+        expect(ajustes.rows.filter((item) => item.campo.startsWith('anos.'))).toHaveLength(47);
+        const ajusteInicial = ajustes.rows.find((item) => item.campo === 'periodo.inicio');
+        if (!ajusteInicial) throw new Error('Ajuste inicial sintético ausente.');
+        expect(ajusteInicial.motivo_cifrado.includes(Buffer.from(motivo))).toBe(false);
+        const motivoDecifrado = protetor.decifrar(ajusteInicial.motivo_cifrado, {
+          schema: 'documentos', tabela: 'ajuste_campo', registroId: ajusteInicial.id, campo: 'motivo_cifrado',
+        }).toString('utf8');
+        expect(JSON.parse(motivoDecifrado)).toBe(motivo);
+        expect((await cliente.query('SELECT count(*) FROM documentos.emissao')).rows[0].count)
+          .toBe(estadoAntes.rows[0].emissoes);
+
+        const ultimo = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${rascunho.id}`, cookie: analista.cookie,
+        });
+        const antesDaReducao = rascunhoDofSchema.parse(JSON.parse(ultimo.corpo));
+        const reduzida = {
+          ...antesDaReducao.entrada, fim: '2023-12-31',
+          anos: antesDaReducao.entrada.anos.filter((ano) => ano.ano !== 2024),
+        };
+        for (const confirmados of [undefined, [2023]]) {
+          const semConfirmacao = await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+            corpo: {
+              calculo: reduzida, motivo: 'Redução fictícia do intervalo', admissaoEsperada,
+              revisao: 3, ...(confirmados ? { anosRemovidosConfirmados: confirmados } : {}),
+            },
+            ...analista,
+          });
+          expect(semConfirmacao.status, semConfirmacao.corpo).toBe(400);
+        }
+        const reducao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: {
+            calculo: reduzida, motivo: 'Redução fictícia do intervalo', admissaoEsperada,
+            revisao: 3, anosRemovidosConfirmados: [2024],
+          },
+          ...analista,
+        });
+        expect(reducao.status, reducao.corpo).toBe(200);
+        const rascunhoAtual = rascunhoDofSchema.parse(JSON.parse(reducao.corpo));
+        expect(rascunhoAtual.revisao).toBe(4);
+        expect(rascunhoAtual.entrada.anos).toHaveLength(44);
+        const anoRemovido = await cliente.query<{
+          id: string; valor_original_cifrado: Buffer; valor_novo_cifrado: Buffer;
+        }>(`
+          SELECT id, valor_original_cifrado, valor_novo_cifrado FROM documentos.ajuste_campo
+          WHERE documento_id = $1 AND campo = 'anos.2024' AND valor_original_cifrado IS NOT NULL
+        `, [rascunho.id]);
+        expect(anoRemovido.rowCount).toBe(1);
+        const registroRemovido = anoRemovido.rows[0];
+        const decifrarAjuste = (campo: string, valor: Buffer): unknown => JSON.parse(protetor.decifrar(valor, {
+          schema: 'documentos', tabela: 'ajuste_campo', registroId: registroRemovido.id, campo,
+        }).toString('utf8'));
+        expect(decifrarAjuste('valor_original_cifrado', registroRemovido.valor_original_cifrado))
+          .toEqual(antesDaReducao.entrada.anos.find((ano) => ano.ano === 2024));
+        expect(decifrarAjuste('valor_novo_cifrado', registroRemovido.valor_novo_cifrado)).toBeNull();
+        const periodoReduzido = await cliente.query<{ fim: string }>(`
+          SELECT to_char(fim, 'YYYY-MM-DD') AS fim FROM documentos.documento_periodo WHERE documento_id = $1
+        `, [rascunho.id]);
+        expect(periodoReduzido.rows).toEqual([{ fim: '2023-12-31' }]);
+        const regraAntigaId = randomUUID();
+        const versaoAntiga = `anterior-ficticia-${randomUUID()}`;
+        await cliente.query(`
+          INSERT INTO documentos.regra_versao (id, codigo, versao, configuracao, evidencia, vigente_de)
+          SELECT $1, r.codigo, $2, r.configuracao, r.evidencia, r.vigente_de
+          FROM documentos.regra_versao r
+          JOIN documentos.documento d ON d.regra_versao_id = r.id WHERE d.id = $3
+        `, [regraAntigaId, versaoAntiga, rascunho.id]);
+        const resultadoAntigo = {
+          ...rascunhoAtual.resultado,
+          regra: { ...rascunhoAtual.resultado.regra, versao: versaoAntiga },
+        };
+        const resultadoCifrado = protetor.cifrar(Buffer.from(JSON.stringify(resultadoAntigo)), {
+          schema: 'documentos', tabela: 'documento', registroId: rascunho.id, campo: 'resultado_calculo_cifrado',
+        });
+        await cliente.query(
+          'UPDATE documentos.documento SET regra_versao_id = $1, resultado_calculo_cifrado = $2 WHERE id = $3',
+          [regraAntigaId, resultadoCifrado, rascunho.id],
+        );
+        const aberturaAntiga = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${rascunho.id}`, cookie: analista.cookie,
+        });
+        expect(rascunhoDofSchema.parse(JSON.parse(aberturaAntiga.corpo)).resultado.regra.versao).toBe(versaoAntiga);
+        const edicaoRegraAntiga = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+          corpo: { calculo: alterada, motivo, admissaoEsperada, revisao: 4 }, ...analista,
+        });
+        expect(edicaoRegraAntiga.status, edicaoRegraAntiga.corpo).toBe(409);
+        expect(edicaoRegraAntiga.corpo).toContain('versão de regra');
+        const aposBloqueio = await cliente.query<{
+          revisao: number; regra_versao_id: string; resultado_calculo_cifrado: Buffer;
+        }>('SELECT revisao, regra_versao_id, resultado_calculo_cifrado FROM documentos.documento WHERE id = $1', [rascunho.id]);
+        expect(aposBloqueio.rows[0]).toMatchObject({
+          revisao: 4, regra_versao_id: regraAntigaId, resultado_calculo_cifrado: resultadoCifrado,
+        });
+        const acoes = await cliente.query<{ acao: string }>(
+          'SELECT acao FROM seguranca.auditoria WHERE entidade_id = $1',
+          [rascunho.id],
+        );
+        expect(acoes.rows.map((item) => item.acao)).toEqual(expect.arrayContaining([
+          'rascunho_criado', 'rascunho_aberto', 'rascunho_editado', 'rascunho_conflito',
+          'rascunho_regra_incompativel', 'rascunho_admissao_alterada',
+        ]));
       } finally {
         await encerrar();
       }

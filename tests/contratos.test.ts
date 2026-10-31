@@ -6,10 +6,12 @@ import {
   buscarServidoresQuerySchema,
   cpfSchema,
   criarDocumentoSchema,
+  criarRascunhoDofSchema,
   dataFuncionalSchema,
   detalheServidorSchema,
   eventosServidorQuerySchema,
   incorporacaoSchema,
+  atualizarRascunhoDofSchema,
   solicitarCalculoDofSchema,
 } from '../packages/contratos/dist/index.js';
 import { cpfSintetico } from './dados-sinteticos.js';
@@ -122,6 +124,34 @@ describe('contratos de domínio', () => {
     expect(ajusteCampoSchema.safeParse({ ...ajuste, campo: '' }).success).toBe(false);
     expect(ajusteCampoSchema.safeParse({ ...ajuste, valorNovo: undefined }).success).toBe(false);
     expect(ajusteCampoSchema.safeParse({ ...ajuste, outro: true }).success).toBe(false);
+  });
+
+  it('valida motivo, revisão e identidade fixa nos contratos de rascunho', () => {
+    const calculo = {
+      pessoaId: randomUUID(), vinculoId: randomUUID(), inicio: '2024-01-01', fim: '2024-12-31',
+      anos: [{
+        ano: 2024, abrangencia: 'intervalo_declarado', faltas: 0, ts: 0, pf: 0,
+        ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
+      }],
+      confirmacaoDados: true,
+    };
+    const admissaoEsperada = '2024-01-01';
+    expect(criarRascunhoDofSchema.parse({ calculo, admissaoEsperada, motivo: '  Conferência  ' }).motivo).toBe('Conferência');
+    expect(criarRascunhoDofSchema.safeParse({ calculo, admissaoEsperada, motivo: ' ' }).success).toBe(false);
+    expect(criarRascunhoDofSchema.safeParse({ calculo, admissaoEsperada, motivo: 'x'.repeat(2001) }).success).toBe(false);
+    expect(criarRascunhoDofSchema.safeParse({ calculo, motivo: 'Motivo' }).success).toBe(false);
+    expect(criarRascunhoDofSchema.safeParse({ calculo, admissaoEsperada: 'data inválida', motivo: 'Motivo' }).success).toBe(false);
+    expect(criarRascunhoDofSchema.safeParse({ calculo, admissaoEsperada, motivo: 'Motivo', status: 'emitido' }).success).toBe(false);
+    expect(atualizarRascunhoDofSchema.safeParse({ calculo, admissaoEsperada, motivo: 'Motivo', revisao: 1 }).success).toBe(true);
+    expect(atualizarRascunhoDofSchema.safeParse({
+      calculo, admissaoEsperada, motivo: 'Motivo', revisao: 1, anosRemovidosConfirmados: [2023, 2024],
+    }).success).toBe(true);
+    expect(atualizarRascunhoDofSchema.safeParse({
+      calculo, admissaoEsperada, motivo: 'Motivo', revisao: 1, anosRemovidosConfirmados: [2024, 2024],
+    }).success).toBe(false);
+    for (const revisao of [0, -1, 1.5, 2147483648, '1']) {
+      expect(atualizarRascunhoDofSchema.safeParse({ calculo, admissaoEsperada, motivo: 'Motivo', revisao }).success).toBe(false);
+    }
   });
 
   it('distingue afastamentos anuais e intervalos sem aceitar formas misturadas', () => {
