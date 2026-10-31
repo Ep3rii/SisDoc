@@ -6,6 +6,7 @@ import {
   paginaEncaminhamentosDofSchema,
   paginaRascunhosDofSchema,
   paginaUsuariosSchema,
+  preconferenciaDofSchema,
   detalheServidorSchema,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
@@ -26,6 +27,7 @@ import {
   type PaginaEncaminhamentosDof,
   type PaginaRascunhosDof,
   type PaginaUsuarios,
+  type PreconferenciaDof,
   type RascunhoDof,
   type RecolherRascunhoDof,
   type RespostaSessao,
@@ -172,6 +174,9 @@ export const api = {
   },
   async recolherRascunhoDof(csrf: string, id: string, dados: RecolherRascunhoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/recolher`, 'POST', dados, csrf));
+  },
+  async verificarPreconferenciaDof(id: string): Promise<PreconferenciaDof> {
+    return validar(preconferenciaDofSchema, await requisitar(`documentos/${id}/preconferencia`));
   },
   async obterPreviaDof(id: string): Promise<number> {
     let resposta: Response;

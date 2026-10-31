@@ -98,6 +98,57 @@ export const paginaEncaminhamentosDofSchema = z.strictObject({
   proximoCursor: z.uuid().nullable(),
 });
 
+const codigoPendenciaConferenciaDofSchema = z.enum([
+  'conferencia_indisponivel',
+  'aprovacao_modelo_nao_verificada',
+  'cpf_indisponivel',
+  'cpf_invalido',
+  'cpf_hash_inconsistente',
+  'matricula_inconsistente',
+  'matricula_ambigua',
+  'vinculo_removido',
+  'admissao_ausente',
+  'admissao_alterada',
+  'nascimento_inconsistente',
+  'periodo_inconsistente',
+  'regra_incompativel',
+  'calculo_invalido',
+  'calculo_divergente',
+  'processo_ausente',
+  'mascaras_ausentes',
+  'processo_invalido',
+  'variaveis_ausentes',
+  'variaveis_malformadas',
+  'inicio_ajustado_sem_confirmacao',
+]);
+
+const codigoAvisoConferenciaDofSchema = z.enum([
+  'regra_provisoria',
+  'dados_sem_data',
+  'dados_antigos',
+  'data_fonte_futura',
+  'campos_referencia_ausentes',
+]);
+
+export const preconferenciaDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  verificadoEm: z.iso.datetime(),
+  status: z.literal('nao_conferido'),
+  conferenciaDisponivel: z.literal(false),
+  bloqueios: z.array(z.strictObject({ codigo: codigoPendenciaConferenciaDofSchema, mensagem: z.string().min(1) })).min(1),
+  avisos: z.array(z.strictObject({ codigo: codigoAvisoConferenciaDofSchema, mensagem: z.string().min(1) })),
+}).superRefine((dados, contexto) => {
+  if (!dados.bloqueios.some((item) => item.codigo === 'conferencia_indisponivel')) {
+    contexto.addIssue({ code: 'custom', message: 'A indisponibilidade da conferência deve ser informada.' });
+  }
+  for (const itens of [dados.bloqueios, dados.avisos]) {
+    if (new Set(itens.map((item) => item.codigo)).size !== itens.length) {
+      contexto.addIssue({ code: 'custom', message: 'Códigos de pendência ou aviso devem ser únicos.' });
+    }
+  }
+});
+
 export const rascunhoDofSchema = resumoRascunhoDofSchema.extend({
   status: z.literal('rascunho'),
   admissao: dataFuncionalSchema.nullable(),
@@ -125,4 +176,5 @@ export type RecolherRascunhoDof = z.infer<typeof recolherRascunhoDofSchema>;
 export type PaginaCoordenadoresDof = z.infer<typeof paginaCoordenadoresDofSchema>;
 export type PaginaEncaminhamentosDof = z.infer<typeof paginaEncaminhamentosDofSchema>;
 export type PaginaRascunhosDof = z.infer<typeof paginaRascunhosDofSchema>;
+export type PreconferenciaDof = z.infer<typeof preconferenciaDofSchema>;
 export type RascunhoDof = z.infer<typeof rascunhoDofSchema>;

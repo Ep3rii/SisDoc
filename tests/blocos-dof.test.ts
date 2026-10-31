@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
 import { atualizarBlocosDofSchema, resultadoCalculoDofSchema, type BlocoRascunhoDof } from '@sisdoc/contratos';
-import { renderizarPreviaDof } from '@sisdoc/templates';
+import { analisarTextoDof, renderizarPreviaDof, verificarVariaveisDof } from '@sisdoc/templates';
 import { describe, expect, it } from 'vitest';
 
 function resultadoSintetico() {
@@ -80,5 +80,33 @@ describe('blocos e prévia provisória de DOF', () => {
     expect(html).not.toContain('INATIVO-SINTETICO');
     expect(html).not.toContain('Variável não disponível: ausente');
     expect(html.match(/<tr>/g)).toHaveLength(46);
+  });
+
+  it('identifica expressões malformadas e variáveis ausentes somente em blocos ativos', () => {
+    const dados = {
+      nome: 'Pessoa fictícia', matricula: 'FICTICIA', processo: null, revisao: 1, resultado: resultadoSintetico(),
+      blocos: [
+        { ...bloco, texto: '{{nome}} {{ processo }} {{desconhecida}} {{}} {{a-b}} {{aberta' },
+        { id: randomUUID(), codigo: 'complementares' as const, ativo: false, texto: '{{inativa}} }}' },
+      ],
+    };
+    expect(verificarVariaveisDof(dados)).toEqual({ indisponiveis: ['desconhecida', 'processo'], malformadas: true });
+    const html = renderizarPreviaDof(dados);
+    expect(html).toContain('Pessoa fictícia');
+    expect(html).toContain('Variável não disponível: processo');
+    expect(html).toContain('Variável não disponível: desconhecida');
+    expect(html).toContain('Expressão malformada: {{}}');
+    expect(html).toContain('Expressão malformada: {{a-b}}');
+    expect(html).toContain('Expressão malformada: {{aberta');
+    expect(html).not.toContain('inativa');
+    for (const texto of ['}}', '{{{nome}}}', '{{nome}}}', '{{a{{nome}}', '{{a}b}}', '{{']) {
+      expect(analisarTextoDof(texto).some((parte) => parte.tipo === 'malformada')).toBe(true);
+    }
+    const texto = 'texto com { chaves simples } e {{ nome }}';
+    const partes = analisarTextoDof(texto);
+    expect(partes.map((parte) => parte.conteudo).join('')).toBe(texto);
+    expect(partes.filter((parte) => parte.tipo === 'malformada')).toHaveLength(0);
+    expect(verificarVariaveisDof({ ...dados, blocos: [{ ...bloco, ativo: false, texto: '{{faltando' }] }))
+      .toEqual({ indisponiveis: [], malformadas: false });
   });
 });

@@ -1,4 +1,8 @@
 import { TITULOS_BLOCOS_DOF, type RascunhoDof } from '@sisdoc/contratos';
+import { analisarTextoDof, valoresVariaveisDof } from './variaveis-dof';
+
+export { analisarTextoDof, valoresVariaveisDof, verificarVariaveisDof } from './variaveis-dof';
+export type { ParteTextoDof } from './variaveis-dof';
 
 type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resultado' | 'blocos' | 'processo'>;
 
@@ -15,35 +19,28 @@ function data(dataIso: string): string {
 
 export function renderizarPreviaDof(dados: DadosPreviaDof): string {
   const { resultado } = dados;
-  const variaveis = new Map<string, string>([
-    ['nome', dados.nome],
-    ['matricula', dados.matricula],
-    ['processo', dados.processo ?? ''],
-    ['admissao', data(resultado.admissaoConsiderada)],
-    ['inicio', data(resultado.periodo.inicioEfetivo)],
-    ['fim', data(resultado.periodo.fim)],
-    ['dias_periodo', String(resultado.totais.diasBrutos)],
-    ['tempo_contribuicao', String(resultado.totais.totalContribuicao)],
-    ['efetivo_exercicio', String(resultado.totais.efetivoExercicio)],
-  ]);
+  const variaveis = valoresVariaveisDof(dados);
   const ausentes = new Set<string>();
+  let malformadas = false;
   const textoComVariaveis = (texto: string): string => {
-    let inicio = 0;
     let html = '';
-    for (const ocorrencia of texto.matchAll(/\{\{([^{}]*)\}\}/g)) {
-      const posicao = ocorrencia.index;
-      const nome = ocorrencia[1].trim();
-      const valor = variaveis.get(nome);
-      html += escapar(texto.slice(inicio, posicao));
-      if (valor) {
-        html += escapar(valor);
+    for (const parte of analisarTextoDof(texto)) {
+      if (parte.tipo === 'texto') {
+        html += escapar(parte.conteudo);
+      } else if (parte.tipo === 'malformada') {
+        malformadas = true;
+        html += `<mark>Expressão malformada: ${escapar(parte.conteudo)}</mark>`;
       } else {
-        ausentes.add(nome || '(nome vazio)');
-        html += `<mark>Variável não disponível: ${escapar(nome || '(nome vazio)')}</mark>`;
+        const valor = variaveis.get(parte.nome);
+        if (valor) {
+          html += escapar(valor);
+        } else {
+          ausentes.add(parte.nome);
+          html += `<mark>Variável não disponível: ${escapar(parte.nome)}</mark>`;
+        }
       }
-      inicio = posicao + ocorrencia[0].length;
     }
-    return html + escapar(texto.slice(inicio));
+    return html;
   };
   const blocos = dados.blocos.filter((bloco) => bloco.ativo).map((bloco) =>
     `<section><h2>${escapar(TITULOS_BLOCOS_DOF[bloco.codigo])}</h2><p class="texto">${textoComVariaveis(bloco.texto)}</p></section>`
@@ -56,6 +53,7 @@ export function renderizarPreviaDof(dados: DadosPreviaDof): string {
   const declaracao = resultado.declaracao.map((linha) => `<li>${escapar(linha)}</li>`).join('');
   const avisoVariaveis = ausentes.size
     ? `<p class="aviso">Variáveis não disponíveis nesta prévia: ${[...ausentes].map(escapar).join(', ')}.</p>` : '';
+  const avisoMalformadas = malformadas ? '<p class="aviso">Há expressões de variáveis malformadas nos blocos ativos.</p>' : '';
 
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
@@ -79,6 +77,6 @@ ${avisos ? `<ul>${avisos}</ul>` : ''}
 <p>Dias do período: ${escapar(resultado.totais.diasBrutos)}. Tempo líquido de contribuição: ${escapar(resultado.totais.totalContribuicao)}. Efetivo exercício: ${escapar(resultado.totais.efetivoExercicio)}.</p>
 <div class="tabela"><table><thead><tr><th>Ano</th><th>Dias</th><th>Faltas</th><th>T/S</th><th>P/F</th><th>I/P</th><th>Outros</th><th>Contribuição</th><th>Efetivo</th><th>PB</th><th>PV</th><th>Licença-prêmio</th></tr></thead><tbody>${linhas}</tbody></table></div>
 ${declaracao ? `<h2>Linhas condicionais de referência</h2><ul>${declaracao}</ul>` : ''}
-${avisoVariaveis}${blocos}
+${avisoVariaveis}${avisoMalformadas}${blocos}
 </body></html>`;
 }

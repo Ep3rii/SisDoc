@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia provisória e encaminhamento para análise; conferência, emissão e PDF ainda não implementados |
+| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia provisória, encaminhamento e verificação preliminar; conferência, emissão e PDF ainda não implementados |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -152,6 +152,35 @@ vulnerabilidades. Nesta execução, a prévia HTTPS descartável de 45 anos levo
 de blocos. O bundle principal continua acima de 500 kB. Essas medições não
 substituem integração com a CA operacional nem demonstram capacidade de produção.
 
+Foi adicionada uma verificação preliminar auditada para rascunhos próprios e
+encaminhados ao coordenador destinatário. Ela compara identidade, matrícula,
+admissão, período e recálculo, processo e variáveis de blocos ativos; informa
+pendências e avisos, sem transição de estado. Falta a definição dos campos
+obrigatórios e da aprovação institucional do modelo. Presença de nome da mãe
+não significa validação do conteúdo; afastamentos e incorporações da fonte
+ainda não são automaticamente confrontados com os lançamentos.
+
+A migração `008-preconferencia-dof` protege a leitura da fonte durante a
+consulta com um bloqueio advisory compartilhado; escritas em pessoa e vínculo
+obtêm o bloqueio exclusivo antes do comando. Há conflito explícito quando
+uma escrita já está em andamento. O bloqueio é global e seu impacto em
+importações e sincronização futuras ainda não foi aferido. O setup aplica
+essa migração somente em banco novo; instalação anterior não inicia e não há
+procedimento autorizado de atualização. A verificação é um retrato pontual:
+mudanças posteriores exigem nova consulta.
+
+Os testes direcionados de backend HTTPS/PostgreSQL e navegador com API
+simulada passaram (32 testes), incluindo duplicidade concorrente, máscaras,
+regra incompatível, erros de integridade e resposta obsoleta. Na execução,
+a prévia de 45 anos levou 7,2 ms no HTTPS descartável; as atualizações locais
+no limite de 200 blocos e 20.000 caracteres chegaram a 85,0 ms e, com milhares
+de delimitadores malformados, a 160,3 ms. Essas medições são locais e não
+representam desempenho operacional nem substituem a revisão humana.
+`npm run typecheck` passou, `npm test` passou com 88 testes em 12 arquivos e
+`npm audit` não apontou vulnerabilidades. Na suíte completa, os máximos
+correspondentes foram 8,2 ms, 84,2 ms e 158,1 ms, respectivamente; o bundle
+principal ainda excede 500 kB.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -167,4 +196,5 @@ Divergências e decisões estão em
 [007-rascunhos-dof.md](decisoes/007-rascunhos-dof.md) e
 [008-blocos-e-previa-dof.md](decisoes/008-blocos-e-previa-dof.md) e
 [009-processo-dof.md](decisoes/009-processo-dof.md) e
-[010-encaminhamento-dof.md](decisoes/010-encaminhamento-dof.md).
+[010-encaminhamento-dof.md](decisoes/010-encaminhamento-dof.md) e
+[011-preconferencia-dof.md](decisoes/011-preconferencia-dof.md).

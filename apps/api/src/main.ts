@@ -1,7 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
-import { VERSAO_ENCAMINHAMENTO_DOF } from './migracoes/encaminhamento-dof';
+import { VERSAO_PRECONFERENCIA_DOF } from './migracoes/preconferencia-dof';
 
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
@@ -18,7 +18,7 @@ async function iniciar(): Promise<void> {
   try {
     const resultado = await banco.query<{ atual: boolean }>(
       'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
-      [VERSAO_ENCAMINHAMENTO_DOF],
+      [VERSAO_PRECONFERENCIA_DOF],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {
@@ -33,7 +33,7 @@ async function iniciar(): Promise<void> {
   }
   if (!migracaoAtual) {
     await banco.end();
-    throw new Error('O banco não possui a migração de encaminhamento DOF; atualizações existentes ainda exigem procedimento seguro.');
+    throw new Error('O banco não possui a migração de pré-conferência DOF; atualizações existentes ainda exigem procedimento seguro.');
   }
   let app;
   try {

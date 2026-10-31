@@ -60,6 +60,12 @@ export class RascunhosController {
     resposta.end(renderizarPreviaDof(rascunho));
   }
 
+  @ExigirAcao('conferir')
+  @Get(':id/preconferencia')
+  verificarPreconferencia(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
+    return this.rascunhos.verificarPreconferencia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
+  }
+
   @ExigirAcao('criar_rascunho')
   @Post()
   criar(@Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {

@@ -67,12 +67,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 007, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 008, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `007-encaminhamento-dof` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `008-preconferencia-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -176,6 +176,31 @@ exibida antes do recolhimento não pode ser recuperada remotamente.
 Em caso de conflito, reabra o rascunho. Se a comunicação falhar, confira o
 estado antes de repetir: envio ou recolhimento podem ter sido concluídos.
 Se o destinatário estiver em outra operação, aguarde e tente novamente.
+
+## Verificação preliminar de pendências
+
+No rascunho próprio ou encaminhado ao coordenador destinatário, salve ou
+descarte as alterações locais e use **Verificar pendências para conferência**.
+A consulta mostra bloqueios e avisos para a revisão salva. Ela não registra
+conferência, não aprova o modelo e não autoriza emissão. Após alterações na
+fonte ou no rascunho, execute novamente; uma consulta anterior não garante que
+os dados continuem válidos.
+
+A verificação identifica, entre outras pendências, CPF protegido inválido ou
+inconsistente, matrícula divergente ou duplicada entre vínculos ativos,
+vínculo removido, admissão alterada, divergência de período/cálculo, processo
+fora das máscaras atuais e variáveis indisponíveis ou malformadas em blocos
+ativos. Dados do vínculo sem data de sincronização, com mais de 24 horas ou
+com data futura geram avisos. Outros campos da referência ainda dependem de
+definição institucional; a presença de nome da mãe não valida seu conteúdo.
+Os registros de afastamento e incorporação não são automaticamente
+confrontados com os lançamentos.
+
+Se a fonte estiver sendo atualizada durante a consulta, a operação retorna
+conflito; aguarde e tente novamente. Enquanto a consulta está em andamento,
+escritas em pessoas e vínculos aguardam um bloqueio transacional global.
+Esse mecanismo provisório e seu impacto em importações futuras devem ser
+reavaliados antes de implementar sincronização ou operação concorrente.
 
 ## Verificação de software
 

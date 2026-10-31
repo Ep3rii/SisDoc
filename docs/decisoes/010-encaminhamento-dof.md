@@ -40,7 +40,9 @@ O navegador é testado separadamente com API simulada e dados fictícios.
 A migração `007-encaminhamento-dof` só é aplicada pelo setup em banco novo;
 não há procedimento aprovado para atualizar instalação existente.
 
-Ainda faltam validação e transição de conferência, regra e modelo aprovados,
-emissão, PDF e histórico. A interface e a API não tratam o envio como
-aprovação. A concorrência futura com sincronização da fonte também continua
-pendente, conforme a decisão 007.
+Uma consulta de pendências posterior está descrita na
+[decisão 011](011-preconferencia-dof.md); ela não muda o estado do documento.
+Ainda faltam validação final e transição de conferência, regra e modelo
+aprovados, emissão, PDF e histórico. A interface e a API não tratam o envio
+como aprovação. A concorrência futura com sincronização da fonte também
+continua pendente, conforme a decisão 007.

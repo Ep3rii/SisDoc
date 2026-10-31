@@ -11,6 +11,7 @@ import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
 import { aplicarAutenticacao } from '../migracoes/autenticacao';
 import { aplicarBlocosDof } from '../migracoes/blocos-dof';
 import { aplicarEncaminhamentoDof } from '../migracoes/encaminhamento-dof';
+import { aplicarPreconferenciaDof } from '../migracoes/preconferencia-dof';
 import { aplicarProcessoDof } from '../migracoes/processo-dof';
 import { aplicarConsulta } from '../migracoes/consulta';
 import { aplicarRascunhoDof } from '../migracoes/rascunho-dof';
@@ -402,6 +403,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarBlocosDof(cliente, opcoes.banco.usuario);
     await aplicarProcessoDof(cliente, opcoes.banco.usuario);
     await aplicarEncaminhamentoDof(cliente, opcoes.banco.usuario);
+    await aplicarPreconferenciaDof(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

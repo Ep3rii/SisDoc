@@ -11,6 +11,7 @@ import {
 import { api, ErroApi } from './api';
 import { BlocosDof } from './blocos-dof';
 import { EncaminhamentoDof } from './encaminhamento-dof';
+import { VerificacaoConferenciaDof } from './preconferencia-dof';
 import { ProcessoDof } from './processo-dof';
 
 type Props = {
@@ -405,6 +406,12 @@ export function CalculoDof({
           bloqueado={calculoPendente || processoPendente || encaminhamentoPendente || operacaoEncaminhamento || ocupado}
           somenteLeitura={edicaoIndisponivel}
           onAtualizar={setRascunho} onPendente={marcarBlocos} onErro={onErro} onLimpar={onLimpar} />
+      )}
+      {rascunho && (podeSalvar || somenteLeitura) && (
+        <VerificacaoConferenciaDof rascunho={rascunho}
+          bloqueado={calculoPendente || blocosPendentes || processoPendente || encaminhamentoPendente
+            || operacaoEncaminhamento || ocupado}
+          onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && podeSalvar && !somenteLeitura && (
         <EncaminhamentoDof rascunho={rascunho} csrf={csrf}

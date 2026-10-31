@@ -19,6 +19,7 @@ import {
   type PaginaCoordenadoresDof,
   type PaginaEncaminhamentosDof,
   type PaginaRascunhosDof,
+  type PreconferenciaDof,
   type RascunhoDof,
   type RecolherRascunhoDof,
   type SolicitarCalculoDof,
@@ -27,12 +28,14 @@ import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { transacao } from '../banco';
 import { calcularDofNaTransacao } from '../calculos/calculos';
 import { VERSAO_BLOCO_VAZIO } from '../migracoes/blocos-dof';
+import { CHAVE_BLOQUEIO_FONTE_DOF } from '../migracoes/preconferencia-dof';
 import { TEMPLATE_DOF_PROVISORIO } from '../migracoes/rascunho-dof';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
+import { verificarPreconferenciaDof } from './preconferencia';
 
 type LinhaRascunho = {
   id: string;
@@ -343,6 +346,31 @@ export class RascunhosService {
 
   async obterParaPrevia(sessao: SessaoAutenticada, ip: string, id: string): Promise<RascunhoDof> {
     return this.obterAuditado(sessao, ip, id, 'previa_dof_aberta');
+  }
+
+  async verificarPreconferencia(sessao: SessaoAutenticada, ip: string, id: string): Promise<PreconferenciaDof> {
+    const tentativa = await transacao<Tentativa<PreconferenciaDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('conferir'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      const bloqueio = await cliente.query<{ obtido: boolean }>(
+        'SELECT pg_try_advisory_xact_lock_shared($1, $2) AS obtido', [...CHAVE_BLOQUEIO_FONTE_DOF],
+      );
+      if (!bloqueio.rows[0].obtido) {
+        await auditarConsultaFuncional(cliente, sessao, 'preconferencia_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e verifique novamente.' } };
+      }
+      const atual = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
+      if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a pré-conferência.');
+      const rascunho = await this.apresentar(cliente, atual);
+      const resultado = await verificarPreconferenciaDof(cliente, sessao, ip, rascunho, atual.regra_atual, this.protetor);
+      await auditarConsultaFuncional(cliente, sessao, 'preconferencia_verificada', 'documento', id, atual.pessoa_id, ip);
+      return { valor: resultado };
+    });
+    return concluir(tentativa);
   }
 
   async criar(sessao: SessaoAutenticada, ip: string, dados: CriarRascunhoDof): Promise<RascunhoDof> {

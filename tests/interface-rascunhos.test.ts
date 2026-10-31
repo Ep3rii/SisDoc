@@ -14,7 +14,7 @@ import {
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
-import { renderizarPreviaDof } from '@sisdoc/templates';
+import { renderizarPreviaDof, verificarVariaveisDof } from '@sisdoc/templates';
 import { chromium, type Browser, type Page, type Route } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -41,6 +41,8 @@ type Simulacao = {
   escritas: number;
   anosConfirmados: number[];
   previas: number;
+  adiarPreconferencia: boolean;
+  liberarPreconferencia: (() => void) | null;
 };
 
 function resultadoSintetico(entrada: SolicitarCalculoDof, admissao: string): ResultadoCalculoDof {
@@ -85,6 +87,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
   const estado: Simulacao = {
     papel: 'analista', admissao: '1980-01-01', rascunho: null,
     conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [], previas: 0,
+    adiarPreconferencia: false, liberarPreconferencia: null,
   };
   await pagina.route('**/api/v1/**', async (rota) => {
     try {
@@ -188,6 +191,25 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           headers: { 'X-Sisdoc-Revisao': String(estado.rascunho.revisao) },
           body: renderizarPreviaDof(estado.rascunho),
         });
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/preconferencia` && metodo === 'GET' && estado.rascunho) {
+        const variaveis = verificarVariaveisDof(estado.rascunho);
+        const resposta = {
+          documentoId, revisao: estado.rascunho.revisao, verificadoEm: new Date().toISOString(),
+          status: 'nao_conferido', conferenciaDisponivel: false,
+          bloqueios: [
+            { codigo: 'conferencia_indisponivel', mensagem: 'A transição para conferido ainda não foi implementada.' },
+            { codigo: 'aprovacao_modelo_nao_verificada', mensagem: 'A aprovação do modelo ainda não foi verificada.' },
+            ...(!estado.rascunho.processo ? [{ codigo: 'processo_ausente', mensagem: 'Informe o número do processo.' }] : []),
+            ...(variaveis.indisponiveis.length ? [{ codigo: 'variaveis_ausentes', mensagem: 'Há variáveis indisponíveis.' }] : []),
+            ...(variaveis.malformadas ? [{ codigo: 'variaveis_malformadas', mensagem: 'Há expressões malformadas.' }] : []),
+          ],
+          avisos: [{ codigo: 'regra_provisoria', mensagem: 'A regra é provisória.' }],
+        };
+        if (estado.adiarPreconferencia) {
+          await new Promise<void>((resolve) => { estado.liberarPreconferencia = resolve; });
+        }
+        return responder(rota, 200, resposta);
       }
       if (caminho === `/api/v1/documentos/${documentoId}/encaminhar` && metodo === 'POST' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
@@ -342,6 +364,7 @@ describe('interface de rascunhos com API sintética', () => {
   });
 
   afterEach(async () => {
+    estado.liberarPreconferencia?.();
     await pagina.close({ runBeforeUnload: false });
     expect(estado.erros).toEqual([]);
   });
@@ -581,6 +604,40 @@ describe('interface de rascunhos com API sintética', () => {
     );
   });
 
+  it('mantém a prévia abaixo de um segundo com muitos delimitadores malformados', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    if (!estado.rascunho) throw new Error('Rascunho sintético ausente.');
+    estado.rascunho = {
+      ...estado.rascunho,
+      blocos: Array.from({ length: 200 }, (_, indice) => ({
+        id: `aaaaaaaa-aaaa-4aaa-8aaa-${String(indice + 1).padStart(12, '0')}`,
+        codigo: 'complementares', ativo: true, texto: `${'}}X'.repeat(33)}Z`,
+      })),
+    };
+    await abrirRascunho(pagina);
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
+    await quadro.getByText('Há expressões de variáveis malformadas nos blocos ativos.').waitFor();
+    expect(await quadro.locator('mark').count()).toBe(6600);
+    const duracoes: number[] = [];
+    for (let indice = 0; indice < 5; indice += 1) {
+      const inicio = await pagina.evaluate(() => performance.now());
+      await pagina.getByLabel('Texto do bloco 200').fill(`MARCADOR-MALFORMADO-${indice}`.padEnd(100, '}'));
+      await quadro.getByText(`MARCADOR-MALFORMADO-${indice}`, { exact: false }).waitFor();
+      duracoes.push(await pagina.evaluate(() => performance.now()) - inicio);
+    }
+    const maiorDuracao = Math.max(...duracoes);
+    expect(maiorDuracao).toBeLessThan(1000);
+    process.stdout.write(
+      `Prévia sintética com delimitadores malformados (45 anos, 200 blocos, 20.000 caracteres): ${maiorDuracao.toFixed(1)} ms.\n`,
+    );
+  });
+
   it('valida e salva o processo somente com máscara configurada, preservando alterações pendentes', async () => {
     await pagina.goto(endereco);
     await iniciarCalculo(pagina);
@@ -661,6 +718,9 @@ describe('interface de rascunhos com API sintética', () => {
     expect(estado.rascunho?.encaminhamento?.destinatarioId).toBe(coordenadorId);
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
+    expect(await pagina.getByText('A transição para conferido ainda não foi implementada.').count()).toBe(1);
 
     estado.papel = 'coordenador';
     await pagina.reload();
@@ -674,6 +734,8 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
 
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
     estado.papel = 'analista';
     await pagina.reload();
     await abrirRascunho(pagina);
@@ -689,6 +751,46 @@ describe('interface de rascunhos com API sintética', () => {
     expect(estado.rascunho?.encaminhamento).toBeNull();
     expect(await pagina.getByLabel('Faltas em 1980').isEnabled()).toBe(true);
     expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
+  });
+
+  it('mostra bloqueios preliminares e invalida o resultado diante de edições locais', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados fictícios');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Rascunho não conferido — revisão 1,', { exact: false }).waitFor();
+    await pagina.getByText('Informe o número do processo.').waitFor();
+    expect(await pagina.getByText('A aprovação do modelo ainda não foi verificada.').count()).toBe(1);
+    expect(await pagina.getByRole('button', { name: 'Conferir', exact: true }).count()).toBe(0);
+
+    await pagina.getByLabel('Número do processo').fill('1234/5678');
+    expect(await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).isDisabled()).toBe(true);
+    expect(await pagina.getByText('Rascunho não conferido — revisão 1,', { exact: false }).count()).toBe(0);
+    await pagina.getByLabel('Número do processo').clear();
+    await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
+    await pagina.getByLabel('Texto do bloco 1').fill('Teste {{nome}} {{inexistente}} {{malformada');
+    await pagina.getByLabel('Motivo da alteração dos blocos').fill('Teste de variáveis');
+    await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
+    await pagina.getByText('Blocos salvos na revisão 2.', { exact: false }).waitFor();
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/Expressão malformada/).first().waitFor();
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
+    await pagina.getByText('Há variáveis indisponíveis.').waitFor();
+    await pagina.getByText('Há expressões malformadas.').waitFor();
+
+    estado.adiarPreconferencia = true;
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await expect.poll(() => estado.liberarPreconferencia !== null).toBe(true);
+    await pagina.getByLabel('Número do processo').fill('1234/5678');
+    await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByText('Processo salvo na revisão 3.', { exact: false }).waitFor();
+    estado.liberarPreconferencia?.();
+    await pagina.getByRole('alert').getByText(/O rascunho mudou durante a verificação/).waitFor();
+    expect(await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).count()).toBe(0);
   });
 
   it('restringe controles por perfil e apresenta falha de listagem com retentativa e paginação', async () => {
