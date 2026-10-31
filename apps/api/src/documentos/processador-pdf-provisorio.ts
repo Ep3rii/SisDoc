@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { dadosPdfProvisorioDofSchema, type DadosPdfProvisorioDof } from '@sisdoc/contratos';
 import type { Pool } from 'pg';
+import { z } from 'zod';
 import { transacao } from '../banco';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { ArmazenamentoPdf } from './armazenamento-pdf';
@@ -18,6 +19,11 @@ type Resultado =
   | { estado: 'sem_trabalho' }
   | { estado: 'posse_perdida'; jobId: string; emissaoId: string }
   | { estado: 'concluido'; jobId: string; emissaoId: string; artefatoId: string };
+type ResultadoReagendamento = {
+  estado: 'reagendado' | 'pendente' | 'processando' | 'concluido';
+  jobId: string;
+  emissaoId: string;
+};
 
 export class ProcessadorPdfProvisorio {
   constructor(
@@ -101,6 +107,46 @@ export class ProcessadorPdfProvisorio {
           AND posse_expira_em > clock_timestamp()
       `, [trabalho.id, trabalho.emissaoId, trabalho.posse]);
       return atualizado.rowCount === 1;
+    });
+  }
+
+  async reagendar(jobId: string): Promise<ResultadoReagendamento> {
+    const identificador = z.uuid().safeParse(jobId);
+    if (!identificador.success) throw new Error('Identificador de job de PDF inválido.');
+    return transacao(this.banco, async (cliente) => {
+      const consulta = await cliente.query<{
+        id: string; emissao_id: string; tipo: string; documento_status: string;
+        status: 'pendente' | 'processando' | 'concluido' | 'falhou';
+        posse: string | null; posse_expira_em: Date | null;
+      }>(`
+        SELECT j.id, j.emissao_id, e.tipo, d.status AS documento_status, j.status, j.posse, j.posse_expira_em
+        FROM documentos.job_pdf j
+        JOIN documentos.emissao e ON e.id = j.emissao_id
+        JOIN documentos.documento d ON d.id = e.documento_id
+        WHERE j.id = $1 FOR UPDATE OF j
+      `, [identificador.data]);
+      const linha = consulta.rows[0];
+      if (!linha) throw new Error('Job de PDF não encontrado.');
+      if (linha.tipo !== 'DOF' || !['emitido', 'cancelado'].includes(linha.documento_status)) {
+        throw new Error('Job incompatível com o processamento de PDF provisório.');
+      }
+      const artefato = await cliente.query<{ existe: boolean }>(
+        'SELECT EXISTS (SELECT 1 FROM documentos.artefato_pdf WHERE job_id = $1) AS existe', [linha.id],
+      );
+      if ((linha.status === 'processando' && (linha.posse === null || linha.posse_expira_em === null))
+          || (linha.status !== 'processando' && (linha.posse !== null || linha.posse_expira_em !== null))
+          || (linha.status === 'concluido') !== artefato.rows[0].existe) {
+        throw new Error('O job de PDF está em estado inconsistente.');
+      }
+      if (linha.status === 'falhou') {
+        const atualizado = await cliente.query(`
+          UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL,
+            atualizado_em = clock_timestamp() WHERE id = $1 AND status = 'falhou'
+        `, [linha.id]);
+        if (atualizado.rowCount !== 1) throw new Error('O job de PDF não pôde ser reagendado.');
+        return { estado: 'reagendado', jobId: linha.id, emissaoId: linha.emissao_id };
+      }
+      return { estado: linha.status, jobId: linha.id, emissaoId: linha.emissao_id };
     });
   }
 

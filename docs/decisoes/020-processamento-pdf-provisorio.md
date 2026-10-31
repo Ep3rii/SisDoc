@@ -38,10 +38,21 @@ idempotência, autorização ou auditoria de emissão.
   job ou deixado uma posse que só será retomada depois de expirar. Os testes
   também cobrem a reversão da transação e retomada do mesmo job e emissão.
 
-`falhou` não é reencaminhado automaticamente; a retomada desse estado foi
-simulada por SQL apenas no banco descartável. Não há procedimento operacional
-de reprocessamento, observabilidade ou escalonador. A posse não é renovada:
-um prazo insuficiente pode provocar trabalho repetido e arquivos órfãos.
+`falhou` não é reencaminhado automaticamente. O método interno experimental
+`reagendar` bloqueia o job, verifica posse e metadados e o devolve a
+`pendente` sem criar nova emissão ou número. Chamadas repetidas ou
+concorrentes retornam o estado já observado (`pendente`, `processando` ou
+`concluido`), sem duplicar o reagendamento. `concluido` indica apenas o estado
+e a presença de metadados no banco; não verifica a integridade atual do arquivo.
+Estados incompatíveis, documento ou tipo não elegível e identificador inválido
+são erros explícitos. A verificação do artefato ocorre depois de adquirir o
+bloqueio, para observar uma conclusão concorrente já confirmada.
+
+Esse método é chamado somente por testes com banco descartável: não possui
+rota, autenticação ou auditoria de usuário e não é um procedimento
+operacional de reprocessamento. Não há observabilidade ou escalonador. A
+posse não é renovada: um prazo insuficiente pode provocar trabalho repetido e
+arquivos órfãos.
 Após falha, prazo expirado ou confirmação incerta, pode existir arquivo sem
 registro no banco; uma tentativa antiga pode terminar mesmo após perder a
 posse. Não há coleta segura de órfãos nem procedimento de recuperação abrupta.
@@ -58,11 +69,12 @@ pendente ou cancelamento ainda depende de decisão externa e não foi aprovada.
 Os testes verificam invisibilidade antes do commit, snapshot inalterável e
 adulterado, identidade divergente, concorrência, expiração da posse, falha de
 renderização, falha após publicação e rollback entre inserir artefato e
-concluir o job. Também simulam resultado incerto tanto na reivindicação
-quanto na conclusão, nos casos em que o commit ocorreu ou foi revertido.
-Verificam número e emissão preservados, mensagens sanitizadas e ausência de
-privilégios do papel da aplicação. A suíte completa passou com 130 testes em
-17 arquivos; a verificação de tipos e `npm audit` também passaram.
+concluir o job. Também simulam resultado incerto na reivindicação,
+conclusão e reagendamento, nos casos em que o commit ocorreu ou foi revertido.
+Verificam reagendamentos concorrentes, espera por conclusão transacional,
+estados inconsistentes, número e emissão preservados, mensagens sanitizadas e
+ausência de privilégios do papel da aplicação. A suíte completa passou com
+130 testes em 17 arquivos; a verificação de tipos e `npm audit` também passaram.
 
 Em uma execução direcionada, 20 jobs sintéticos de 45 anos com Chromium
 aquecido levaram mediana de 289,3 ms, p95 de 309,5 ms e máximo de 322,6 ms,
@@ -73,6 +85,7 @@ concorrente. Não comprova o limite ponta a ponta de cinco segundos.
 
 Permanecem pendentes: emissão transacional com número, snapshot completo e
 job, idempotência e aprovações; worker operacional com permissões mínimas,
-recuperação e limpeza seguras; reserva de nome, download auditado, histórico,
-cópia e teste integrado do fluxo. O gate da fatia 5 continua não cumprido e a
-aplicação não está autorizada para uso operacional.
+reprocessamento autorizado e auditado, recuperação e limpeza seguras; reserva
+de nome, download auditado, histórico, cópia e teste integrado do fluxo. O gate
+da fatia 5 continua não cumprido e a aplicação não está autorizada para uso
+operacional.

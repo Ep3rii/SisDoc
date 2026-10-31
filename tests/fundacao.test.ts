@@ -4322,6 +4322,8 @@ describe('fundação em recursos descartáveis', () => {
       const processador = new ProcessadorPdfProvisorio(
         banco, protetor, armazenamento, (dados) => renderizarPdfProvisorioDof(browser, dados), 30000,
       );
+      await expect(processador.reagendar('id-invalido')).rejects.toThrow('Identificador de job de PDF inválido');
+      await expect(processador.reagendar(randomUUID())).rejects.toThrow('Job de PDF não encontrado');
       const privilegios = await cliente.query<{ job: boolean; artefato: boolean }>(`
         SELECT has_table_privilege('sisdoc_aplicativo', 'documentos.job_pdf', 'UPDATE') AS job,
           has_table_privilege('sisdoc_aplicativo', 'documentos.artefato_pdf', 'INSERT') AS artefato
@@ -4343,7 +4345,9 @@ describe('fundação em recursos descartáveis', () => {
         VALUES ($1, 'DOF', $2, '<p>Modelo sintético</p>', '', '2024-01-01')
       `, [template, `worker-sintetico-${template}`]);
 
-      const criarJob = async (numero: number, documentoDivergente = false, snapshotAdulterado = false) => {
+      const criarJob = async (
+        numero: number, documentoDivergente = false, snapshotAdulterado = false, emitirDocumento = true,
+      ) => {
         const { pessoa, vinculo } = await inserirPessoaEVinculo(cliente);
         const documento = randomUUID();
         const emissao = randomUUID();
@@ -4375,7 +4379,9 @@ describe('fundação em recursos descartáveis', () => {
             id, documento_id, tipo, ano, numero, numero_formatado, chave_idempotencia, snapshot_cifrado, emitido_por
           ) VALUES ($1, $2, 'DOF', 2024, $3, $4, $5, $6, $7)
         `, [emissao, documento, numero, `TESTE-${numero}`, `PDF-SINTETICO-${emissao}`, snapshot, usuario]);
-        await cliente.query("UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [documento]);
+        if (emitirDocumento) {
+          await cliente.query("UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [documento]);
+        }
         await cliente.query(`
           INSERT INTO documentos.job_pdf (id, emissao_id, status) VALUES ($1, $2, 'pendente')
         `, [job, emissao]);
@@ -4431,6 +4437,9 @@ describe('fundação em recursos descartáveis', () => {
       expect(dadosGravados.rows[0].snapshot_cifrado.equals(primeiro.snapshot)).toBe(true);
       const pdf = await armazenamento.ler(concluido.artefatoId, dadosGravados.rows[0].sha256.toString('hex'));
       expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+      expect(await processador.reagendar(primeiro.job)).toEqual({
+        estado: 'concluido', jobId: primeiro.job, emissaoId: primeiro.emissao,
+      });
       await expect(cliente.query('UPDATE documentos.emissao SET snapshot_cifrado = $2 WHERE id = $1',
         [primeiro.emissao, randomBytes(48)])).rejects.toMatchObject({ code: '55000' });
       expect(await processador.processarUm()).toEqual({ estado: 'sem_trabalho' });
@@ -4447,7 +4456,14 @@ describe('fundação em recursos descartáveis', () => {
         status: 'falhou', tentativas: 1, erro_sanitizado: 'Falha ao gerar ou gravar PDF provisório.',
       });
       expect(falho.rows[0].erro_sanitizado).not.toContain('DADO-SENSIVEL-SINTETICO');
-      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [segundo.job]);
+      const reagendamentos = await Promise.all([
+        processador.reagendar(segundo.job), processador.reagendar(segundo.job),
+      ]);
+      expect(reagendamentos.map((resultado) => resultado.estado).sort()).toEqual(['pendente', 'reagendado']);
+      expect(reagendamentos.every((resultado) => resultado.jobId === segundo.job && resultado.emissaoId === segundo.emissao))
+        .toBe(true);
+      expect((await cliente.query('SELECT erro_sanitizado FROM documentos.job_pdf WHERE id = $1', [segundo.job])).rows[0].erro_sanitizado)
+        .toBeNull();
       const recuperado = await processador.processarUm();
       expect(recuperado).toMatchObject({ estado: 'concluido', jobId: segundo.job, emissaoId: segundo.emissao });
       const segundaConsulta = await cliente.query<{ tentativas: number; numero: string; quantidade: string }>(`
@@ -4468,7 +4484,9 @@ describe('fundação em recursos descartáveis', () => {
       await expect(falhaDepoisDoArquivo.processarUm()).rejects.toThrow('job foi marcado como falho');
       expect((await readdir(pasta)).length).toBe(arquivosAntes + 1);
       expect((await cliente.query('SELECT count(*) FROM documentos.artefato_pdf WHERE emissao_id = $1', [terceiro.emissao])).rows[0].count).toBe('0');
-      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [terceiro.job]);
+      expect(await processador.reagendar(terceiro.job)).toEqual({
+        estado: 'reagendado', jobId: terceiro.job, emissaoId: terceiro.emissao,
+      });
       expect(await processador.processarUm()).toMatchObject({
         estado: 'concluido', jobId: terceiro.job, emissaoId: terceiro.emissao,
       });
@@ -4488,6 +4506,9 @@ describe('fundação em recursos descartáveis', () => {
       const pendente = lento.processarUm();
       try {
         await iniciado;
+        expect(await processador.reagendar(quarto.job)).toEqual({
+          estado: 'processando', jobId: quarto.job, emissaoId: quarto.emissao,
+        });
         const posseAntiga = await cliente.query<{ posse: string }>('SELECT posse FROM documentos.job_pdf WHERE id = $1', [quarto.job]);
         await cliente.query(`
           UPDATE documentos.job_pdf SET posse_expira_em = clock_timestamp() - interval '1 second' WHERE id = $1
@@ -4548,7 +4569,9 @@ describe('fundação em recursos descartáveis', () => {
         await cliente.query('DROP TRIGGER falha_pdf_sintetica ON documentos.job_pdf');
         await cliente.query('DROP FUNCTION documentos.falhar_conclusao_pdf_sintetico()');
       }
-      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [setimo.job]);
+      expect(await processador.reagendar(setimo.job)).toEqual({
+        estado: 'reagendado', jobId: setimo.job, emissaoId: setimo.emissao,
+      });
       expect(await processador.processarUm()).toMatchObject({
         estado: 'concluido', jobId: setimo.job, emissaoId: setimo.emissao,
       });
@@ -4558,6 +4581,7 @@ describe('fundação em recursos descartáveis', () => {
         UPDATE documentos.job_pdf SET posse = $2, posse_expira_em = clock_timestamp() + interval '1 minute' WHERE id = $1
       `, [oitavo.job, randomUUID()]);
       await expect(processador.processarUm()).rejects.toThrow('estado de posse inconsistente');
+      await expect(processador.reagendar(oitavo.job)).rejects.toThrow('estado inconsistente');
       await cliente.query(`
         UPDATE documentos.job_pdf SET status = 'falhou', posse = NULL, posse_expira_em = NULL,
           erro_sanitizado = 'Estado sintético inconsistente.' WHERE id = $1
@@ -4580,6 +4604,17 @@ describe('fundação em recursos descartáveis', () => {
       }, async () => pdf, 30000);
       await expect(metadadosInvalidos.processarUm()).rejects.toThrow('job foi marcado como falho');
       expect((await cliente.query('SELECT count(*) FROM documentos.artefato_pdf WHERE emissao_id = $1', [decimo.emissao])).rows[0].count).toBe('0');
+      const reagendamentoRevertido = new ProcessadorPdfProvisorio(
+        bancoComFalhaDeConfirmacao(false, 1), protetor, armazenamento, async () => pdf, 30000,
+      );
+      await expect(reagendamentoRevertido.reagendar(decimo.job)).rejects.toThrow('Não foi possível confirmar a transação');
+      expect((await cliente.query('SELECT status FROM documentos.job_pdf WHERE id = $1', [decimo.job])).rows[0].status).toBe('falhou');
+      expect(await processador.reagendar(decimo.job)).toEqual({
+        estado: 'reagendado', jobId: decimo.job, emissaoId: decimo.emissao,
+      });
+      expect(await processador.processarUm()).toMatchObject({
+        estado: 'concluido', jobId: decimo.job, emissaoId: decimo.emissao,
+      });
 
       const decimoPrimeiro = await criarJob(50011);
       const commitConfirmado = new ProcessadorPdfProvisorio(
@@ -4609,7 +4644,14 @@ describe('fundação em recursos descartáveis', () => {
       expect(aposReversaoIncerta.rows[0]).toEqual({
         status: 'falhou', artefatos: '0', numero: String(decimoSegundo.numero),
       });
-      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [decimoSegundo.job]);
+      const reagendamentoConfirmado = new ProcessadorPdfProvisorio(
+        bancoComFalhaDeConfirmacao(true, 1), protetor, armazenamento, async () => pdf, 30000,
+      );
+      await expect(reagendamentoConfirmado.reagendar(decimoSegundo.job))
+        .rejects.toThrow('Não foi possível confirmar a transação');
+      expect(await processador.reagendar(decimoSegundo.job)).toEqual({
+        estado: 'pendente', jobId: decimoSegundo.job, emissaoId: decimoSegundo.emissao,
+      });
       expect(await processador.processarUm()).toMatchObject({
         estado: 'concluido', jobId: decimoSegundo.job, emissaoId: decimoSegundo.emissao,
       });
@@ -4653,6 +4695,106 @@ describe('fundação em recursos descartáveis', () => {
       expect(await processador.processarUm()).toMatchObject({
         estado: 'concluido', jobId: decimoQuinto.job, emissaoId: decimoQuinto.emissao,
       });
+
+      const decimoSexto = await criarJob(50016);
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'concluido' WHERE id = $1", [decimoSexto.job]);
+      await expect(processador.reagendar(decimoSexto.job)).rejects.toThrow('estado inconsistente');
+
+      const decimoSetimo = await criarJob(50017);
+      const artefatoInconsistente = randomUUID();
+      const arquivoInconsistente = await armazenamento.gravar(artefatoInconsistente, pdf);
+      await cliente.query(`
+        INSERT INTO documentos.artefato_pdf (id, emissao_id, job_id, caminho_relativo, sha256)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [
+        artefatoInconsistente, decimoSetimo.emissao, decimoSetimo.job,
+        arquivoInconsistente.caminhoRelativo, Buffer.from(arquivoInconsistente.sha256, 'hex'),
+      ]);
+      await expect(processador.reagendar(decimoSetimo.job)).rejects.toThrow('estado inconsistente');
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'falhou' WHERE id = $1", [decimoSetimo.job]);
+      await expect(processador.reagendar(decimoSetimo.job)).rejects.toThrow('estado inconsistente');
+
+      const decimoOitavo = await criarJob(50018);
+      const artefatoConcorrente = randomUUID();
+      const arquivoConcorrente = await armazenamento.gravar(artefatoConcorrente, pdf);
+      const pid = (await cliente.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+      await cliente.query('BEGIN');
+      transacaoAberta = true;
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'concluido' WHERE id = $1", [decimoOitavo.job]);
+      await cliente.query(`
+        INSERT INTO documentos.artefato_pdf (id, emissao_id, job_id, caminho_relativo, sha256)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [
+        artefatoConcorrente, decimoOitavo.emissao, decimoOitavo.job,
+        arquivoConcorrente.caminhoRelativo, Buffer.from(arquivoConcorrente.sha256, 'hex'),
+      ]);
+      const aguardandoConclusao = processador.reagendar(decimoOitavo.job);
+      try {
+        let aguardandoBloqueio = false;
+        for (let tentativa = 0; tentativa < 100 && !aguardandoBloqueio; tentativa += 1) {
+          const atividade = await banco.query<{ aguardando: boolean }>(`
+            SELECT EXISTS (
+              SELECT 1 FROM pg_stat_activity
+              WHERE datname = current_database() AND $1 = ANY(pg_blocking_pids(pid))
+                AND query LIKE '%WHERE j.id = $1 FOR UPDATE OF j%'
+            ) AS aguardando
+          `, [pid]);
+          aguardandoBloqueio = atividade.rows[0].aguardando;
+          if (!aguardandoBloqueio) await delay(20);
+        }
+        expect(aguardandoBloqueio).toBe(true);
+        await cliente.query('COMMIT');
+        transacaoAberta = false;
+        expect(await aguardandoConclusao).toEqual({
+          estado: 'concluido', jobId: decimoOitavo.job, emissaoId: decimoOitavo.emissao,
+        });
+      } finally {
+        if (transacaoAberta) {
+          await cliente.query('ROLLBACK');
+          transacaoAberta = false;
+        }
+        await aguardandoConclusao;
+      }
+
+      const decimoNono = await criarJob(50019, false, false, false);
+      await expect(processador.reagendar(decimoNono.job)).rejects.toThrow('incompatível com o processamento');
+
+      const vigesimo = await criarJob(50020);
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'processando' WHERE id = $1", [vigesimo.job]);
+      await expect(processador.reagendar(vigesimo.job)).rejects.toThrow('estado inconsistente');
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'falhou' WHERE id = $1", [vigesimo.job]);
+
+      const { pessoa: pessoaDtc, vinculo: vinculoDtc } = await inserirPessoaEVinculo(cliente);
+      const templateDtc = randomUUID();
+      const documentoDtc = randomUUID();
+      const emissaoDtc = randomUUID();
+      const jobDtc = randomUUID();
+      await cliente.query(`
+        INSERT INTO documentos.template_versao (id, tipo, versao, html, css, vigente_de)
+        VALUES ($1, 'DTC_IPAM', $2, '<p>Modelo sintético</p>', '', '2024-01-01')
+      `, [templateDtc, `reagendamento-sintetico-${templateDtc}`]);
+      await cliente.query(`
+        INSERT INTO documentos.documento (
+          id, tipo, pessoa_id, vinculo_id, entrada_cifrada, template_versao_id,
+          regra_versao_id, criado_por, atualizado_por
+        ) VALUES ($1, 'DTC_IPAM', $2, $3, $4, $5, $6, $7, $7)
+      `, [documentoDtc, pessoaDtc, vinculoDtc, randomBytes(48), templateDtc, regra, usuario]);
+      await cliente.query(`
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 1, '2020-01-01', '2020-12-31')
+      `, [documentoDtc]);
+      await cliente.query(`
+        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = clock_timestamp()
+        WHERE id = $1
+      `, [documentoDtc, usuario]);
+      await cliente.query(`
+        INSERT INTO documentos.emissao (
+          id, documento_id, tipo, ano, numero, numero_formatado, chave_idempotencia, snapshot_cifrado, emitido_por
+        ) VALUES ($1, $2, 'DTC_IPAM', 2024, 50021, 'TESTE-50021', $3, $4, $5)
+      `, [emissaoDtc, documentoDtc, `DTC-SINTETICO-${emissaoDtc}`, randomBytes(48), usuario]);
+      await cliente.query("UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [documentoDtc]);
+      await cliente.query("INSERT INTO documentos.job_pdf (id, emissao_id, status) VALUES ($1, $2, 'pendente')", [jobDtc, emissaoDtc]);
+      await expect(processador.reagendar(jobDtc)).rejects.toThrow('incompatível com o processamento');
 
       const duracoes: number[] = [];
       for (let indice = 0; indice < 20; indice += 1) {

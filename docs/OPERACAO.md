@@ -8,7 +8,8 @@ ou usar operacionalmente até a
 conclusão das demais fatias, revisão e autorização formal.
 O renderizador, o armazenamento e o processador experimentais de PDF são
 usados apenas por testes sintéticos: não há worker iniciado, botão de download,
-arquivo operacional persistido, numeração ou emissão.
+arquivo operacional persistido, reprocessamento autorizado, numeração ou
+emissão.
 
 ## Pré-requisitos para uma futura instalação
 

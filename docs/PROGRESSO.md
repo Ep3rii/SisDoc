@@ -313,11 +313,19 @@ mediana de 289,3 ms, p95 de 309,5 ms e máximo de 322,6 ms da chamada do
 processador ao commit do artefato. Não inclui transporte ou espera em fila e
 não comprova o limite ponta a ponta. O processador não está ligado à aplicação,
 não inicia worker e pode deixar arquivos órfãos; a recuperação segura e o
-reprocessamento de falhas permanecem pendentes. A identidade da posse agora é
-o UUID do artefato interno. Detalhes e demais limites na
+reprocessamento operacional de falhas permanecem pendentes. A identidade da
+posse agora é o UUID do artefato interno. Detalhes e demais limites na
 [decisão 020](decisoes/020-processamento-pdf-provisorio.md). `npm test`
 passou com 130 testes em 17 arquivos; `npm run typecheck` passou e
 `npm audit` não apontou vulnerabilidades.
+
+O processador também possui reagendamento interno experimental para jobs
+falhos. A mesma emissão e o mesmo número são preservados; chamadas simultâneas,
+estados inconsistentes, conclusão concorrente e confirmação incerta foram
+testados em banco descartável. Não há rota, autenticação ou auditoria para
+esse método, e o estado concluído do banco não comprova o arquivo em disco.
+Um reprocessamento operacional autorizado e auditado ainda não foi implementado.
+A suíte completa voltou a passar com 130 testes em 17 arquivos.
 
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui emissão, importação ou instalação como
