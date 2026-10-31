@@ -7,9 +7,9 @@ import { z } from 'zod';
 type OperacoesArquivo = Pick<typeof fs, 'lstat' | 'realpath' | 'open' | 'readFile' | 'link' | 'unlink'>;
 type ResultadoArmazenamento = { caminhoRelativo: string; sha256: string; reutilizado: boolean };
 
-function identificadorEmissao(entrada: string): string {
+function identificadorArquivo(entrada: string): string {
   const resultado = z.uuid().safeParse(entrada);
-  if (!resultado.success) throw new Error('Identificador de emissão inválido.');
+  if (!resultado.success) throw new Error('Identificador de artefato inválido.');
   return resultado.data.toLowerCase();
 }
 
@@ -75,8 +75,8 @@ export class ArmazenamentoPdf {
     return this.arquivos.readFile(caminho);
   }
 
-  async gravar(emissaoId: string, pdf: Buffer): Promise<ResultadoArmazenamento> {
-    const id = identificadorEmissao(emissaoId);
+  async gravar(artefatoId: string, pdf: Buffer): Promise<ResultadoArmazenamento> {
+    const id = identificadorArquivo(artefatoId);
     validarPdf(pdf);
     const sha256 = hash(pdf);
     const raiz = await this.raiz();
@@ -102,7 +102,7 @@ export class ArmazenamentoPdf {
         if (!temCodigo(erro, 'EEXIST')) throw erro;
         const existente = await this.lerArquivo(destino);
         if (existente.length !== pdf.length || hash(existente) !== sha256) {
-          throw new Error('Já existe um PDF diferente para esta emissão; verifique o artefato antes de continuar.');
+          throw new Error('Já existe um PDF diferente para este artefato; verifique o arquivo antes de continuar.');
         }
         resultado = { caminhoRelativo, sha256, reutilizado: true };
       }
@@ -123,8 +123,8 @@ export class ArmazenamentoPdf {
     return resultado;
   }
 
-  async ler(emissaoId: string, sha256Esperado: string): Promise<Buffer> {
-    const id = identificadorEmissao(emissaoId);
+  async ler(artefatoId: string, sha256Esperado: string): Promise<Buffer> {
+    const id = identificadorArquivo(artefatoId);
     if (!/^[0-9a-f]{64}$/.test(sha256Esperado)) throw new Error('O hash esperado do PDF é inválido.');
     const raiz = await this.raiz();
     const pdf = await this.lerArquivo(path.join(raiz, `${id}.pdf`));

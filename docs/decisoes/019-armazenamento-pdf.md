@@ -4,7 +4,7 @@
 
 Para preparar o futuro worker sem autorizar emissão, foi criado um componente
 de armazenamento chamado apenas por testes sintéticos. Ele recebe uma pasta
-absoluta previamente controlada, um UUID de emissão e bytes de PDF. O nome
+absoluta previamente controlada, um UUID de artefato e bytes de PDF. O nome
 interno é `<uuid>.pdf`: não usa caminho, CPF ou matrícula fornecidos pelo
 usuário. Essa identificação interna não substitui a futura reserva do nome
 de download descrita na [decisão 018](018-pdf-provisorio-dof.md).
@@ -17,7 +17,7 @@ um SHA-256 esperado e rejeitam divergência. O controle reconhece apenas
 cabeçalho e terminador de PDF; ele não substitui um leitor ou a revisão do
 conteúdo. Os testes também abrem o arquivo gerado usando PDF.js.
 
-Uma nova tentativa com o mesmo UUID e **bytes iguais** reconhece o arquivo
+Uma nova tentativa com o mesmo UUID de artefato e **bytes iguais** reconhece o arquivo
 existente; bytes diferentes produzem erro, sem sobrescrita. A limpeza que
 falha depois da publicação informa que o resultado pode já estar gravado.
 Isso não demonstra recuperação completa do worker: renderizações repetidas
@@ -45,8 +45,9 @@ operacionais. Uma medição direcionada de 20 renderizações aquecidas de 45
 anos, incluindo gravação e verificação local, observou mediana de 302,6 ms,
 p95 de 317,2 ms e máximo de 317,7 ms.
 
-Não há fila, worker, reserva de nome, registro de artefato no banco, download
-auditado ou integração com a transação de emissão. A medição não inclui
-esses componentes nem partida fria e não comprova o limite ponta a ponta de
-cinco segundos. Aprovações, snapshot persistido e numeração permanecem
+O processador da [decisão 020](020-processamento-pdf-provisorio.md) registra
+artefatos apenas em banco descartável. Não há worker iniciado, reserva de
+nome, download auditado ou integração com a transação de emissão. A medição
+acima não inclui fila, transação ou partida fria e não comprova o limite ponta
+a ponta de cinco segundos. Aprovações, snapshot oficial e numeração permanecem
 pendentes; o gate da fatia 5 continua não cumprido.

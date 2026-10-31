@@ -1,7 +1,7 @@
 import { execFile as execFileCallback } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises';
 import type { IncomingHttpHeaders } from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
@@ -11,6 +11,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import * as pty from '@lydell/node-pty';
 import {
+  capturarDadosPdfProvisorioDof,
   dadosFontePreviaDofSchema,
   detalheServidorSchema,
   paginaAuditoriaSchema,
@@ -36,11 +37,15 @@ import { verify } from 'argon2';
 import EmbeddedPostgres from 'embedded-postgres';
 import forge from 'node-forge';
 import { Client, Pool } from 'pg';
+import { chromium, type Browser } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { HealthController } from '../apps/api/dist/app.module.js';
 import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
+import { ArmazenamentoPdf } from '../apps/api/dist/documentos/armazenamento-pdf.js';
+import { renderizarPdfProvisorioDof } from '../apps/api/dist/documentos/pdf-provisorio-dof.js';
+import { ProcessadorPdfProvisorio } from '../apps/api/dist/documentos/processador-pdf-provisorio.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarBlocosDof } from '../apps/api/dist/migracoes/blocos-dof.js';
 import { aplicarConfirmacaoInicioDof } from '../apps/api/dist/migracoes/confirmacao-inicio-dof.js';
@@ -58,6 +63,7 @@ import { gerarHashSenha } from '../apps/api/dist/seguranca/senhas.js';
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
 import { validarDestinos } from '../scripts/isolar-testes.cjs';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { previaDofSintetica } from './dof-sintetica.js';
 import { gerarPessoasSinteticas } from '../tools/anonimizar/fixtures.js';
 
 const senhaMigrador = 'MigracaoFicticia!12345';
@@ -4289,6 +4295,387 @@ describe('fundação em recursos descartáveis', () => {
       }
     } finally {
       await cliente.end();
+    }
+  });
+
+  it('processa jobs provisórios somente após commit e retoma a mesma emissão em banco descartável', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    const banco = new Pool({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador, max: 5,
+    });
+    const pasta = path.join(temporario, `pdf-worker-${randomUUID()}`);
+    let navegador: Browser | undefined;
+    let transacaoAberta = false;
+    try {
+      await mkdir(pasta);
+      navegador = await chromium.launch({ headless: true });
+      const browser = navegador;
+      const protetor = new ProtetorDados({
+        cifra: randomBytes(32).toString('base64'), hmac: randomBytes(32).toString('base64'),
+      });
+      const armazenamento = new ArmazenamentoPdf(pasta);
+      const processador = new ProcessadorPdfProvisorio(
+        banco, protetor, armazenamento, (dados) => renderizarPdfProvisorioDof(browser, dados), 30000,
+      );
+      const privilegios = await cliente.query<{ job: boolean; artefato: boolean }>(`
+        SELECT has_table_privilege('sisdoc_aplicativo', 'documentos.job_pdf', 'UPDATE') AS job,
+          has_table_privilege('sisdoc_aplicativo', 'documentos.artefato_pdf', 'INSERT') AS artefato
+      `);
+      expect(privilegios.rows[0]).toEqual({ job: false, artefato: false });
+      const usuario = randomUUID();
+      const regra = randomUUID();
+      const template = randomUUID();
+      await cliente.query(`
+        INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+        VALUES ($1, $2, 'Coordenador sintético', 'hash-sintetico', 'coordenador', false)
+      `, [usuario, `COORD-PDF-${usuario}`]);
+      await cliente.query(`
+        INSERT INTO documentos.regra_versao (id, codigo, versao, configuracao, evidencia, vigente_de)
+        VALUES ($1, $2, '1', '{}', 'inferido', '2024-01-01')
+      `, [regra, `regra-pdf-sintetica-${regra}`]);
+      await cliente.query(`
+        INSERT INTO documentos.template_versao (id, tipo, versao, html, css, vigente_de)
+        VALUES ($1, 'DOF', $2, '<p>Modelo sintético</p>', '', '2024-01-01')
+      `, [template, `worker-sintetico-${template}`]);
+
+      const criarJob = async (numero: number, documentoDivergente = false, snapshotAdulterado = false) => {
+        const { pessoa, vinculo } = await inserirPessoaEVinculo(cliente);
+        const documento = randomUUID();
+        const emissao = randomUUID();
+        const job = randomUUID();
+        await cliente.query(`
+          INSERT INTO documentos.documento (
+            id, tipo, pessoa_id, vinculo_id, entrada_cifrada, template_versao_id,
+            regra_versao_id, criado_por, atualizado_por
+          ) VALUES ($1, 'DOF', $2, $3, $4, $5, $6, $7, $7)
+        `, [documento, pessoa, vinculo, randomBytes(48), template, regra, usuario]);
+        await cliente.query(`
+          INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+          VALUES ($1, 1, '1980-01-01', '2024-12-31')
+        `, [documento]);
+        await conferirSqlSintetico(cliente, documento, usuario);
+        const previa = previaDofSintetica();
+        previa.documentoId = documento;
+        previa.fonte.documentoId = documento;
+        const dados = capturarDadosPdfProvisorioDof(previa);
+        if (documentoDivergente) dados.documentoId = randomUUID();
+        const snapshot = protetor.cifrar(Buffer.from(JSON.stringify(dados), 'utf8'), {
+          schema: 'documentos', tabela: 'emissao', registroId: emissao, campo: 'snapshot_cifrado',
+        });
+        if (snapshotAdulterado) {
+          snapshot[snapshot.length - 1] = snapshot.readUInt8(snapshot.length - 1) ^ 1;
+        }
+        await cliente.query(`
+          INSERT INTO documentos.emissao (
+            id, documento_id, tipo, ano, numero, numero_formatado, chave_idempotencia, snapshot_cifrado, emitido_por
+          ) VALUES ($1, $2, 'DOF', 2024, $3, $4, $5, $6, $7)
+        `, [emissao, documento, numero, `TESTE-${numero}`, `PDF-SINTETICO-${emissao}`, snapshot, usuario]);
+        await cliente.query("UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [documento]);
+        await cliente.query(`
+          INSERT INTO documentos.job_pdf (id, emissao_id, status) VALUES ($1, $2, 'pendente')
+        `, [job, emissao]);
+        return { documento, emissao, job, numero, snapshot };
+      };
+      const bancoComFalhaDeConfirmacao = (confirmar: boolean, commitAlvo = 2): Pool => {
+        let commits = 0;
+        return new Proxy(banco, {
+          get(alvo, propriedade, receptor) {
+            if (propriedade !== 'connect') return Reflect.get(alvo, propriedade, receptor);
+            return async () => {
+              const conexao = await alvo.connect();
+              return new Proxy(conexao, {
+                get(clienteReal, nome, receptorCliente) {
+                  if (nome !== 'query') return Reflect.get(clienteReal, nome, receptorCliente);
+                  return (...argumentos: unknown[]) => {
+                    if (argumentos[0] === 'COMMIT' && ++commits === commitAlvo) {
+                      return (async () => {
+                        if (confirmar) await clienteReal.query('COMMIT');
+                        throw new Error('Falha sintética de confirmação.');
+                      })();
+                    }
+                    return Reflect.apply(clienteReal.query, clienteReal, argumentos);
+                  };
+                },
+              });
+            };
+          },
+        });
+      };
+
+      await cliente.query('BEGIN');
+      transacaoAberta = true;
+      const primeiro = await criarJob(50001);
+      expect(await processador.processarUm()).toEqual({ estado: 'sem_trabalho' });
+      await cliente.query('COMMIT');
+      transacaoAberta = false;
+      const concluido = await processador.processarUm();
+      expect(concluido.estado).toBe('concluido');
+      if (concluido.estado !== 'concluido') throw new Error('Job sintético não foi concluído.');
+      expect(concluido).toMatchObject({ jobId: primeiro.job, emissaoId: primeiro.emissao });
+      const dadosGravados = await cliente.query<{
+        status: string; tentativas: number; caminho_relativo: string; sha256: Buffer; snapshot_cifrado: Buffer;
+      }>(`
+        SELECT j.status, j.tentativas, a.caminho_relativo, a.sha256, e.snapshot_cifrado
+        FROM documentos.job_pdf j JOIN documentos.emissao e ON e.id = j.emissao_id
+        JOIN documentos.artefato_pdf a ON a.job_id = j.id WHERE j.id = $1
+      `, [primeiro.job]);
+      expect(dadosGravados.rows).toHaveLength(1);
+      expect(dadosGravados.rows[0]).toMatchObject({
+        status: 'concluido', tentativas: 1, caminho_relativo: `${concluido.artefatoId}.pdf`,
+      });
+      expect(dadosGravados.rows[0].snapshot_cifrado.equals(primeiro.snapshot)).toBe(true);
+      const pdf = await armazenamento.ler(concluido.artefatoId, dadosGravados.rows[0].sha256.toString('hex'));
+      expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+      await expect(cliente.query('UPDATE documentos.emissao SET snapshot_cifrado = $2 WHERE id = $1',
+        [primeiro.emissao, randomBytes(48)])).rejects.toMatchObject({ code: '55000' });
+      expect(await processador.processarUm()).toEqual({ estado: 'sem_trabalho' });
+
+      const segundo = await criarJob(50002);
+      const falhaRenderizacao = new ProcessadorPdfProvisorio(
+        banco, protetor, armazenamento, async () => { throw new Error('DADO-SENSIVEL-SINTETICO'); }, 30000,
+      );
+      await expect(falhaRenderizacao.processarUm()).rejects.toThrow('job foi marcado como falho');
+      const falho = await cliente.query<{ status: string; tentativas: number; erro_sanitizado: string }>(
+        'SELECT status, tentativas, erro_sanitizado FROM documentos.job_pdf WHERE id = $1', [segundo.job],
+      );
+      expect(falho.rows[0]).toEqual({
+        status: 'falhou', tentativas: 1, erro_sanitizado: 'Falha ao gerar ou gravar PDF provisório.',
+      });
+      expect(falho.rows[0].erro_sanitizado).not.toContain('DADO-SENSIVEL-SINTETICO');
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [segundo.job]);
+      const recuperado = await processador.processarUm();
+      expect(recuperado).toMatchObject({ estado: 'concluido', jobId: segundo.job, emissaoId: segundo.emissao });
+      const segundaConsulta = await cliente.query<{ tentativas: number; numero: string; quantidade: string }>(`
+        SELECT j.tentativas, e.numero::text AS numero,
+          (SELECT count(*) FROM documentos.emissao WHERE documento_id = e.documento_id)::text AS quantidade
+        FROM documentos.job_pdf j JOIN documentos.emissao e ON e.id = j.emissao_id WHERE j.id = $1
+      `, [segundo.job]);
+      expect(segundaConsulta.rows[0]).toEqual({ tentativas: 2, numero: String(segundo.numero), quantidade: '1' });
+
+      const terceiro = await criarJob(50003);
+      const falhaDepoisDoArquivo = new ProcessadorPdfProvisorio(banco, protetor, {
+        gravar: async (id, conteudo) => {
+          await armazenamento.gravar(id, conteudo);
+          throw new Error('Falha sintética após publicação.');
+        },
+      }, async () => pdf, 30000);
+      const arquivosAntes = (await readdir(pasta)).length;
+      await expect(falhaDepoisDoArquivo.processarUm()).rejects.toThrow('job foi marcado como falho');
+      expect((await readdir(pasta)).length).toBe(arquivosAntes + 1);
+      expect((await cliente.query('SELECT count(*) FROM documentos.artefato_pdf WHERE emissao_id = $1', [terceiro.emissao])).rows[0].count).toBe('0');
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [terceiro.job]);
+      expect(await processador.processarUm()).toMatchObject({
+        estado: 'concluido', jobId: terceiro.job, emissaoId: terceiro.emissao,
+      });
+      expect((await readdir(pasta)).length).toBe(arquivosAntes + 2);
+      expect((await cliente.query('SELECT count(*) FROM documentos.emissao WHERE documento_id = $1', [terceiro.documento])).rows[0].count).toBe('1');
+
+      const quarto = await criarJob(50004);
+      let sinalizarInicio: () => void = () => {};
+      let liberar: () => void = () => {};
+      const iniciado = new Promise<void>((resolver) => { sinalizarInicio = resolver; });
+      const liberacao = new Promise<void>((resolver) => { liberar = resolver; });
+      const lento = new ProcessadorPdfProvisorio(banco, protetor, armazenamento, async () => {
+        sinalizarInicio();
+        await liberacao;
+        return pdf;
+      }, 30000);
+      const pendente = lento.processarUm();
+      try {
+        await iniciado;
+        const posseAntiga = await cliente.query<{ posse: string }>('SELECT posse FROM documentos.job_pdf WHERE id = $1', [quarto.job]);
+        await cliente.query(`
+          UPDATE documentos.job_pdf SET posse_expira_em = clock_timestamp() - interval '1 second' WHERE id = $1
+        `, [quarto.job]);
+        const novaTentativa = await processador.processarUm();
+        expect(novaTentativa).toMatchObject({ estado: 'concluido', jobId: quarto.job, emissaoId: quarto.emissao });
+        if (novaTentativa.estado !== 'concluido') throw new Error('A retomada sintética falhou.');
+        expect(novaTentativa.artefatoId).not.toBe(posseAntiga.rows[0].posse);
+        liberar();
+        expect(await pendente).toEqual({ estado: 'posse_perdida', jobId: quarto.job, emissaoId: quarto.emissao });
+        const estadoFinal = await cliente.query<{ status: string; tentativas: number; artefatos: string; emissoes: string }>(`
+          SELECT j.status, j.tentativas,
+            (SELECT count(*) FROM documentos.artefato_pdf WHERE job_id = j.id)::text AS artefatos,
+            (SELECT count(*) FROM documentos.emissao WHERE documento_id = e.documento_id)::text AS emissoes
+          FROM documentos.job_pdf j JOIN documentos.emissao e ON e.id = j.emissao_id WHERE j.id = $1
+        `, [quarto.job]);
+        expect(estadoFinal.rows[0]).toEqual({ status: 'concluido', tentativas: 2, artefatos: '1', emissoes: '1' });
+      } finally {
+        liberar();
+        await pendente;
+      }
+
+      const quinto = await criarJob(50005, true);
+      await expect(processador.processarUm()).rejects.toThrow('job foi marcado como falho');
+      expect((await cliente.query('SELECT count(*) FROM documentos.artefato_pdf WHERE emissao_id = $1', [quinto.emissao])).rows[0].count).toBe('0');
+
+      const sexto = await criarJob(50006);
+      const paralelos = await Promise.all([processador.processarUm(), processador.processarUm()]);
+      expect(paralelos.map((resultado) => resultado.estado).sort()).toEqual(['concluido', 'sem_trabalho']);
+      expect(paralelos.find((resultado) => resultado.estado === 'concluido'))
+        .toMatchObject({ jobId: sexto.job, emissaoId: sexto.emissao });
+
+      const setimo = await criarJob(50007);
+      await cliente.query(`
+        CREATE FUNCTION documentos.falhar_conclusao_pdf_sintetico() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+          IF NEW.status = 'concluido' THEN
+            RAISE EXCEPTION 'Falha sintética antes do commit do artefato.' USING ERRCODE = 'P0001';
+          END IF;
+          RETURN NEW;
+        END;
+        $$;
+        CREATE TRIGGER falha_pdf_sintetica BEFORE UPDATE ON documentos.job_pdf
+          FOR EACH ROW EXECUTE FUNCTION documentos.falhar_conclusao_pdf_sintetico()
+      `);
+      try {
+        await expect(processador.processarUm()).rejects.toThrow('job foi marcado como falho');
+        const revertido = await cliente.query<{ status: string; artefatos: string; emissoes: string; numero: string }>(`
+          SELECT j.status, e.numero::text AS numero,
+            (SELECT count(*) FROM documentos.artefato_pdf WHERE job_id = j.id)::text AS artefatos,
+            (SELECT count(*) FROM documentos.emissao WHERE documento_id = e.documento_id)::text AS emissoes
+          FROM documentos.job_pdf j JOIN documentos.emissao e ON e.id = j.emissao_id WHERE j.id = $1
+        `, [setimo.job]);
+        expect(revertido.rows[0]).toEqual({
+          status: 'falhou', numero: String(setimo.numero), artefatos: '0', emissoes: '1',
+        });
+      } finally {
+        await cliente.query('DROP TRIGGER falha_pdf_sintetica ON documentos.job_pdf');
+        await cliente.query('DROP FUNCTION documentos.falhar_conclusao_pdf_sintetico()');
+      }
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [setimo.job]);
+      expect(await processador.processarUm()).toMatchObject({
+        estado: 'concluido', jobId: setimo.job, emissaoId: setimo.emissao,
+      });
+
+      const oitavo = await criarJob(50008);
+      await cliente.query(`
+        UPDATE documentos.job_pdf SET posse = $2, posse_expira_em = clock_timestamp() + interval '1 minute' WHERE id = $1
+      `, [oitavo.job, randomUUID()]);
+      await expect(processador.processarUm()).rejects.toThrow('estado de posse inconsistente');
+      await cliente.query(`
+        UPDATE documentos.job_pdf SET status = 'falhou', posse = NULL, posse_expira_em = NULL,
+          erro_sanitizado = 'Estado sintético inconsistente.' WHERE id = $1
+      `, [oitavo.job]);
+
+      const nono = await criarJob(50009);
+      await cliente.query(`
+        UPDATE documentos.documento SET status = 'cancelado', cancelado_por = $2, cancelado_em = clock_timestamp(),
+          motivo_cancelamento_cifrado = $3, atualizado_por = $2 WHERE id = $1
+      `, [nono.documento, usuario, randomBytes(48)]);
+      expect(await processador.processarUm()).toMatchObject({
+        estado: 'concluido', jobId: nono.job, emissaoId: nono.emissao,
+      });
+      expect((await cliente.query('SELECT status FROM documentos.documento WHERE id = $1', [nono.documento])).rows[0].status)
+        .toBe('cancelado');
+
+      const decimo = await criarJob(50010);
+      const metadadosInvalidos = new ProcessadorPdfProvisorio(banco, protetor, {
+        gravar: async () => ({ caminhoRelativo: '..\\fora.pdf', sha256: '0'.repeat(64), reutilizado: false }),
+      }, async () => pdf, 30000);
+      await expect(metadadosInvalidos.processarUm()).rejects.toThrow('job foi marcado como falho');
+      expect((await cliente.query('SELECT count(*) FROM documentos.artefato_pdf WHERE emissao_id = $1', [decimo.emissao])).rows[0].count).toBe('0');
+
+      const decimoPrimeiro = await criarJob(50011);
+      const commitConfirmado = new ProcessadorPdfProvisorio(
+        bancoComFalhaDeConfirmacao(true), protetor, armazenamento, async () => pdf, 30000,
+      );
+      await expect(commitConfirmado.processarUm()).rejects.toThrow('consulte o estado do job');
+      const aposConfirmacaoIncerta = await cliente.query<{ status: string; artefatos: string; numero: string }>(`
+        SELECT j.status, e.numero::text AS numero,
+          (SELECT count(*) FROM documentos.artefato_pdf WHERE job_id = j.id)::text AS artefatos
+        FROM documentos.job_pdf j JOIN documentos.emissao e ON e.id = j.emissao_id WHERE j.id = $1
+      `, [decimoPrimeiro.job]);
+      expect(aposConfirmacaoIncerta.rows[0]).toEqual({
+        status: 'concluido', artefatos: '1', numero: String(decimoPrimeiro.numero),
+      });
+      expect(await processador.processarUm()).toEqual({ estado: 'sem_trabalho' });
+
+      const decimoSegundo = await criarJob(50012);
+      const commitRevertido = new ProcessadorPdfProvisorio(
+        bancoComFalhaDeConfirmacao(false), protetor, armazenamento, async () => pdf, 30000,
+      );
+      await expect(commitRevertido.processarUm()).rejects.toThrow('job foi marcado como falho');
+      const aposReversaoIncerta = await cliente.query<{ status: string; artefatos: string; numero: string }>(`
+        SELECT j.status, e.numero::text AS numero,
+          (SELECT count(*) FROM documentos.artefato_pdf WHERE job_id = j.id)::text AS artefatos
+        FROM documentos.job_pdf j JOIN documentos.emissao e ON e.id = j.emissao_id WHERE j.id = $1
+      `, [decimoSegundo.job]);
+      expect(aposReversaoIncerta.rows[0]).toEqual({
+        status: 'falhou', artefatos: '0', numero: String(decimoSegundo.numero),
+      });
+      await cliente.query("UPDATE documentos.job_pdf SET status = 'pendente', erro_sanitizado = NULL WHERE id = $1", [decimoSegundo.job]);
+      expect(await processador.processarUm()).toMatchObject({
+        estado: 'concluido', jobId: decimoSegundo.job, emissaoId: decimoSegundo.emissao,
+      });
+
+      const decimoTerceiro = await criarJob(50013, false, true);
+      let renderizacoesAdulteradas = 0;
+      const snapshotInvalido = new ProcessadorPdfProvisorio(banco, protetor, armazenamento, async () => {
+        renderizacoesAdulteradas += 1;
+        return pdf;
+      }, 30000);
+      await expect(snapshotInvalido.processarUm()).rejects.toThrow('job foi marcado como falho');
+      expect(renderizacoesAdulteradas).toBe(0);
+      expect((await cliente.query('SELECT count(*) FROM documentos.artefato_pdf WHERE emissao_id = $1', [decimoTerceiro.emissao])).rows[0].count).toBe('0');
+
+      const decimoQuarto = await criarJob(50014);
+      const posseConfirmada = new ProcessadorPdfProvisorio(
+        bancoComFalhaDeConfirmacao(true, 1), protetor, armazenamento, async () => pdf, 30000,
+      );
+      await expect(posseConfirmada.processarUm()).rejects.toThrow('Não foi possível confirmar a transação');
+      const reivindicacaoConfirmada = await cliente.query<{ status: string; tentativas: number }>(
+        'SELECT status, tentativas FROM documentos.job_pdf WHERE id = $1', [decimoQuarto.job],
+      );
+      expect(reivindicacaoConfirmada.rows[0]).toEqual({ status: 'processando', tentativas: 1 });
+      expect(await processador.processarUm()).toEqual({ estado: 'sem_trabalho' });
+      await cliente.query(`
+        UPDATE documentos.job_pdf SET posse_expira_em = clock_timestamp() - interval '1 second' WHERE id = $1
+      `, [decimoQuarto.job]);
+      expect(await processador.processarUm()).toMatchObject({
+        estado: 'concluido', jobId: decimoQuarto.job, emissaoId: decimoQuarto.emissao,
+      });
+
+      const decimoQuinto = await criarJob(50015);
+      const posseRevertida = new ProcessadorPdfProvisorio(
+        bancoComFalhaDeConfirmacao(false, 1), protetor, armazenamento, async () => pdf, 30000,
+      );
+      await expect(posseRevertida.processarUm()).rejects.toThrow('Não foi possível confirmar a transação');
+      const reivindicacaoRevertida = await cliente.query<{ status: string; tentativas: number }>(
+        'SELECT status, tentativas FROM documentos.job_pdf WHERE id = $1', [decimoQuinto.job],
+      );
+      expect(reivindicacaoRevertida.rows[0]).toEqual({ status: 'pendente', tentativas: 0 });
+      expect(await processador.processarUm()).toMatchObject({
+        estado: 'concluido', jobId: decimoQuinto.job, emissaoId: decimoQuinto.emissao,
+      });
+
+      const duracoes: number[] = [];
+      for (let indice = 0; indice < 20; indice += 1) {
+        const job = await criarJob(50100 + indice);
+        const inicio = performance.now();
+        const resultado = await processador.processarUm();
+        duracoes.push(performance.now() - inicio);
+        expect(resultado).toMatchObject({ estado: 'concluido', jobId: job.job, emissaoId: job.emissao });
+      }
+      const ordenadas = [...duracoes].sort((a, b) => a - b);
+      const mediana = (ordenadas[9] + ordenadas[10]) / 2;
+      const p95 = ordenadas[18];
+      const maximo = ordenadas[19];
+      console.info(`Processador provisório aquecido, 45 anos e sem transporte: mediana ${mediana.toFixed(1)} ms; p95 ${p95.toFixed(1)} ms; máximo ${maximo.toFixed(1)} ms.`);
+      expect(maximo).toBeLessThan(5000);
+    } finally {
+      if (transacaoAberta) await cliente.query('ROLLBACK');
+      if (navegador) await navegador.close();
+      await banco.end();
+      await cliente.end();
+      if (path.basename(pasta).startsWith('pdf-worker-')) {
+        await rm(pasta, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
     }
   });
 

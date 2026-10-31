@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia, encaminhamento e conferência provisórios; renderização experimental de PDF em testes; sem emissão, snapshot persistido, download ou histórico |
+| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia, encaminhamento e conferência provisórios; renderização e processamento experimental de PDF em testes; sem emissão, snapshot oficial, download ou histórico |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -304,6 +304,21 @@ estão na [decisão 019](decisoes/019-armazenamento-pdf.md). A suíte completa
 passou com 129 testes em 17 arquivos; nela, as 20 renderizações com gravação
 tiveram mediana de 299,9 ms, p95 de 316,5 ms e máximo de 327,9 ms.
 
+Um processador experimental reivindica jobs sintéticos após commit, valida e
+decifra a cópia provisória, grava o PDF e conclui o job e o artefato em uma
+transação. Foram testados concorrência, perda de posse, falhas de disco e de
+transação, confirmações incertas e retomada da mesma emissão em PostgreSQL
+descartável. Em 20 jobs aquecidos de 45 anos, a execução direcionada teve
+mediana de 289,3 ms, p95 de 309,5 ms e máximo de 322,6 ms da chamada do
+processador ao commit do artefato. Não inclui transporte ou espera em fila e
+não comprova o limite ponta a ponta. O processador não está ligado à aplicação,
+não inicia worker e pode deixar arquivos órfãos; a recuperação segura e o
+reprocessamento de falhas permanecem pendentes. A identidade da posse agora é
+o UUID do artefato interno. Detalhes e demais limites na
+[decisão 020](decisoes/020-processamento-pdf-provisorio.md). `npm test`
+passou com 130 testes em 17 arquivos; `npm run typecheck` passou e
+`npm audit` não apontou vulnerabilidades.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -328,4 +343,5 @@ Divergências e decisões estão em
 [016-revisao-fonte-previa-dof.md](decisoes/016-revisao-fonte-previa-dof.md) e
 [017-conferencia-provisoria-dof.md](decisoes/017-conferencia-provisoria-dof.md) e
 [018-pdf-provisorio-dof.md](decisoes/018-pdf-provisorio-dof.md) e
-[019-armazenamento-pdf.md](decisoes/019-armazenamento-pdf.md).
+[019-armazenamento-pdf.md](decisoes/019-armazenamento-pdf.md) e
+[020-processamento-pdf-provisorio.md](decisoes/020-processamento-pdf-provisorio.md).

@@ -33,14 +33,14 @@ describe('armazenamento isolado de PDF', () => {
     }
   });
 
-  it('grava, verifica e reutiliza somente o mesmo PDF para a mesma emissão', async () => {
+  it('grava, verifica e reutiliza somente o mesmo PDF para o mesmo artefato', async () => {
     const armazenamento = new ArmazenamentoPdf(diretorio);
-    const emissaoId = randomUUID();
+    const artefatoId = randomUUID();
     const sha256 = createHash('sha256').update(pdf).digest('hex');
-    const primeiro = await armazenamento.gravar(emissaoId, pdf);
-    expect(primeiro).toEqual({ caminhoRelativo: `${emissaoId}.pdf`, sha256, reutilizado: false });
-    expect(await fs.readdir(diretorio)).toEqual([`${emissaoId}.pdf`]);
-    const lido = await armazenamento.ler(emissaoId, sha256);
+    const primeiro = await armazenamento.gravar(artefatoId, pdf);
+    expect(primeiro).toEqual({ caminhoRelativo: `${artefatoId}.pdf`, sha256, reutilizado: false });
+    expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
+    const lido = await armazenamento.ler(artefatoId, sha256);
     expect(lido.equals(pdf)).toBe(true);
     const tarefa = getDocument({ data: new Uint8Array(lido), useSystemFonts: true, verbosity: 0 });
     try {
@@ -50,28 +50,28 @@ describe('armazenamento isolado de PDF', () => {
     } finally {
       await tarefa.destroy();
     }
-    expect(await armazenamento.gravar(emissaoId, pdf)).toEqual({ ...primeiro, reutilizado: true });
-    expect(await fs.readdir(diretorio)).toEqual([`${emissaoId}.pdf`]);
+    expect(await armazenamento.gravar(artefatoId, pdf)).toEqual({ ...primeiro, reutilizado: true });
+    expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
   });
 
   it('publica um único arquivo em gravações simultâneas iguais', async () => {
     const armazenamento = new ArmazenamentoPdf(diretorio);
-    const emissaoId = randomUUID();
+    const artefatoId = randomUUID();
     const resultados = await Promise.all([
-      armazenamento.gravar(emissaoId, pdf), armazenamento.gravar(emissaoId, pdf),
+      armazenamento.gravar(artefatoId, pdf), armazenamento.gravar(artefatoId, pdf),
     ]);
     expect(resultados.map((item) => item.reutilizado).sort()).toEqual([false, true]);
     expect(new Set(resultados.map((item) => item.sha256)).size).toBe(1);
-    expect(await fs.readdir(diretorio)).toEqual([`${emissaoId}.pdf`]);
-    expect((await armazenamento.ler(emissaoId, resultados[0].sha256)).equals(pdf)).toBe(true);
+    expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
+    expect((await armazenamento.ler(artefatoId, resultados[0].sha256)).equals(pdf)).toBe(true);
   });
 
   it('não sobrescreve conteúdo diferente em concorrência', async () => {
     const armazenamento = new ArmazenamentoPdf(diretorio);
-    const emissaoId = randomUUID();
+    const artefatoId = randomUUID();
     const diferente = Buffer.concat([pdf, Buffer.from('\n')]);
     const resultados = await Promise.allSettled([
-      armazenamento.gravar(emissaoId, pdf), armazenamento.gravar(emissaoId, diferente),
+      armazenamento.gravar(artefatoId, pdf), armazenamento.gravar(artefatoId, diferente),
     ]);
     const sucessos = resultados.filter((resultado) => resultado.status === 'fulfilled');
     const falhas = resultados.filter((resultado) => resultado.status === 'rejected');
@@ -79,33 +79,33 @@ describe('armazenamento isolado de PDF', () => {
     expect(falhas).toHaveLength(1);
     expect(falhas[0].reason).toBeInstanceOf(Error);
     expect(falhas[0].reason.message).toContain('PDF diferente');
-    const gravado = await fs.readFile(path.join(diretorio, `${emissaoId}.pdf`));
+    const gravado = await fs.readFile(path.join(diretorio, `${artefatoId}.pdf`));
     expect(gravado.equals(pdf) || gravado.equals(diferente)).toBe(true);
-    expect(await fs.readdir(diretorio)).toEqual([`${emissaoId}.pdf`]);
+    expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
   });
 
   it('recusa caminho, identificador, hash e conteúdo inválidos', async () => {
     expect(() => new ArmazenamentoPdf(path.parse(diretorio).root)).toThrow('raiz do volume');
     expect(() => new ArmazenamentoPdf('pasta-relativa')).toThrow('absoluto');
     const armazenamento = new ArmazenamentoPdf(diretorio);
-    const emissaoId = randomUUID();
-    await expect(armazenamento.gravar('..\\fora', pdf)).rejects.toThrow('Identificador de emissão inválido');
-    await expect(armazenamento.gravar(emissaoId, Buffer.from('%PDF-1.7\nincompleto'))).rejects.toThrow('incompleto ou inválido');
-    await expect(armazenamento.ler(emissaoId, '../fora')).rejects.toThrow('hash esperado');
+    const artefatoId = randomUUID();
+    await expect(armazenamento.gravar('..\\fora', pdf)).rejects.toThrow('Identificador de artefato inválido');
+    await expect(armazenamento.gravar(artefatoId, Buffer.from('%PDF-1.7\nincompleto'))).rejects.toThrow('incompleto ou inválido');
+    await expect(armazenamento.ler(artefatoId, '../fora')).rejects.toThrow('hash esperado');
     expect(await fs.readdir(diretorio)).toEqual([]);
   });
 
   it('recusa diretórios e artefatos que são junções', async () => {
     const pasta = path.join(diretorio, 'pasta');
     const juncao = path.join(diretorio, 'juncao');
-    const emissaoId = randomUUID();
-    const artefato = path.join(diretorio, `${emissaoId}.pdf`);
+    const artefatoId = randomUUID();
+    const artefato = path.join(diretorio, `${artefatoId}.pdf`);
     await fs.mkdir(pasta);
     await fs.symlink(pasta, juncao, 'junction');
     await fs.symlink(pasta, artefato, 'junction');
     try {
-      await expect(new ArmazenamentoPdf(juncao).gravar(emissaoId, pdf)).rejects.toThrow('não é uma pasta regular');
-      await expect(new ArmazenamentoPdf(diretorio).ler(emissaoId, 'a'.repeat(64)))
+      await expect(new ArmazenamentoPdf(juncao).gravar(artefatoId, pdf)).rejects.toThrow('não é uma pasta regular');
+      await expect(new ArmazenamentoPdf(diretorio).ler(artefatoId, 'a'.repeat(64)))
         .rejects.toThrow('não é um arquivo regular');
     } finally {
       await fs.unlink(juncao);
@@ -115,13 +115,13 @@ describe('armazenamento isolado de PDF', () => {
 
   it('detecta alteração do arquivo e não substitui artefato divergente', async () => {
     const armazenamento = new ArmazenamentoPdf(diretorio);
-    const emissaoId = randomUUID();
-    const resultado = await armazenamento.gravar(emissaoId, pdf);
+    const artefatoId = randomUUID();
+    const resultado = await armazenamento.gravar(artefatoId, pdf);
     const caminho = path.join(diretorio, resultado.caminhoRelativo);
     await fs.writeFile(caminho, Buffer.concat([pdf, Buffer.from('\n')]));
-    await expect(armazenamento.ler(emissaoId, resultado.sha256)).rejects.toThrow('não corresponde ao hash');
-    await expect(armazenamento.gravar(emissaoId, pdf)).rejects.toThrow('PDF diferente');
-    expect(await fs.readdir(diretorio)).toEqual([`${emissaoId}.pdf`]);
+    await expect(armazenamento.ler(artefatoId, resultado.sha256)).rejects.toThrow('não corresponde ao hash');
+    await expect(armazenamento.gravar(artefatoId, pdf)).rejects.toThrow('PDF diferente');
+    expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
   });
 
   it('remove o temporário quando uma escrita parcial falha', async () => {
@@ -176,17 +176,17 @@ describe('armazenamento isolado de PDF', () => {
   });
 
   it('informa falha de limpeza e permite verificar arquivo já publicado', async () => {
-    const emissaoId = randomUUID();
+    const artefatoId = randomUUID();
     const removerComFalha: typeof fs.unlink = async (caminho) => {
       await fs.unlink(caminho);
       throw new Error('Falha sintética de limpeza.');
     };
     const falho = new ArmazenamentoPdf(diretorio, { ...fs, unlink: removerComFalha });
-    await expect(falho.gravar(emissaoId, pdf)).rejects.toThrow('PDF pode ter sido gravado');
+    await expect(falho.gravar(artefatoId, pdf)).rejects.toThrow('PDF pode ter sido gravado');
     const armazenamento = new ArmazenamentoPdf(diretorio);
-    const resultado = await armazenamento.gravar(emissaoId, pdf);
+    const resultado = await armazenamento.gravar(artefatoId, pdf);
     expect(resultado.reutilizado).toBe(true);
-    expect((await armazenamento.ler(emissaoId, resultado.sha256)).equals(pdf)).toBe(true);
-    expect(await fs.readdir(diretorio)).toEqual([`${emissaoId}.pdf`]);
+    expect((await armazenamento.ler(artefatoId, resultado.sha256)).equals(pdf)).toBe(true);
+    expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
   });
 });
