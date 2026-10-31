@@ -12,6 +12,7 @@ const esperado: Record<Acao, Papel[]> = {
   emitir: ['coordenador'],
   cancelar_rascunho: ['analista', 'coordenador'],
   cancelar_emitido: ['secretario_adjunto', 'admin'],
+  consultar_emissoes: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
   historico_terceiros: ['coordenador', 'secretario_adjunto'],
   pesquisa_avancada: ['coordenador', 'secretario_adjunto'],
   gerenciar_blocos: ['admin'],

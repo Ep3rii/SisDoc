@@ -1,4 +1,13 @@
 import {
+  historicoEmissoesSchema,
+  resultadoCopiaEmitidoSchema,
+  situacaoEmissaoSchema,
+  type CancelarEmitido,
+  type EmitirDof,
+  type GrupoHistorico,
+  type HistoricoEmissoes,
+  type ResultadoCopiaEmitido,
+  type SituacaoEmissao,
   paginaAuditoriaSchema,
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
@@ -67,6 +76,7 @@ async function requisitar(
   corpo?: unknown,
   csrf?: string,
   provaFonte?: string,
+  extras: Record<string, string> = {},
 ): Promise<unknown> {
   let resposta: Response;
   try {
@@ -79,6 +89,7 @@ async function requisitar(
         ...(corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
         ...(provaFonte === undefined ? {} : { 'X-Sisdoc-Fonte-Dof': provaFonte }),
+        ...extras,
       },
       ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
     });
@@ -227,5 +238,51 @@ export const api = {
   },
   async obterPreviaConferidaDof(id: string): Promise<PreviaConferidaDof> {
     return validar(previaConferidaDofSchema, await requisitar(`documentos/${id}/dados-previa-conferida`));
+  },
+  async emitirDof(csrf: string, id: string, chave: string, dados: EmitirDof): Promise<SituacaoEmissao> {
+    return validar(situacaoEmissaoSchema, await requisitar(
+      `documentos/${id}/emitir`, 'POST', dados, csrf, undefined, { 'Idempotency-Key': chave },
+    ));
+  },
+  async situacaoEmissao(id: string): Promise<SituacaoEmissao> {
+    return validar(situacaoEmissaoSchema, await requisitar(`emissoes/${id}`));
+  },
+  async historico(tipo: GrupoHistorico, escopo: 'proprio' | 'todos'): Promise<HistoricoEmissoes> {
+    return validar(historicoEmissoesSchema, await requisitar(`historico?${new URLSearchParams({ tipo, escopo }).toString()}`));
+  },
+  async copiarEmitido(csrf: string, documentoId: string): Promise<ResultadoCopiaEmitido> {
+    return validar(resultadoCopiaEmitidoSchema, await requisitar(
+      `documentos/${documentoId}/copia`, 'POST', { confirmar: true }, csrf,
+    ));
+  },
+  async cancelarEmitido(csrf: string, documentoId: string, dados: CancelarEmitido): Promise<SituacaoEmissao> {
+    return validar(situacaoEmissaoSchema, await requisitar(`documentos/${documentoId}/cancelar`, 'POST', dados, csrf));
+  },
+  async baixarPdf(emissaoId: string): Promise<{ nome: string; arquivo: Blob }> {
+    let resposta: Response;
+    try {
+      resposta = await fetch(`/api/v1/emissoes/${emissaoId}/pdf`, {
+        credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/pdf' },
+      });
+    } catch {
+      throw new ErroApi(0, 'Não foi possível conectar ao SisDoc. Verifique a conexão e tente novamente.');
+    }
+    if (!resposta.ok) {
+      let detalhe = 'Não foi possível baixar o PDF. Tente novamente mais tarde.';
+      try {
+        const dados: unknown = await resposta.json();
+        if (typeof dados === 'object' && dados !== null && 'detail' in dados && typeof dados.detail === 'string') {
+          detalhe = dados.detail;
+        }
+      } catch {
+        // Mantém a mensagem genérica quando o corpo não é JSON.
+      }
+      throw new ErroApi(resposta.status, detalhe);
+    }
+    const nome = /filename="([A-Za-z0-9_.-]+\.pdf)"/.exec(resposta.headers.get('Content-Disposition') ?? '')?.[1];
+    if (!nome || resposta.headers.get('Content-Type') !== 'application/pdf') {
+      throw new ErroApi(0, 'O servidor retornou um arquivo inválido. Contate o administrador.');
+    }
+    return { nome, arquivo: await resposta.blob() };
   },
 };

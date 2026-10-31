@@ -82,5 +82,15 @@ export async function carregarConfiguracao(arquivo: string | undefined): Promise
       throw new Error('A lista de senhas deve ficar fora do repositório.');
     }
   }
-  return resultado.data;
+  const diretorioPdf = resultado.data.pdf?.diretorio
+    ?? path.join(path.dirname(path.dirname(arquivoReal)), 'pdf');
+  if (!path.isAbsolute(diretorioPdf) || estaDentro(path.resolve(diretorioPdf), repositorio)) {
+    throw new Error('O diretório de PDF deve usar caminho absoluto fora do repositório.');
+  }
+  return { ...resultado.data, pdf: { diretorio: path.resolve(diretorioPdf) } };
+}
+
+export function diretorioPdf(configuracao: Configuracao): string {
+  if (!configuracao.pdf) throw new Error('Diretório de PDF não configurado.');
+  return configuracao.pdf.diretorio;
 }

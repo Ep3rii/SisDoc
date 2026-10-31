@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { PaginaConferidosDof, PreviaConferidaDof } from '@sisdoc/contratos';
+import type { PaginaConferidosDof, PreviaConferidaDof, SituacaoEmissao } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { api, ErroApi } from './api';
+import { PainelEmissao } from './emissao';
 
 type Props = {
   csrf: string;
   podeDevolver: boolean;
+  podeEmitir: boolean;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
@@ -14,7 +16,7 @@ type Props = {
 
 type Conferido = PaginaConferidosDof['itens'][number];
 
-export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
+export function ConferidosDof({ csrf, podeDevolver, podeEmitir, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
   const [pagina, setPagina] = useState<PaginaConferidosDof | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [selecionado, setSelecionado] = useState<Conferido | null>(null);
@@ -26,6 +28,9 @@ export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente
   const [falhou, setFalhou] = useState(false);
   const [mensagem, setMensagem] = useState('');
   const [versao, setVersao] = useState(0);
+  const [revisado, setRevisado] = useState(false);
+  const [emissao, setEmissao] = useState<SituacaoEmissao | null>(null);
+  const chaveEmissao = useRef<{ documento: string; revisao: number; chave: string } | null>(null);
   const ativa = useRef(true);
 
   useEffect(() => {
@@ -95,6 +100,48 @@ export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente
     }
   }
 
+  async function emitir() {
+    if (!selecionado || !previa || previa.documentoId !== selecionado.id || previa.revisao !== selecionado.revisao) return;
+    if (chaveEmissao.current?.documento !== selecionado.id || chaveEmissao.current.revisao !== selecionado.revisao) {
+      chaveEmissao.current = { documento: selecionado.id, revisao: selecionado.revisao, chave: crypto.randomUUID() };
+    }
+    try {
+      onLimpar();
+      setOcupado(true);
+      const resultado = await api.emitirDof(csrf, selecionado.id, chaveEmissao.current.chave, {
+        revisao: selecionado.revisao, provaFonte: previa.fonte.provaFonte,
+      });
+      if (resultado.documentoId !== selecionado.id) {
+        throw new ErroApi(0, 'Não foi possível confirmar a emissão. Consulte o Histórico antes de tentar novamente.');
+      }
+      if (ativa.current) {
+        setEmissao(resultado);
+        setVersao((atual) => atual + 1);
+      }
+    } catch (erro) {
+      if (ativa.current) onErro(erro instanceof ErroApi && erro.status === 0
+        ? new ErroApi(0, 'Não foi possível confirmar a emissão. Tente novamente: a mesma solicitação não gera número duplicado.')
+        : erro);
+    } finally {
+      if (ativa.current) setOcupado(false);
+    }
+  }
+
+  function fechar() {
+    setSelecionado(null); setMotivo(''); setRevisado(false); setEmissao(null); onPendente(false);
+  }
+
+  if (selecionado && emissao) {
+    return (
+      <section className="painel" aria-labelledby="emitido-titulo">
+        <h2 id="emitido-titulo">DOF emitida</h2>
+        <p>{selecionado.nome} — matrícula {selecionado.matricula}.</p>
+        <PainelEmissao situacao={emissao} onErro={onErro} onLimpar={onLimpar} />
+        <button type="button" className="secundario" onClick={fechar}>Voltar às DOFs conferidas</button>
+      </section>
+    );
+  }
+
   if (selecionado) {
     return (
       <section className="painel" aria-labelledby="conferido-titulo">
@@ -102,9 +149,9 @@ export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente
         <p>{selecionado.nome} — matrícula {selecionado.matricula}. Revisão {selecionado.revisao},
           conferida por {selecionado.conferidoPorNome} em{' '}
           {new Date(selecionado.conferidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.</p>
-        <p>A conferência não aprova regras nem modelo e não autoriza emissão.</p>
+        <p>A conferência não aprova regras nem modelo. A emissão só é liberada depois da aprovação formal da regra e do modelo.</p>
         {(selecionado.fonteSelecionadaAlterada || previa?.fonteSelecionadaAlterada) && (
-          <p className="aviso erro">A pessoa ou o vínculo mudou após a conferência. Devolva para revisão antes de qualquer emissão futura.</p>
+          <p className="aviso erro">A pessoa ou o vínculo mudou após a conferência. Devolva para revisão antes de emitir.</p>
         )}
         <p>A prévia abaixo usa a fonte atual, que pode ter mudado desde a conferência. Não é um snapshot nem um documento oficial.</p>
         {falhaPrevia ? (
@@ -115,6 +162,19 @@ export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente
           <iframe className="previa-conferida" title="Prévia atual da DOF conferida" sandbox=""
             srcDoc={renderizarPreviaDof(previa)} />
         ) : <p role="status">Carregando prévia da DOF conferida...</p>}
+        {podeEmitir && (
+          <div className="separado">
+            <h3>Emitir DOF</h3>
+            <p>A emissão reserva o número oficial, grava um snapshot imutável e gera o PDF. Depois de emitida, a DOF não pode ser editada; apenas cancelada.</p>
+            <label className="marcador"><input type="checkbox" checked={revisado} disabled={ocupado}
+              onChange={(evento) => setRevisado(evento.target.checked)} />
+              Revisei a prévia e confirmo a emissão desta DOF</label>
+            <button type="button" disabled={ocupado || !revisado || !previa || previa.fonteSelecionadaAlterada
+              || selecionado.fonteSelecionadaAlterada} onClick={() => void emitir()}>
+              {ocupado ? 'Emitindo...' : 'Emitir DOF'}
+            </button>
+          </div>
+        )}
         {podeDevolver && (
           <form className="separado" onSubmit={(evento) => void devolver(evento)}>
             <label>Motivo da devolução ao autor
@@ -129,7 +189,7 @@ export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente
           </form>
         )}
         <button type="button" className="secundario" disabled={ocupado} onClick={() => {
-          if (confirmarSaida()) { setSelecionado(null); setMotivo(''); onPendente(false); }
+          if (confirmarSaida()) fechar();
         }}>Voltar às DOFs conferidas</button>
       </section>
     );
@@ -138,7 +198,7 @@ export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente
   return (
     <section className="painel" aria-labelledby="conferidos-titulo">
       <h2 id="conferidos-titulo">DOFs conferidas</h2>
-      <p>Somente suas DOFs e as encaminhadas a você são exibidas. A conferência é provisória; emissão ainda não está disponível.</p>
+      <p>Somente suas DOFs e as encaminhadas a você são exibidas. A emissão é feita pelo coordenador e depende da aprovação formal da regra e do modelo.</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {falhou ? (
         <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>
@@ -156,7 +216,7 @@ export function ConferidosDof({ csrf, podeDevolver, onErro, onLimpar, onPendente
                   <td>{item.conferidoPorNome}</td>
                   <td>{item.fonteSelecionadaAlterada ? 'Pessoa ou vínculo alterado' : 'Sem alteração detectada na pessoa e no vínculo'}</td>
                   <td><button type="button" className="secundario" onClick={() => {
-                    onLimpar(); setMensagem(''); setSelecionado(item);
+                    onLimpar(); setMensagem(''); setRevisado(false); setEmissao(null); setSelecionado(item);
                   }}>Abrir <span className="sr-only">DOF de {item.nome}, matrícula {item.matricula}</span></button></td>
                 </tr>
               ))}</tbody>

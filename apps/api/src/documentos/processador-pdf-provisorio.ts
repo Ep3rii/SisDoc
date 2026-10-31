@@ -50,6 +50,7 @@ export class ProcessadorPdfProvisorio {
         JOIN documentos.emissao e ON e.id = j.emissao_id
         JOIN documentos.documento d ON d.id = e.documento_id
         WHERE e.tipo = 'DOF' AND d.status IN ('emitido', 'cancelado')
+          AND NOT EXISTS (SELECT 1 FROM documentos.emissao_aprovacao a WHERE a.emissao_id = e.id)
           AND (j.status = 'pendente' OR
             (j.status = 'processando' AND (j.posse IS NULL OR j.posse_expira_em <= clock_timestamp())))
         ORDER BY j.criado_em, j.id
@@ -115,11 +116,12 @@ export class ProcessadorPdfProvisorio {
     if (!identificador.success) throw new Error('Identificador de job de PDF inválido.');
     return transacao(this.banco, async (cliente) => {
       const consulta = await cliente.query<{
-        id: string; emissao_id: string; tipo: string; documento_status: string;
+        id: string; emissao_id: string; tipo: string; documento_status: string; oficial: boolean;
         status: 'pendente' | 'processando' | 'concluido' | 'falhou';
         posse: string | null; posse_expira_em: Date | null;
       }>(`
-        SELECT j.id, j.emissao_id, e.tipo, d.status AS documento_status, j.status, j.posse, j.posse_expira_em
+        SELECT j.id, j.emissao_id, e.tipo, d.status AS documento_status, j.status, j.posse, j.posse_expira_em,
+          EXISTS (SELECT 1 FROM documentos.emissao_aprovacao a WHERE a.emissao_id = e.id) AS oficial
         FROM documentos.job_pdf j
         JOIN documentos.emissao e ON e.id = j.emissao_id
         JOIN documentos.documento d ON d.id = e.documento_id
@@ -127,7 +129,7 @@ export class ProcessadorPdfProvisorio {
       `, [identificador.data]);
       const linha = consulta.rows[0];
       if (!linha) throw new Error('Job de PDF não encontrado.');
-      if (linha.tipo !== 'DOF' || !['emitido', 'cancelado'].includes(linha.documento_status)) {
+      if (linha.tipo !== 'DOF' || linha.oficial || !['emitido', 'cancelado'].includes(linha.documento_status)) {
         throw new Error('Job incompatível com o processamento de PDF provisório.');
       }
       const artefato = await cliente.query<{ existe: boolean }>(

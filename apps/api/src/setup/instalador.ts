@@ -13,6 +13,7 @@ import { aplicarBlocosDof } from '../migracoes/blocos-dof';
 import { aplicarConfirmacaoInicioDof } from '../migracoes/confirmacao-inicio-dof';
 import { aplicarConferenciaDof } from '../migracoes/conferencia-dof';
 import { aplicarDevolucaoDof } from '../migracoes/devolucao-dof';
+import { aplicarEmissao } from '../migracoes/emissao';
 import { aplicarEncaminhamentoDof } from '../migracoes/encaminhamento-dof';
 import { aplicarPreconferenciaDof } from '../migracoes/preconferencia-dof';
 import { aplicarRevisaoFonteDof } from '../migracoes/revisao-fonte-dof';
@@ -412,6 +413,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarDevolucaoDof(cliente, opcoes.banco.usuario);
     await aplicarRevisaoFonteDof(cliente, opcoes.banco.usuario);
     await aplicarConferenciaDof(cliente, opcoes.banco.usuario);
+    await aplicarEmissao(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

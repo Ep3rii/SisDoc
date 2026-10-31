@@ -4,6 +4,7 @@ import type { RespostaSessao } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { Auditoria } from './auditoria';
 import { ConferidosDof } from './conferidos-dof';
+import { Historico } from './historico';
 import { RascunhosDof } from './rascunhos-dof';
 import { BuscaGlobal, Servidores, type Consulta } from './servidores';
 import { nomesPerfis, Usuarios } from './usuarios';
@@ -80,7 +81,7 @@ function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos'>('busca');
+  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos' | 'historico'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [menuAberto, setMenuAberto] = useState(false);
@@ -177,6 +178,8 @@ function App() {
   };
   const funcional = sessao && sessao.usuario.papel !== 'admin';
   const podeSalvar = sessao?.usuario.papel === 'analista' || sessao?.usuario.papel === 'coordenador';
+  const escoposHistorico: ReadonlyArray<'proprio' | 'todos'> = sessao?.usuario.papel === 'coordenador' ? ['proprio', 'todos']
+    : sessao?.usuario.papel === 'analista' ? ['proprio'] : ['todos'];
 
   return (
     <div className="pagina">
@@ -201,11 +204,14 @@ function App() {
                 <button type="button" disabled>DTC IPAM<span>Anexo III</span></button>
                 <button type="button" disabled>DTC Comissionado<span>Benefício junto ao INSS</span></button>
                 <button type="button" disabled>DTC INSS<span>RGPS</span></button>
-                <div className="menu-separado"><button type="button" disabled>Histórico<span>Disponível após implementar a emissão</span></button></div>
+                <div className="menu-separado"><button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
+                  onClick={() => navegar('historico')}>Histórico<span>Emissões, PDF e cópias</span></button></div>
               </>}
               {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <p className="grupo-menu">Administração</p>}
               {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
                 onClick={() => navegar('usuarios')}>Usuários</button>}
+              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
+                onClick={() => navegar('historico')}>Histórico de emissões</button>}
               {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <button type="button"
                 aria-current={tela === 'auditoria' ? 'page' : undefined} onClick={() => navegar('auditoria')}>Auditoria</button>}
             </nav>
@@ -227,8 +233,8 @@ function App() {
       <div className="conteudo">
         <h1 className="sr-only">DOF e DTC</h1>
         <details className="situacao-implantacao">
-          <summary>Uso operacional autorizado em 31/10/2026 — emissão de PDF e DTCs ainda indisponíveis</summary>
-          <p>Consulta, cálculo, rascunhos, prévia e conferência da DOF estão liberados. As regras e a prévia seguem identificadas como provisórias; confira o documento antes do uso oficial.</p>
+          <summary>Uso operacional autorizado em 31/10/2026 — emissão da DOF depende de aprovação formal; DTCs ainda indisponíveis</summary>
+          <p>Consulta, cálculo, rascunhos, prévia e conferência da DOF estão liberados. A emissão da DOF com número e PDF já existe, mas só é liberada depois que a regra e o modelo forem aprovados formalmente pelo administrador com npm run aprovar-modelo. Até lá, as regras e a prévia seguem identificadas como provisórias.</p>
         </details>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
@@ -245,11 +251,17 @@ function App() {
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'conferidos' && <ConferidosDof key={chaveTela} csrf={sessao.csrf}
-              podeDevolver={sessao.usuario.papel === 'coordenador'} onErro={tratarErro} onLimpar={limparMensagens}
+              podeDevolver={sessao.usuario.papel === 'coordenador'} podeEmitir={sessao.usuario.papel === 'coordenador'}
+              onErro={tratarErro} onLimpar={limparMensagens}
               onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {sessao.usuario.papel === 'coordenador' && tela === 'encaminhados' && (
               <RascunhosDof key={chaveTela} csrf={sessao.csrf} recebidos
                 onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
+            )}
+            {tela === 'historico' && (
+              <Historico key={chaveTela} csrf={sessao.csrf} escopos={escoposHistorico}
+                onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia}
+                {...(podeSalvar ? { onAbrirRascunhos: () => navegar('rascunhos') } : {})} />
             )}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
               <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />

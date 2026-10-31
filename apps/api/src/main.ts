@@ -1,7 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
-import { VERSAO_CONFERENCIA_DOF } from './migracoes/conferencia-dof';
+import { VERSAO_EMISSAO } from './migracoes/emissao';
 
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
@@ -18,7 +18,7 @@ async function iniciar(): Promise<void> {
   try {
     const resultado = await banco.query<{ atual: boolean }>(
       'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
-      [VERSAO_CONFERENCIA_DOF],
+      [VERSAO_EMISSAO],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {
@@ -33,7 +33,7 @@ async function iniciar(): Promise<void> {
   }
   if (!migracaoAtual) {
     await banco.end();
-    throw new Error('O banco não possui a migração de conferência DOF; atualizações existentes ainda exigem procedimento seguro.');
+    throw new Error('O banco não possui a migração de emissão (013); execute npm run migrar com o serviço parado e inicie novamente.');
   }
   let app;
   try {

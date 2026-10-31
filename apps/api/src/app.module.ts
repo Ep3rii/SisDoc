@@ -6,7 +6,10 @@ import { BANCO, CONFIGURACAO } from './injecao';
 import { CalculosController } from './calculos/calculos.controller';
 import { CalculosService } from './calculos/calculos';
 import { RascunhosController } from './documentos/rascunhos.controller';
+import { EmissoesController } from './documentos/emissoes.controller';
+import { EmissoesService } from './documentos/emissoes';
 import { RascunhosService } from './documentos/rascunhos';
+import { WorkerPdfEmissao } from './documentos/worker-pdf-emissao';
 import { AutenticacaoService } from './seguranca/autenticacao';
 import { AutenticacaoController } from './seguranca/autenticacao.controller';
 import { GuardaAcesso, Publica } from './seguranca/guarda';
@@ -41,7 +44,7 @@ export class AppModule {
   static registrar(banco: Pool, configuracao: Configuracao): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController, RascunhosController],
+      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController, RascunhosController, EmissoesController],
       providers: [
         { provide: BANCO, useValue: banco },
         { provide: CONFIGURACAO, useValue: configuracao },
@@ -68,6 +71,16 @@ export class AppModule {
         {
           provide: RascunhosService,
           useFactory: (pool: Pool, config: Configuracao) => new RascunhosService(pool, config),
+          inject: [BANCO, CONFIGURACAO],
+        },
+        {
+          provide: EmissoesService,
+          useFactory: (pool: Pool, config: Configuracao) => new EmissoesService(pool, config),
+          inject: [BANCO, CONFIGURACAO],
+        },
+        {
+          provide: WorkerPdfEmissao,
+          useFactory: (pool: Pool, config: Configuracao) => new WorkerPdfEmissao(pool, config),
           inject: [BANCO, CONFIGURACAO],
         },
         { provide: APP_GUARD, useClass: GuardaAcesso },

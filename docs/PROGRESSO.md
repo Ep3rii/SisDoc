@@ -451,3 +451,36 @@ O responsável autorizou expressamente o uso operacional da instalação local
 indisponíveis estão na [decisão 021](decisoes/021-autorizacao-operacional.md).
 A interface passou a indicar a autorização; novas instalações continuam
 iniciando sem autorização até registro próprio do responsável.
+
+## Fatia 5 concluída — emissão da DOF — 31/10/2026
+
+Implementada a emissão da DOF de ponta a ponta, condicionada à aprovação
+formal da regra e do template ([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)):
+
+- migração `013-emissao`: `documentos.aprovacao_modelo` (imutável, gravável
+  só pelo papel de migração), `documentos.emissao_aprovacao` (vínculo imutável
+  da emissão à aprovação usada) e GRANTs de coluna mínimos ao papel da
+  aplicação para numeração, emissão, jobs/artefatos de PDF e cancelamento;
+- `npm run migrar` (atualização idempotente de instalação existente) e
+  `npm run aprovar-modelo` (interativo, confirmação `APROVAR DOF`, auditado);
+- `POST /api/documentos/:id/emitir` (coordenador, `Idempotency-Key`,
+  revalidação de conferência, fonte e regra, `FOR UPDATE` na numeração,
+  snapshot cifrado), worker de PDF iniciado com a API com reprocessamento no
+  mesmo número, template oficial sem marca de prévia, download auditado,
+  histórico, cópia como rascunho e cancelamento com motivo cifrado;
+- interface: **Emitir DOF** em DOFs conferidas para coordenador, estado e
+  download do PDF, tela **Histórico** habilitada, cópia e cancelamento.
+
+`tests/emissao.test.ts` cobre, com aprovação sintética em banco descartável:
+bloqueio sem aprovação, perfis, idempotência concorrente, numeração
+sequencial concorrente, PDF gerado para caso com mais de 41 anos de serviço,
+falha e reprocessamento com o mesmo número, worker automático, nomes de
+colisão, download auditado, histórico por perfil, cópia, cancelamento e
+`migrar` sobre banco com 13 migrações.
+
+`npm run typecheck` passou e `npm test` passou com **140 testes em 18
+arquivos**. **Nenhuma aprovação foi registrada na instalação local**: a
+emissão operacional permanece bloqueada até a validação formal pela área
+responsável. A instalação local precisa de `npm run build` e
+`npm run migrar` antes de reiniciar com esta versão. DTCs, importação, backup
+e serviço Windows continuam pendentes.

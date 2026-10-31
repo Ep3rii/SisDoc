@@ -9,6 +9,7 @@ export * from './servidores';
 export * from './calculo';
 export * from './rascunho-dof';
 export * from './processo';
+export * from './emissao';
 
 const porta = z.number().int().min(1).max(65535);
 const chave = z.string().regex(/^[A-Za-z0-9+/]{43}=$/);
@@ -36,6 +37,9 @@ export const configuracaoSchema = z.strictObject({
     listaSenhas: z.string().min(1),
   }).optional(),
   processos: configuracaoProcessosSchema.optional(),
+  pdf: z.strictObject({
+    diretorio: z.string().min(1),
+  }).optional(),
 });
 
 export type Configuracao = z.infer<typeof configuracaoSchema>;

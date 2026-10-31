@@ -5,8 +5,11 @@ declarações: DOF, DTC IPAM, DTC Comissionado e DTC INSS.
 
 **Autorizado para uso operacional local em 31/10/2026** ([decisão 021](docs/decisoes/021-autorizacao-operacional.md)),
 nas funções existentes: consulta de servidores, cálculo, rascunhos, prévia e
-conferência da DOF. Emissão oficial com PDF, DTCs, importação das fontes,
-backup e serviço automático da aplicação ainda não estão implementados.
+conferência da DOF. A emissão da DOF com numeração, PDF, histórico, cópia e
+cancelamento está implementada, mas **bloqueada até a aprovação formal** da
+regra e do template ([decisão 022](docs/decisoes/022-aprovacao-formal-e-emissao.md)).
+DTCs, importação das fontes, backup e serviço automático da aplicação ainda
+não estão implementados.
 
 ## Estado atual
 
@@ -17,8 +20,8 @@ backup e serviço automático da aplicação ainda não estão implementados.
 - Autenticação, usuários, auditoria, busca e fluxo provisório de rascunhos DOF.
 - Layout inspirado no [protótipo](Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg):
   menu lateral, busca global, abas, editor com prévia à direita e totais fixos.
-- Emissão e sincronização sinalizadas como indisponíveis; nenhuma fonte é
-  alterada pela edição de rascunhos.
+- Emissão da DOF dependente de aprovação formal; sincronização indisponível;
+  nenhuma fonte é alterada pela edição de rascunhos.
 
 ## Acesso à instalação desta máquina
 
@@ -32,7 +35,11 @@ $env:SISDOC_CONFIG = 'C:\ProgramData\SisDoc\instalacao\config\aplicacao.json'
 npm start
 ```
 
-Se o código mudou, execute `npm run build` antes de iniciar. Não inicie outra
+Se o código mudou, pare a aplicação, execute `npm run build` e
+`npm run migrar` (aplica só migrações pendentes, com o papel de migração
+lido de `C:\ProgramData\SisDoc\provisionamento\banco.json`) antes de iniciar.
+A aprovação formal da regra e do template, quando houver, é registrada com
+`npm run aprovar-modelo`; veja [operação](docs/OPERACAO.md). Não inicie outra
 cópia enquanto a porta estiver ocupada. Configuração, senhas, certificados e
 chaves ficam fora do Git; não publique nem cole seus conteúdos em logs.
 

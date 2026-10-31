@@ -2,6 +2,7 @@ import { TITULOS_BLOCOS_DOF, type DadosFontePreviaDof, type RascunhoDof } from '
 import { analisarTextoDof, valoresVariaveisDof } from './variaveis-dof';
 
 export { analisarTextoDof, valoresVariaveisDof, verificarVariaveisDof } from './variaveis-dof';
+export { renderizarEmissaoDof } from './emissao-dof';
 export type { ParteTextoDof } from './variaveis-dof';
 
 type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resultado' | 'blocos' | 'processo'> & {

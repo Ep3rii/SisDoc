@@ -4,13 +4,13 @@ Há uma [instalação local inicializada](INSTALACAO_LOCAL.md), com banco
 permanente, HTTPS e administrador inicial, **autorizada para uso operacional**
 pelo responsável em 31/10/2026 ([decisão 021](decisoes/021-autorizacao-operacional.md)).
 Estão liberados consulta de servidores e cálculo, rascunho, blocos, prévia e
-conferência de DOF pela interface. **Não há emissão com PDF, DTCs, importação,
-backup ou serviço Windows da aplicação implementados**. A prévia segue
-identificada como provisória; confira o conteúdo antes de qualquer uso oficial.
-O renderizador, o armazenamento e o processador experimentais de PDF são
-usados apenas por testes sintéticos: não há worker iniciado, botão de download,
-arquivo operacional persistido, reprocessamento autorizado, numeração ou
-emissão.
+conferência de DOF pela interface. A emissão da DOF (numeração, snapshot,
+PDF, histórico, cópia e cancelamento) está implementada, mas **fica bloqueada
+até o registro da aprovação formal** da regra e do template
+([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)). **Não há DTCs,
+importação, backup ou serviço Windows da aplicação implementados**. A prévia
+segue identificada como provisória; confira o conteúdo antes de qualquer uso
+oficial.
 
 ## Pré-requisitos para uma nova instalação
 
@@ -81,9 +81,49 @@ lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `012-conferencia-dof` ao banco novo. Uma instalação anterior sem essa
-migração não inicia com esta versão. Não existe procedimento aprovado de
-atualização: não aplique a migração manualmente em banco existente.
+O setup aplica até `013-emissao` ao banco novo. Uma instalação anterior sem essa
+migração não inicia com esta versão. Para atualizar uma instalação existente,
+pare a aplicação e execute na raiz do repositório:
+
+```powershell
+npm run build
+npm run migrar
+```
+
+O comando lê `C:\ProgramData\SisDoc\provisionamento\banco.json` (ou o caminho
+absoluto em `SISDOC_PROVISIONAMENTO`), conecta com o papel de migração e
+aplica, numa transação, somente as migrações ausentes em `seguranca.migracao`.
+Repetir o comando não altera nada. Senhas não são impressas. Bancos sem
+histórico de migrações são recusados. Não aplique migrações manualmente.
+
+## Aprovação formal e emissão da DOF
+
+A emissão responde "Emissão operacional bloqueada: regra/template provisórios
+ainda não aprovados" até que a regra de cálculo e o template vigentes sejam
+aprovados formalmente pela área responsável. Somente após essa validação, o
+operador autorizado registra a aprovação, em terminal interativo:
+
+```powershell
+npm run build
+npm run aprovar-modelo
+```
+
+O comando mostra regra e template vigentes, pede nome/cargo de quem aprovou e
+a referência da decisão (ofício, processo ou `docs/decisoes/0NN`) e exige a
+digitação de `APROVAR DOF`. O registro é permanente, imutável e auditado; o
+papel da aplicação não consegue gravá-lo, e não existe chave ou configuração
+que substitua a aprovação. Uma nova versão de regra ou template exige nova
+aprovação.
+
+Com a aprovação registrada, o coordenador emite pela tela de conferidos. O
+número (`N° nP/AAAA`) é reservado na mesma transação do snapshot cifrado. O
+PDF é gerado pelo worker iniciado com a aplicação em `pdf.diretorio` da
+configuração (padrão `<raiz da instalação>\pdf`), requer o Chromium do
+Playwright acessível à conta da aplicação e, em caso de falha, é reprocessado
+automaticamente com o mesmo número. A tela Histórico lista as últimas cinco
+emissões, permite baixar o PDF (acesso auditado), copiar como novo rascunho
+(analista/coordenador) e cancelar com motivo obrigatório (secretário adjunto e
+administrador). O número cancelado não é reutilizado.
 
 O limite é de cinco falhas por matrícula e 20 por IP em 15 minutos. O IP é o
 endereço da conexão, sem confiar em cabeçalhos encaminhados. A origem aceita
@@ -294,7 +334,10 @@ um snapshot do conteúdo conferido. Se não puder ser carregada, a tela informa
 o erro e oferece nova tentativa. O coordenador autor ou destinatário pode
 informar um motivo e devolver o documento para ajustes; a conferência anterior
 é preservada e eventual encaminhamento é encerrado. Se a comunicação falhar,
-consulte os rascunhos antes de repetir a devolução.
+consulte os rascunhos antes de repetir a devolução. Com a aprovação formal
+registrada, o coordenador pode **Emitir DOF** nesta tela, confirmando que
+revisou a prévia; a fonte é revalidada na emissão e a mesma tentativa repetida
+não gera outro número. Consulte a seção de aprovação formal e emissão.
 
 ## Verificação de software
 
