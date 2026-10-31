@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import {
   papelSchema,
   type AtualizarUsuario,
@@ -11,7 +11,9 @@ import {
 import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { transacao } from '../banco';
 import { AutenticacaoService, type SessaoAutenticada } from './autenticacao';
+import { papeisPermitidos } from './permissoes';
 import { gerarHashSenha } from './senhas';
+import { confirmarSessao } from './sessao-transacao';
 
 type UsuarioBanco = {
   id: string;
@@ -33,20 +35,6 @@ function usuarioAdministrativo(usuario: UsuarioBanco): UsuarioAdministrativo {
     ativo: usuario.ativo,
     trocaSenhaObrigatoria: usuario.troca_senha_obrigatoria,
   };
-}
-
-async function confirmarSessao(
-  cliente: PoolClient,
-  sessao: SessaoAutenticada,
-  papeis: readonly string[],
-): Promise<void> {
-  const resultado = await cliente.query(`
-    SELECT 1 FROM seguranca.sessao s JOIN seguranca.usuario u ON u.id = s.usuario_id
-    WHERE s.id_hash = $1 AND u.ativo AND NOT u.troca_senha_obrigatoria AND u.papel = ANY($2::text[])
-      AND s.expira_em > now() AND s.ultimo_uso > now() - interval '30 minutes'
-    FOR UPDATE OF u, s
-  `, [sessao.hash, papeis]);
-  if (resultado.rowCount !== 1) throw new UnauthorizedException('Sessão inválida ou expirada.');
 }
 
 async function registrarEvento(
@@ -73,7 +61,7 @@ export class UsuariosService {
 
   async listar(sessao: SessaoAutenticada, ip: string, limite: number, cursor?: string): Promise<PaginaUsuarios> {
     return transacao(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, ['admin']);
+      await confirmarSessao(cliente, sessao, papeisPermitidos('gerenciar_usuarios'));
       const resultado = await cliente.query<UsuarioBanco>(`
         SELECT id, matricula, nome, email, papel, ativo, troca_senha_obrigatoria
         FROM seguranca.usuario WHERE ($1::uuid IS NULL OR id > $1::uuid)
@@ -93,7 +81,7 @@ export class UsuariosService {
     try {
       return await transacao(this.banco, async (cliente) => {
         await bloquearAdministracao(cliente);
-        await confirmarSessao(cliente, sessao, ['admin']);
+        await confirmarSessao(cliente, sessao, papeisPermitidos('gerenciar_usuarios'));
         const resultado = await cliente.query<UsuarioBanco>(`
           INSERT INTO seguranca.usuario (id, matricula, nome, email, senha_hash, papel)
           VALUES ($1, $2, $3, $4, $5, $6)
@@ -120,7 +108,7 @@ export class UsuariosService {
   ): Promise<UsuarioAdministrativo> {
     return transacao(this.banco, async (cliente) => {
       await bloquearAdministracao(cliente);
-      await confirmarSessao(cliente, sessao, ['admin']);
+      await confirmarSessao(cliente, sessao, papeisPermitidos('gerenciar_usuarios'));
       const consulta = await cliente.query<UsuarioBanco>(`
         SELECT id, matricula, nome, email, papel, ativo, troca_senha_obrigatoria
         FROM seguranca.usuario WHERE id = $1 FOR UPDATE
@@ -155,7 +143,7 @@ export class UsuariosService {
     const senhaHash = await gerarHashSenha(senha);
     await transacao(this.banco, async (cliente) => {
       await bloquearAdministracao(cliente);
-      await confirmarSessao(cliente, sessao, ['admin']);
+      await confirmarSessao(cliente, sessao, papeisPermitidos('gerenciar_usuarios'));
       const resultado = await cliente.query(`
         UPDATE seguranca.usuario SET senha_hash = $2, troca_senha_obrigatoria = true,
           tentativas_falhas = 0, bloqueado_ate = NULL
@@ -169,7 +157,7 @@ export class UsuariosService {
 
   async listarAuditoria(sessao: SessaoAutenticada, ip: string, limite: number, cursor?: string): Promise<PaginaAuditoria> {
     return transacao(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, ['admin', 'secretario_adjunto']);
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_auditoria'));
       const resultado = await cliente.query<{
         id: string; usuario_id: string | null; acao: string; entidade: string; entidade_id: string | null; em: Date;
       }>(`

@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   afastamentoSchema,
   ajusteCampoSchema,
+  buscarServidoresQuerySchema,
   cpfSchema,
   criarDocumentoSchema,
   dataFuncionalSchema,
+  detalheServidorSchema,
+  eventosServidorQuerySchema,
   incorporacaoSchema,
 } from '../packages/contratos/dist/index.js';
 import { cpfSintetico } from './dados-sinteticos.js';
@@ -31,6 +34,37 @@ describe('contratos de domínio', () => {
     expect(cpfSchema.safeParse(`${cpf.slice(0, -1)}${(Number(cpf.at(-1)) + 1) % 10}`).success).toBe(false);
     expect(cpfSchema.safeParse('000.000.000-00').success).toBe(false);
     expect(cpfSchema.safeParse(`${cpf.slice(0, 3)}-${cpf.slice(3)}`).success).toBe(false);
+  });
+
+  it('valida consultas e paginação de servidores sem aceitar parâmetros ambíguos', () => {
+    const cpf = cpfSintetico();
+    expect(buscarServidoresQuerySchema.parse({ q: '  Árvore  ', tipo: 'nome' }))
+      .toEqual({ q: 'Árvore', tipo: 'nome', limite: 25 });
+    expect(buscarServidoresQuerySchema.parse({ q: cpf, tipo: 'cpf', limite: '50' }).limite).toBe(50);
+    expect(buscarServidoresQuerySchema.safeParse({ q: '1.000001-2', tipo: 'matricula' }).success).toBe(true);
+    for (const entrada of [
+      { q: 'áé', tipo: 'nome' }, { q: 'abc\u0000', tipo: 'nome' },
+      { q: '00000000000', tipo: 'cpf' }, { q: 'x'.repeat(101), tipo: 'matricula' },
+      { q: 'nome', tipo: 'nome', limite: '0' }, { q: 'nome', tipo: 'nome', limite: '51' },
+      { q: 'nome', tipo: 'nome', cursor: 'inválido' }, { q: 'nome', tipo: 'outro' },
+      { q: 'nome', tipo: 'nome', campoExtra: true },
+    ]) {
+      expect(buscarServidoresQuerySchema.safeParse(entrada).success).toBe(false);
+    }
+    expect(eventosServidorQuerySchema.parse({ vinculoId: randomUUID(), limite: '1' }).limite).toBe(1);
+    expect(eventosServidorQuerySchema.safeParse({ vinculoId: 'inválido' }).success).toBe(false);
+  });
+
+  it('exige CPF mascarado na resposta de detalhes', () => {
+    const pessoa = { id: randomUUID(), nome: 'Pessoa fictícia', cpfMascarado: '***.***.123-**' };
+    const detalhe = { pessoa, vinculos: [], proximoCursor: null };
+    expect(detalheServidorSchema.safeParse(detalhe).success).toBe(true);
+    expect(detalheServidorSchema.safeParse({
+      ...detalhe, pessoa: { ...pessoa, cpfMascarado: cpfSintetico() },
+    }).success).toBe(false);
+    expect(detalheServidorSchema.safeParse({
+      ...detalhe, pessoa: { ...pessoa, cpfMascarado: '***.***.12-**' },
+    }).success).toBe(false);
   });
 
   it('valida limites, ordem e sobreposição inclusiva dos períodos', () => {

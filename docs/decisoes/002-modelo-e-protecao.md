@@ -38,7 +38,7 @@ As chaves são externas e não são intercambiáveis.
 Os testes exercitam cifra, autenticação, HMAC e persistência com dados e chaves
 sintéticos. O banco não consegue provar que um `bytea` contém uma cifra
 válida: todos os futuros caminhos de escrita e leitura precisam usar o
-componente e ser testados. Ainda não existem importação, consulta de pessoas,
+componente e ser testados. À época desta decisão ainda não existiam importação, consulta de pessoas,
 escrita de rascunhos ou emissão pela aplicação.
 
 ## Integridade e imutabilidade

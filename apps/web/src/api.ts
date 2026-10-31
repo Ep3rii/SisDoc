@@ -1,13 +1,20 @@
 import {
   paginaAuditoriaSchema,
+  paginaBuscaServidoresSchema,
+  paginaEventosServidorSchema,
   paginaUsuariosSchema,
+  detalheServidorSchema,
   respostaSessaoSchema,
   usuarioAdministrativoSchema,
   type AtualizarUsuario,
   type CriarUsuario,
+  type DetalheServidor,
   type PaginaAuditoria,
+  type PaginaBuscaServidores,
+  type PaginaEventosServidor,
   type PaginaUsuarios,
   type RespostaSessao,
+  type TipoBuscaServidor,
   type UsuarioAdministrativo,
 } from '@sisdoc/contratos';
 
@@ -102,5 +109,18 @@ export const api = {
   },
   async auditoria(cursor?: string): Promise<PaginaAuditoria> {
     return validar(paginaAuditoriaSchema, await requisitar(`admin/auditoria?${parametros(cursor)}`));
+  },
+  async buscarServidores(q: string, tipo: TipoBuscaServidor, cursor?: string): Promise<PaginaBuscaServidores> {
+    const consulta = new URLSearchParams({ q, tipo, limite: '25' });
+    if (cursor) consulta.set('cursor', cursor);
+    return validar(paginaBuscaServidoresSchema, await requisitar(`servidores?${consulta.toString()}`));
+  },
+  async servidor(id: string, cursor?: string): Promise<DetalheServidor> {
+    return validar(detalheServidorSchema, await requisitar(`servidores/${id}?${parametros(cursor)}`));
+  },
+  async eventosServidor(id: string, vinculoId: string, cursor?: string): Promise<PaginaEventosServidor> {
+    const consulta = new URLSearchParams({ vinculoId, limite: '25' });
+    if (cursor) consulta.set('cursor', cursor);
+    return validar(paginaEventosServidorSchema, await requisitar(`servidores/${id}/eventos?${consulta.toString()}`));
   },
 };

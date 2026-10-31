@@ -25,8 +25,12 @@ const matriz = {
 export type Acao = keyof typeof matriz;
 export const ACOES = Object.freeze(Object.keys(matriz) as Acao[]);
 
+export function papeisPermitidos(acao: Acao): readonly Papel[] {
+  return matriz[acao];
+}
+
 export function perfilPermiteAcao(papel: Papel, acao: Acao): boolean {
-  return matriz[acao].some((perfil) => perfil === papel);
+  return papeisPermitidos(acao).some((perfil) => perfil === papel);
 }
 
 export function permiteAcao(

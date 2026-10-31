@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { normalizarMatricula } from '@sisdoc/contratos';
 
 const vinculoSchema = z.strictObject({
   id: z.uuid(),
@@ -17,10 +18,6 @@ export type VinculoParaConsulta = z.infer<typeof vinculoSchema>;
 export type ResultadoVinculo =
   | { sucesso: true; atual: VinculoParaConsulta; historico: VinculoParaConsulta[] }
   | { sucesso: false; codigo: string; mensagem: string };
-
-function normalizarMatricula(valor: string): string {
-  return valor.trim().toUpperCase();
-}
 
 export function localizarVinculo(entrada: unknown): ResultadoVinculo {
   const resultado = consultaSchema.safeParse(entrada);

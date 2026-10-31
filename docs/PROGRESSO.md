@@ -9,7 +9,8 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 1 — dados e contratos | gate técnico verificado | migração no banco vazio e em cópia sintética da fundação; contratos, restrições, privilégios e concorrência testados |
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
-| 4 a 9 — fluxos e operação | não iniciadas | — |
+| 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
+| 5 a 9 — documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
 citada no prompt. Node 24.20.0 e npm 11.19.0 foram encontrados; PostgreSQL e
@@ -49,13 +50,41 @@ integrado de navegador com CA operacional. `npm run typecheck`, `npm test`
 A revisão humana está pendente. A compilação da interface avisa que o bundle
 principal excede 500 kB; ainda não foi feita aferição de carregamento em rede.
 
+Na fatia 4, analista, coordenador e secretário adjunto podem consultar nome,
+CPF ou matrícula, selecionar uma pessoa e percorrer vínculos e eventos
+paginados. O administrador técnico não tem acesso funcional. As consultas são
+autorizadas e auditadas, sem termo de busca no registro de auditoria; o CPF
+aparece mascarado nos detalhes. A migração `003-consulta` adiciona índices
+para vínculos e eventos. O setup a aplica somente em banco novo; não há
+procedimento autorizado de atualização de instalação existente.
+
+Em PostgreSQL 16.15 e HTTPS descartáveis, os testes inseriram 17.700 vínculos
+exclusivamente fictícios e verificaram a matriz de acesso, CPF mascarado,
+vínculos com sufixos, matrícula duplicada, paginação, erros e auditoria. Em
+uma execução direcionada, os tempos máximos observados foram 25,2 ms para
+nome, 6,2 ms para CPF, 6,5 ms para matrícula e 50,5 ms para páginas de nome
+com muitos resultados; cada medição deve ficar abaixo de 1.000 ms. São
+medições locais, não uma garantia de capacidade em produção.
+
+A interface foi exercitada no navegador com API simulada e dados fictícios:
+resultados vazios, falhas e retentativas, paginação de busca/vínculos/eventos,
+sessão expirada, perfis, foco por teclado e larguras de 1366 e 375 pixels.
+Foi usado o navegador integrado baseado em Electron 43.8.3 e Chromium
+150.0.7871.250. `npm run typecheck`, `npm test` (67 testes em sete arquivos)
+e `npm audit` passaram; a auditoria não apontou vulnerabilidades.
+Esse teste não substitui navegador integrado ao serviço HTTPS com CA confiável,
+revisão de acessibilidade ou revisão humana. O gerador atual atende à aferição
+da consulta, mas ainda não cobre todos os cenários necessários à importação
+e sincronização da fatia 7.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
-possui consulta funcional, fluxo de cálculo na interface, emissão ou instalação
-como serviço; não está pronta para uso operacional. Requisitos de certificado,
+possui fluxo de cálculo na interface, emissão, importação ou instalação como
+serviço; não está pronta para uso operacional. Requisitos de certificado,
 conta de serviço, proxy, backup e suporte do sistema operacional permanecem
 sem aceite.
 Divergências e decisões estão em
 [001-regras-e-estado-inicial.md](decisoes/001-regras-e-estado-inicial.md) e
 [002-modelo-e-protecao.md](decisoes/002-modelo-e-protecao.md) e
 [003-motor-calculo.md](decisoes/003-motor-calculo.md) e
-[004-autenticacao.md](decisoes/004-autenticacao.md).
+[004-autenticacao.md](decisoes/004-autenticacao.md) e
+[005-consulta-servidores.md](decisoes/005-consulta-servidores.md).

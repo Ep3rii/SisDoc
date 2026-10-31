@@ -1,10 +1,10 @@
 # Operação — aplicação ainda não autorizada
 
-O login e a administração de usuários existem para verificação em recursos
-descartáveis. O motor de referência foi testado, mas **não há consulta
-funcional, fluxo de cálculo na interface, emissão, importação, backup ou
-serviço Windows implementados**. Não instalar ou usar operacionalmente até a
-conclusão das demais fatias, revisão e autorização formal.
+O login, a administração e a consulta de servidores existem para verificação
+em recursos descartáveis. O motor de referência foi testado, mas **não há
+fluxo de cálculo na interface, emissão, importação, backup ou serviço Windows
+implementados**. Não instalar ou usar operacionalmente até a conclusão das
+demais fatias, revisão e autorização formal.
 
 ## Pré-requisitos para uma futura instalação
 
@@ -65,15 +65,34 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 002, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 003, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
+
+O setup aplica `003-consulta` ao banco novo. Uma instalação anterior sem essa
+migração não inicia com esta versão. Não existe procedimento aprovado de
+atualização: não aplique a migração manualmente em banco existente.
 
 O limite é de cinco falhas por matrícula e 20 por IP em 15 minutos. O IP é o
 endereço da conexão, sem confiar em cabeçalhos encaminhados. A origem aceita
 para escritas é a origem HTTPS configurada; a publicação por proxy exige
 configuração explícita e testes de origem e proxies confiáveis, ainda ausentes.
+
+## Consulta de servidores
+
+Analista, coordenador e secretário adjunto podem buscar por nome, CPF válido
+ou matrícula exata, incluindo seu sufixo. Nome exige pelo menos três
+caracteres. Resultados, vínculos e eventos são paginados; matrículas
+duplicadas são apresentadas com sua origem, sem escolha automática. A busca
+não devolve CPF e os detalhes exibem apenas máscara. O administrador técnico
+não recebe acesso funcional por seu perfil.
+
+O termo trafega no parâmetro `q` de uma requisição HTTPS local. A aplicação
+não registra esse termo na auditoria ou em log de acesso, mas histórico de
+rede, extensões, proxies ou servidores intermediários podem registrar URLs.
+Não habilite publicação por proxy sem configurar e verificar a supressão de
+parâmetros sensíveis em seus logs. A consulta é local e não faz sincronização.
 
 ## Verificação de software
 

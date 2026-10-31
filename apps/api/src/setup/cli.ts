@@ -9,7 +9,7 @@ async function executar(): Promise<void> {
   try {
     process.stdout.write(
       'Inicialização de uma nova instalação: use um banco PostgreSQL 16 vazio e uma raiz ainda inexistente.\n' +
-      'A consulta funcional, os cálculos pela interface e a emissão operacional ainda não estão disponíveis.\n',
+      'Os cálculos pela interface e a emissão operacional ainda não estão disponíveis.\n',
     );
     const raiz = await perguntar('Caminho absoluto da nova raiz: ');
     const porta = Number(await perguntar('Porta HTTPS em loopback: '));

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { papelSchema } from './dominio';
+import { limitePaginaSchema } from './paginacao';
 
 const matricula = z.string().trim().min(1).max(100);
 const senhaInformada = z.string().min(1).max(1024);
@@ -31,9 +32,6 @@ export const atualizarUsuarioSchema = z.strictObject({
 }).refine((dados) => Object.keys(dados).length > 0, 'Informe ao menos um campo para alteração.');
 
 export const redefinirSenhaSchema = z.strictObject({ senha: senhaNova });
-
-const limitePaginaSchema = z.string().regex(/^(?:[1-9]|[1-4]\d|50)$/)
-  .transform(Number).optional().transform((valor) => valor ?? 25);
 
 export const paginaUsuariosQuerySchema = z.strictObject({
   cursor: z.uuid().optional(),

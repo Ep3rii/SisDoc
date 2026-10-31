@@ -10,7 +10,15 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import * as pty from '@lydell/node-pty';
-import { paginaAuditoriaSchema, paginaUsuariosSchema, respostaSessaoSchema, usuarioAdministrativoSchema } from '@sisdoc/contratos';
+import {
+  detalheServidorSchema,
+  paginaAuditoriaSchema,
+  paginaBuscaServidoresSchema,
+  paginaEventosServidorSchema,
+  paginaUsuariosSchema,
+  respostaSessaoSchema,
+  usuarioAdministrativoSchema,
+} from '@sisdoc/contratos';
 import { verify } from 'argon2';
 import EmbeddedPostgres from 'embedded-postgres';
 import forge from 'node-forge';
@@ -21,11 +29,14 @@ import { HealthController } from '../apps/api/dist/app.module.js';
 import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
+import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
 import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
 import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
+import { gerarHashSenha } from '../apps/api/dist/seguranca/senhas.js';
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
 import { validarDestinos } from '../scripts/isolar-testes.cjs';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { gerarPessoasSinteticas } from '../tools/anonimizar/fixtures.js';
 
 const senhaMigrador = 'MigracaoFicticia!12345';
 const senhaAplicativo = 'AplicativoFicticio!12345';
@@ -236,7 +247,7 @@ async function requisitarApi(
       resposta.on('end', () => resolve({ status: resposta.statusCode, corpo, headers: resposta.headers }));
       resposta.on('error', reject);
     });
-    pedido.once('timeout', () => pedido.destroy(new Error('Tempo HTTPS esgotado.')));
+    pedido.once('timeout', () => pedido.destroy(new Error(`Tempo HTTPS esgotado em ${opcoes.metodo} ${opcoes.rota.split('?')[0]}.`)));
     pedido.once('error', reject);
     pedido.end(conteudo);
   });
@@ -646,8 +657,12 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -1059,7 +1074,7 @@ describe('fundação em recursos descartáveis', () => {
       const pagina = await requisitar(portaHttps, caPem, nomeTls, '/');
       expect(pagina.status).toBe(200);
       expect(pagina.corpo).toContain('<title>SisDoc</title>');
-      expect((await requisitar(portaHttps, caPem, nomeTls, '/api/v1/servidores')).status).toBe(404);
+      expect((await requisitar(portaHttps, caPem, nomeTls, '/api/v1/servidores')).status).toBe(401);
       await expect(requisitar(portaHttps, caPem, 'outro.local')).rejects.toThrow();
     } finally {
       await encerrar();
@@ -1443,6 +1458,232 @@ describe('fundação em recursos descartáveis', () => {
     } finally {
       await cliente.end();
       await encerrar();
+    }
+  });
+
+  it('busca e abre vínculos sintéticos em menos de um segundo com autorização e auditoria', async () => {
+    const config = await carregarConfiguracao(arquivoConfig);
+    const protetor = new ProtetorDados(config.chaves);
+    const pessoas = gerarPessoasSinteticas(17700);
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    const senhaBusca = 'SenhaBuscaSintetica!12345';
+    const hashSenha = await gerarHashSenha(senhaBusca);
+    const perfis = ['analista', 'coordenador', 'secretario_adjunto', 'admin'] as const;
+    try {
+      await cliente.query('BEGIN');
+      try {
+        for (let inicio = 0; inicio < pessoas.length; inicio += 500) {
+          const lote = pessoas.slice(inicio, inicio + 500);
+          const linhasPessoas = lote.map((pessoa) => ({
+            id: pessoa.id,
+            cpf_cifrado: protetor.cifrar(Buffer.from(pessoa.cpf, 'ascii'), {
+              schema: 'nucleo', tabela: 'pessoa', registroId: pessoa.id, campo: 'cpf_cifrado',
+            }).toString('base64'),
+            cpf_hash: protetor.hashCpf(pessoa.cpf).toString('hex'),
+            nome: pessoa.nome,
+            nome_busca: pessoa.nomeBusca,
+          }));
+          await cliente.query(`
+            INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
+            SELECT id::uuid, decode(cpf_cifrado, 'base64'), decode(cpf_hash, 'hex'), nome, nome_busca
+            FROM jsonb_to_recordset($1::jsonb)
+              AS p(id text, cpf_cifrado text, cpf_hash text, nome text, nome_busca text)
+          `, [JSON.stringify(linhasPessoas)]);
+          const linhasVinculos = lote.flatMap((pessoa) => pessoa.vinculos.map((vinculo) => ({
+            ...vinculo, pessoaId: pessoa.id,
+          })));
+          await cliente.query(`
+            INSERT INTO nucleo.vinculo (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem,
+              matricula_anterior_id, orgao_nome, regime_juridico, referencia)
+            SELECT id::uuid, "pessoaId"::uuid, matricula, "matriculaNorm", "sistemaOrigem", "idOrigem",
+              "matriculaAnteriorId"::uuid, orgao, regime, referencia
+            FROM jsonb_to_recordset($1::jsonb) AS v(
+              id text, "pessoaId" text, matricula text, "matriculaNorm" text, "sistemaOrigem" text,
+              "idOrigem" text, "matriculaAnteriorId" text, orgao text, regime text, referencia text
+            )
+          `, [JSON.stringify(linhasVinculos)]);
+        }
+        for (const papel of perfis) {
+          await cliente.query(`
+            INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+            VALUES ($1, $2, 'Operador de busca sintético', $3, $4, false)
+          `, [randomUUID(), `BUSCA-${papel.toUpperCase()}-SINTETICA`, hashSenha, papel]);
+        }
+        await cliente.query(`
+          INSERT INTO nucleo.evento_funcional (id, vinculo_id, tipo, data_evento, ato_tipo, ato_numero, fonte)
+          VALUES ($1, $2, 'nomeacao', DATE '2001-02-03', 'decreto', 'SINTETICO-1', 'fonte sintética'),
+                 ($3, $2, 'exoneracao', DATE '2002-03-04', 'decreto', 'SINTETICO-2', 'fonte sintética')
+        `, [randomUUID(), pessoas[0].vinculos[0].id, randomUUID()]);
+        await cliente.query('COMMIT');
+      } catch (erro) {
+        await cliente.query('ROLLBACK');
+        throw erro;
+      }
+      const quantidade = await cliente.query<{ total: string }>(`
+        SELECT count(*) AS total FROM nucleo.vinculo
+        WHERE sistema_origem IN ('fonte-sintetica-a', 'fonte-sintetica-b')
+      `);
+      expect(quantidade.rows[0].total).toBe('17700');
+      const primeira = pessoas[0];
+      const bruto = await cliente.query<{ cpf_cifrado: Buffer; cpf_hash: Buffer }>(
+        'SELECT cpf_cifrado, cpf_hash FROM nucleo.pessoa WHERE id = $1', [primeira.id],
+      );
+      expect(bruto.rows[0].cpf_cifrado).not.toEqual(Buffer.from(primeira.cpf, 'ascii'));
+      expect(bruto.rows[0].cpf_hash).toEqual(protetor.hashCpf(primeira.cpf));
+      const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
+      try {
+        const sessoes = new Map<string, { cookie: string; csrf: string }>();
+        for (const papel of perfis) {
+          const login = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/auth/login',
+            corpo: { matricula: `BUSCA-${papel.toUpperCase()}-SINTETICA`, senha: senhaBusca },
+          });
+          expect(login.status, login.corpo).toBe(200);
+          const sessao = respostaSessaoSchema.parse(JSON.parse(login.corpo));
+          const cookie = login.headers['set-cookie']?.[0].split(';')[0];
+          if (!cookie) throw new Error('Cookie da busca sintética ausente.');
+          sessoes.set(papel, { cookie, csrf: sessao.csrf });
+        }
+        const analista = sessoes.get('analista');
+        const admin = sessoes.get('admin');
+        if (!analista || !admin) throw new Error('Sessões sintéticas ausentes.');
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/servidores?q=arvore&tipo=nome' })).status).toBe(401);
+        for (const rota of ['/api/v1/servidores?q=arvore&tipo=nome', `/api/v1/servidores/${primeira.id}`,
+          `/api/v1/servidores/${primeira.id}/eventos?vinculoId=${primeira.vinculos[0].id}`]) {
+          expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: admin.cookie })).status).toBe(403);
+        }
+        const duracoes = { nome: 0, cpf: 0, matricula: 0, pagina: 0 };
+        const consultar = async (q: string, tipo: 'nome' | 'cpf' | 'matricula') => {
+          const inicio = performance.now();
+          const resposta = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `/api/v1/servidores?tipo=${tipo}&q=${encodeURIComponent(q)}`, cookie: analista.cookie,
+          });
+          const duracao = performance.now() - inicio;
+          duracoes[tipo] = Math.max(duracoes[tipo], duracao);
+          expect(resposta.status, resposta.corpo).toBe(200);
+          expect(duracao, `${tipo}: ${duracao.toFixed(1)} ms`).toBeLessThan(1000);
+          expect(resposta.corpo).not.toContain(primeira.cpf);
+          return paginaBuscaServidoresSchema.parse(JSON.parse(resposta.corpo));
+        };
+        for (let repeticao = 0; repeticao < 3; repeticao += 1) {
+          expect((await consultar('arvore ficticia', 'nome')).itens.map((item) => item.vinculoId).sort())
+            .toEqual(primeira.vinculos.map((vinculo) => vinculo.id).sort());
+          expect((await consultar(primeira.cpf, 'cpf')).itens).toHaveLength(2);
+          const sufixo = await consultar('1.000001-2', 'matricula');
+          expect(sufixo.itens.map((item) => item.vinculoId)).toEqual([primeira.vinculos[1].id]);
+        }
+        const cpfMascarado = `${primeira.cpf.slice(0, 3)}.${primeira.cpf.slice(3, 6)}.${primeira.cpf.slice(6, 9)}-${primeira.cpf.slice(9)}`;
+        expect((await consultar(cpfMascarado, 'cpf')).itens).toHaveLength(2);
+        const duplicada = await consultar('7.777777-1', 'matricula');
+        expect(new Set(duplicada.itens.map((item) => item.pessoaId)).size).toBe(2);
+        expect(new Set(duplicada.itens.map((item) => item.sistemaOrigem)).size).toBe(2);
+        const automatica = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/servidores?q=7.777777-1', cookie: analista.cookie,
+        });
+        expect(paginaBuscaServidoresSchema.parse(JSON.parse(automatica.corpo)).itens).toHaveLength(2);
+        for (const rota of ['/api/v1/servidores?q=ab&tipo=nome', '/api/v1/servidores?q=%00abc&tipo=nome',
+          '/api/v1/servidores?q=00000000000&tipo=cpf',
+          '/api/v1/servidores?q=nome&tipo=nome&limite=51', '/api/v1/servidores?q=nome&tipo=nome&limite=0',
+          '/api/v1/servidores?q=nome&tipo=nome&cursor=invalido', '/api/v1/servidores?q=nome&tipo=nome&outro=1']) {
+          expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: analista.cookie })).status).toBe(400);
+        }
+        expect((await consultar('%__', 'nome')).itens).toHaveLength(0);
+        const inicioPagina = performance.now();
+        const primeiraPagina = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/servidores?q=sintetica&tipo=nome&limite=2', cookie: analista.cookie,
+        });
+        duracoes.pagina = performance.now() - inicioPagina;
+        expect(duracoes.pagina, 'Nome com muitos resultados').toBeLessThan(1000);
+        const pagina = paginaBuscaServidoresSchema.parse(JSON.parse(primeiraPagina.corpo));
+        expect(pagina.itens).toHaveLength(2);
+        expect(pagina.proximoCursor).not.toBeNull();
+        const inicioSeguinte = performance.now();
+        const paginaSeguinte = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/servidores?q=sintetica&tipo=nome&limite=2&cursor=${pagina.proximoCursor}`, cookie: analista.cookie,
+        });
+        duracoes.pagina = Math.max(duracoes.pagina, performance.now() - inicioSeguinte);
+        expect(duracoes.pagina, 'Página seguinte com muitos resultados').toBeLessThan(1000);
+        const seguinte = paginaBuscaServidoresSchema.parse(JSON.parse(paginaSeguinte.corpo));
+        expect(seguinte.itens.every((item) => !pagina.itens.some((primeiro) => primeiro.vinculoId === item.vinculoId))).toBe(true);
+
+        for (const papel of ['analista', 'coordenador', 'secretario_adjunto']) {
+          const sessao = sessoes.get(papel);
+          if (!sessao) throw new Error('Sessão funcional sintética ausente.');
+          const detalhe = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `/api/v1/servidores/${primeira.id}`, cookie: sessao.cookie,
+          });
+          expect(detalhe.status, detalhe.corpo).toBe(200);
+          expect(detalhe.corpo).not.toContain(primeira.cpf);
+          const dados = detalheServidorSchema.parse(JSON.parse(detalhe.corpo));
+          expect(dados.pessoa.cpfMascarado).toBe(`***.***.${primeira.cpf.slice(6, 9)}-**`);
+          expect(dados.vinculos.map((vinculo) => vinculo.id).sort()).toEqual(primeira.vinculos.map((vinculo) => vinculo.id).sort());
+          expect(dados.vinculos.find((vinculo) => vinculo.id === primeira.vinculos[1].id)?.matriculaAnteriorId)
+            .toBe(primeira.vinculos[0].id);
+          const eventos = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `/api/v1/servidores/${primeira.id}/eventos?vinculoId=${primeira.vinculos[0].id}`, cookie: sessao.cookie,
+          });
+          expect(eventos.status, eventos.corpo).toBe(200);
+          expect(paginaEventosServidorSchema.parse(JSON.parse(eventos.corpo)).itens)
+            .toContainEqual(expect.objectContaining({ tipo: 'nomeacao', dataEvento: '2001-02-03', atoNumero: 'SINTETICO-1' }));
+        }
+        const detalhePaginado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/servidores/${primeira.id}?limite=1`, cookie: analista.cookie,
+        });
+        const detalheUm = detalheServidorSchema.parse(JSON.parse(detalhePaginado.corpo));
+        expect(detalheUm.vinculos).toHaveLength(1);
+        expect(detalheUm.proximoCursor).toBe(detalheUm.vinculos[0].id);
+        const detalheSeguinte = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/servidores/${primeira.id}?limite=1&cursor=${detalheUm.proximoCursor}`, cookie: analista.cookie,
+        });
+        const detalheDois = detalheServidorSchema.parse(JSON.parse(detalheSeguinte.corpo));
+        expect(detalheDois.vinculos).toHaveLength(1);
+        expect(detalheDois.vinculos[0].id).not.toBe(detalheUm.vinculos[0].id);
+        expect(detalheDois.proximoCursor).toBeNull();
+        const rotaEventos = `/api/v1/servidores/${primeira.id}/eventos?vinculoId=${primeira.vinculos[0].id}`;
+        const eventoPaginado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rotaEventos}&limite=1`, cookie: analista.cookie,
+        });
+        const eventoUm = paginaEventosServidorSchema.parse(JSON.parse(eventoPaginado.corpo));
+        expect(eventoUm.itens).toHaveLength(1);
+        expect(eventoUm.proximoCursor).toBe(eventoUm.itens[0].id);
+        const eventoSeguinte = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rotaEventos}&limite=1&cursor=${eventoUm.proximoCursor}`, cookie: analista.cookie,
+        });
+        const eventoDois = paginaEventosServidorSchema.parse(JSON.parse(eventoSeguinte.corpo));
+        expect(eventoDois.itens).toHaveLength(1);
+        expect(eventoDois.itens[0].id).not.toBe(eventoUm.itens[0].id);
+        expect(eventoDois.proximoCursor).toBeNull();
+        for (const rota of [`/api/v1/servidores/${primeira.id}?cursor=invalido`,
+          `/api/v1/servidores/${primeira.id}/eventos?vinculoId=invalido`,
+          '/api/v1/servidores/invalido']) {
+          expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: analista.cookie })).status).toBe(400);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/servidores/${pessoas[1].id}/eventos?vinculoId=${primeira.vinculos[0].id}`,
+          cookie: analista.cookie,
+        })).status).toBe(404);
+        const auditoria = await cliente.query<{ acao: string; pessoa_id: string | null; detalhes: unknown }>(`
+          SELECT acao, pessoa_id, detalhes FROM seguranca.auditoria
+          WHERE acao IN ('servidores_pesquisados', 'servidor_consultado', 'eventos_consultados')
+        `);
+        expect(auditoria.rows.some((evento) => evento.acao === 'servidores_pesquisados')).toBe(true);
+        expect(auditoria.rows.some((evento) => evento.acao === 'servidor_consultado' && evento.pessoa_id === primeira.id)).toBe(true);
+        expect(auditoria.rows.some((evento) => evento.acao === 'eventos_consultados' && evento.pessoa_id === primeira.id)).toBe(true);
+        expect(JSON.stringify(auditoria.rows)).not.toContain(primeira.cpf);
+        expect(JSON.stringify(auditoria.rows)).not.toContain('1.000001-2');
+        process.stdout.write(
+          `Busca sintética HTTPS, máximos em ms: nome=${duracoes.nome.toFixed(1)}, CPF=${duracoes.cpf.toFixed(1)}, ` +
+          `matrícula=${duracoes.matricula.toFixed(1)}, página ampla=${duracoes.pagina.toFixed(1)}.\n`,
+        );
+      } finally {
+        await encerrar();
+      }
+    } finally {
+      await cliente.end();
     }
   });
 

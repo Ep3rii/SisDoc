@@ -1,6 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
+import { VERSAO_CONSULTA } from './migracoes/consulta';
 
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
@@ -16,7 +17,8 @@ async function iniciar(): Promise<void> {
   let migracaoAtual: boolean;
   try {
     const resultado = await banco.query<{ atual: boolean }>(
-      "SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = '002-autenticacao') AS atual",
+      'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
+      [VERSAO_CONSULTA],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {
@@ -31,7 +33,7 @@ async function iniciar(): Promise<void> {
   }
   if (!migracaoAtual) {
     await banco.end();
-    throw new Error('O banco não possui a migração de autenticação; atualizações existentes ainda exigem procedimento seguro.');
+    throw new Error('O banco não possui a migração de consulta; atualizações existentes ainda exigem procedimento seguro.');
   }
   let app;
   try {

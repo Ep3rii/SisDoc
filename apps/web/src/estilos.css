@@ -26,6 +26,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px s
 .conteudo { max-width: 76rem; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
 .etiqueta { color: #075768; font-weight: 700; }
 .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; align-items: start; }
+.grade-busca { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 2fr); gap: 0 1rem; }
+.grade-busca p, .grade-busca button { grid-column: 1 / -1; }
+.grade-busca button { justify-self: start; }
 .painel { padding: 1.5rem; background: #fff; border: 1px solid #b8cbd5; border-radius: .5rem; }
 .login { max-width: 32rem; margin-top: 1.5rem; }
 .painel h2, .painel h3, .painel h4 { margin-top: 0; }
@@ -51,6 +54,7 @@ button.cabecalho-botao { color: #fff; background: transparent; border-color: #ff
 .erro { color: #7d1717; background: #fff0ef; border-color: #a52a2a; }
 .sucesso { color: #14532d; background: #eaf7ed; border-color: #18753a; }
 .tabela { overflow-x: auto; background: #fff; }
+.tabela button { position: relative; }
 table { width: 100%; border-collapse: collapse; text-align: left; }
 th, td { padding: .7rem; border: 1px solid #b8cbd5; vertical-align: top; }
 th { background: #e7eef2; }
@@ -62,4 +66,5 @@ th { background: #e7eef2; }
   .cabecalho span { display: block; }
   .conteudo { padding: 1rem; }
   .painel { padding: 1rem; }
+  .grade-busca { grid-template-columns: 1fr; }
 }

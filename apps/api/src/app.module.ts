@@ -8,6 +8,8 @@ import { AutenticacaoController } from './seguranca/autenticacao.controller';
 import { GuardaAcesso, Publica } from './seguranca/guarda';
 import { UsuariosService } from './seguranca/usuarios';
 import { UsuariosController } from './seguranca/usuarios.controller';
+import { ServidoresController } from './servidores/servidores.controller';
+import { ServidoresService } from './servidores/servidores';
 
 export interface BancoSaude {
   query(sql: string): Promise<unknown>;
@@ -35,7 +37,7 @@ export class AppModule {
   static registrar(banco: Pool, configuracao: Configuracao): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, AutenticacaoController, UsuariosController],
+      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController],
       providers: [
         { provide: BANCO, useValue: banco },
         { provide: CONFIGURACAO, useValue: configuracao },
@@ -48,6 +50,11 @@ export class AppModule {
           provide: UsuariosService,
           useFactory: (pool: Pool, autenticacao: AutenticacaoService) => new UsuariosService(pool, autenticacao),
           inject: [BANCO, AutenticacaoService],
+        },
+        {
+          provide: ServidoresService,
+          useFactory: (pool: Pool, config: Configuracao) => new ServidoresService(pool, config),
+          inject: [BANCO, CONFIGURACAO],
         },
         { provide: APP_GUARD, useClass: GuardaAcesso },
         { provide: 'ENCERRAR_BANCO', useValue: { onApplicationShutdown: () => banco.end() } },

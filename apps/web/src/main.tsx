@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { RespostaSessao } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { Auditoria } from './auditoria';
+import { Servidores } from './servidores';
 import { nomesPerfis, Usuarios } from './usuarios';
 import './estilos.css';
 
@@ -77,7 +78,7 @@ function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria'>('usuarios');
+  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca'>('busca');
   const tratarErro = useCallback((problema: unknown) => {
     setMensagem('');
     if (problema instanceof ErroApi && problema.status === 401) {
@@ -89,7 +90,10 @@ function App() {
   useEffect(() => {
     let ativa = true;
     api.sessao().then((resultado) => {
-      if (ativa) setSessao(resultado);
+      if (ativa) {
+        setSessao(resultado);
+        setTela(resultado.usuario.papel === 'admin' ? 'usuarios' : 'busca');
+      }
     }).catch((problema: unknown) => {
       if (ativa && (!(problema instanceof ErroApi) || problema.status !== 401)) tratarErro(problema);
     }).finally(() => {
@@ -113,7 +117,7 @@ function App() {
     setSessao(resultado);
     setErro('');
     setMensagem('');
-    setTela('usuarios');
+    setTela(resultado.usuario.papel === 'admin' ? 'usuarios' : 'busca');
   };
   const encerrarLocal = (texto: string) => {
     setSessao(null);
@@ -124,6 +128,11 @@ function App() {
     setErro('');
     setMensagem(texto);
   };
+  const limparMensagens = () => {
+    setErro('');
+    setMensagem('');
+  };
+  const funcional = sessao && sessao.usuario.papel !== 'admin';
 
   return (
     <main className="pagina">
@@ -134,7 +143,7 @@ function App() {
       <div className="conteudo">
         <p className="etiqueta">Sistema em construção — não autorizado para uso operacional</p>
         <h1>DOF e DTC</h1>
-        <p>Consulta funcional, cálculo pela interface e emissão de documentos ainda não estão disponíveis.</p>
+        <p>O cálculo pela interface e a emissão de documentos ainda não estão disponíveis.</p>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
@@ -144,16 +153,18 @@ function App() {
         ) : (
           <>
             <p>Conectado como <strong>{sessao.usuario.nome}</strong> — {nomesPerfis[sessao.usuario.papel]}.</p>
-            {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && (
-              <nav className="acoes" aria-label="Administração">
-                {sessao.usuario.papel === 'admin' && <button type="button" className="secundario" onClick={() => setTela('usuarios')}>Usuários</button>}
+            <nav className="acoes" aria-label="Navegação">
+              {funcional && <button type="button" className="secundario" onClick={() => setTela('busca')}>Buscar servidores</button>}
+              {sessao.usuario.papel === 'admin' && <button type="button" className="secundario" onClick={() => setTela('usuarios')}>Usuários</button>}
+              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && (
                 <button type="button" className="secundario" onClick={() => setTela('auditoria')}>Auditoria</button>
-              </nav>
-            )}
+              )}
+            </nav>
+            {funcional && tela === 'busca' && <Servidores onErro={tratarErro} onLimpar={limparMensagens} />}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
               <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />
             )}
-            {(sessao.usuario.papel === 'secretario_adjunto' || (sessao.usuario.papel === 'admin' && tela === 'auditoria')) && (
+            {((sessao.usuario.papel === 'secretario_adjunto' || sessao.usuario.papel === 'admin') && tela === 'auditoria') && (
               <Auditoria onErro={tratarErro} />
             )}
           </>
