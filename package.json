@@ -1,0 +1,29 @@
+{
+  "name": "sisdoc",
+  "private": true,
+  "version": "0.0.0",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @sisdoc/contratos && npm run build --workspace @sisdoc/web && npm run build --workspace @sisdoc/api",
+    "typecheck": "npm run build --workspace @sisdoc/contratos && npm run typecheck --workspace @sisdoc/web && npm run build --workspace @sisdoc/api && tsc -p tsconfig.tests.json --noEmit",
+    "setup": "npm run build && node apps/api/dist/setup/cli.js",
+    "start": "node apps/api/dist/main.js",
+    "test": "npm run build && node scripts/executar-testes.cjs"
+  },
+  "devDependencies": {
+    "@lydell/node-pty": "1.2.0-beta.18",
+    "@types/node": "24.10.0",
+    "@types/node-forge": "1.3.14",
+    "@types/pg": "8.23.1",
+    "embedded-postgres": "16.15.0-beta.19",
+    "node-forge": "1.4.2",
+    "typescript": "5.9.3",
+    "vitest": "5.0.5"
+  }
+}
