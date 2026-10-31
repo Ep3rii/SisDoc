@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia, encaminhamento e conferência provisórios; emissão, snapshot, PDF e histórico ainda não implementados |
+| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia, encaminhamento e conferência provisórios; renderização experimental de PDF em testes; sem emissão, snapshot persistido, download ou histórico |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -275,6 +275,20 @@ local no limite dos blocos chegou a 87,9 ms, ou 163,1 ms com delimitadores
 malformados. O bundle principal continua acima de 500 kB. A implementação e
 seus limites estão na [decisão 017](decisoes/017-conferencia-provisoria-dof.md).
 
+Foi preparado um renderizador experimental de PDF provisório, ainda sem rota,
+botão, armazenamento ou emissão. Os testes leem PDFs inteiramente sintéticos,
+verificam as 12 colunas de cada linha de 45 anos, cabeçalhos repetidos,
+paginação, margens e os limites de 200 blocos e 20.000 caracteres; cobrem
+isolamento e falhas do navegador. Em 20 renderizações aquecidas em memória,
+a mediana foi 278,0 ms, o p95 291,9 ms e o máximo 300,5 ms. A medição não
+inclui fila, gravação ou download e não comprova o requisito ponta a ponta.
+Fontes autorizadas, snapshot persistido, número, job, histórico e aprovação
+institucional continuam pendentes; detalhes na
+[decisão 018](decisoes/018-pdf-provisorio-dof.md). A suíte completa passou com
+110 testes em 15 arquivos, e `npm audit` não apontou vulnerabilidades. Na
+execução completa, as 20 renderizações aquecidas em memória tiveram mediana
+de 290,6 ms, p95 de 301,8 ms e máximo de 304,7 ms.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -297,4 +311,5 @@ Divergências e decisões estão em
 [014-dados-fonte-previa-dof.md](decisoes/014-dados-fonte-previa-dof.md) e
 [015-devolucao-rascunho-dof.md](decisoes/015-devolucao-rascunho-dof.md) e
 [016-revisao-fonte-previa-dof.md](decisoes/016-revisao-fonte-previa-dof.md) e
-[017-conferencia-provisoria-dof.md](decisoes/017-conferencia-provisoria-dof.md).
+[017-conferencia-provisoria-dof.md](decisoes/017-conferencia-provisoria-dof.md) e
+[018-pdf-provisorio-dof.md](decisoes/018-pdf-provisorio-dof.md).

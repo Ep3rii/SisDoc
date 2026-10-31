@@ -4204,6 +4204,7 @@ describe('fundação em recursos descartáveis', () => {
         expect(previaConferida.headers['content-security-policy']).toContain('sandbox');
         expect(previaConferida.headers['cache-control']).toContain('no-store');
         expect(previaConferida.corpo).not.toContain(previa.provaFonte);
+        expect(previaConferida.corpo).toContain('A pessoa ou o vínculo mudou após a conferência.');
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: `${rota}/previa-conferida`, cookie: sessao('outro').cookie,
         })).status).toBe(404);

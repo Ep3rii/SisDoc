@@ -194,6 +194,40 @@ export const previaConferidaDofSchema = z.strictObject({
   }
 });
 
+const fontePdfProvisorioDofSchema = dadosFontePreviaDofSchema.omit({
+  documentoId: true, revisao: true, provaFonte: true,
+});
+
+export const dadosPdfProvisorioDofSchema = z.strictObject({
+  classificacao: z.literal('provisorio'),
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  nome: z.string().min(1),
+  matricula: z.string().min(1),
+  resultado: resultadoCalculoDofSchema,
+  blocos: blocosDofSchema,
+  processo: numeroProcessoSchema.nullable(),
+  fonte: fontePdfProvisorioDofSchema,
+  fonteSelecionadaAlterada: z.boolean(),
+}).superRefine((dados, contexto) => {
+  if (dados.nome !== dados.fonte.nome || dados.matricula !== dados.fonte.matricula) {
+    contexto.addIssue({ code: 'custom', message: 'A identidade do PDF provisório é inconsistente.' });
+  }
+  if (dados.resultado.periodo.linhas.length > 9999) {
+    contexto.addIssue({ code: 'custom', message: 'A tabela anual excede o limite técnico.' });
+  }
+});
+
+export function capturarDadosPdfProvisorioDof(entrada: PreviaConferidaDof): DadosPdfProvisorioDof {
+  const previa = previaConferidaDofSchema.parse(entrada);
+  const { documentoId: _documentoId, revisao: _revisao, provaFonte: _provaFonte, ...fonte } = previa.fonte;
+  return dadosPdfProvisorioDofSchema.parse({
+    classificacao: 'provisorio', documentoId: previa.documentoId, revisao: previa.revisao,
+    nome: previa.nome, matricula: previa.matricula, resultado: previa.resultado, blocos: previa.blocos,
+    processo: previa.processo, fonte, fonteSelecionadaAlterada: previa.fonteSelecionadaAlterada,
+  });
+}
+
 const codigoPendenciaConferenciaDofSchema = z.enum([
   'cpf_indisponivel',
   'cpf_invalido',
@@ -297,6 +331,7 @@ export type PaginaConferidosDof = z.infer<typeof paginaConferidosDofSchema>;
 export type PaginaRascunhosDof = z.infer<typeof paginaRascunhosDofSchema>;
 export type DadosFontePreviaDof = z.infer<typeof dadosFontePreviaDofSchema>;
 export type PreviaConferidaDof = z.infer<typeof previaConferidaDofSchema>;
+export type DadosPdfProvisorioDof = z.infer<typeof dadosPdfProvisorioDofSchema>;
 export type ProvaFontePreviaDof = Pick<DadosFontePreviaDof, 'documentoId' | 'revisao' | 'provaFonte'>;
 export type PreconferenciaDof = z.infer<typeof preconferenciaDofSchema>;
 export type RascunhoDof = z.infer<typeof rascunhoDofSchema>;

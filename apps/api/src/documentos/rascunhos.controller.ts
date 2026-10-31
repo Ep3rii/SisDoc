@@ -82,10 +82,11 @@ export class RascunhosController {
   @ExigirAcao('conferir')
   @Get(':id/previa-conferida')
   async previaConferida(@Param('id') id: string, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
-    const { conteudo, fonte } = await this.rascunhos.obterParaPrevia(
+    const { conteudo, fonte, fonteSelecionadaAlterada } = await this.rascunhos.obterParaPrevia(
       exigirSessao(req), ipRequisicao(req), idDocumento(id), 'conferido',
     );
-    responderPrevia(resposta, renderizarPreviaDof({ ...conteudo, fonte }), conteudo.revisao);
+    if (fonteSelecionadaAlterada === null) throw new Error('DOF conferida sem registro correspondente.');
+    responderPrevia(resposta, renderizarPreviaDof({ ...conteudo, fonte, fonteSelecionadaAlterada }), conteudo.revisao);
   }
 
   @ExigirAcao('conferir')

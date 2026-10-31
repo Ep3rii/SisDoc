@@ -59,7 +59,7 @@ concorrência, repetição, imutabilidade, cifra do motivo, auditoria, erro de
 comunicação e prévia. O navegador ainda não foi integrado ao serviço com CA
 operacional confiável e não houve revisão humana.
 
-Emissão, reserva de número, snapshot, PDF e histórico não estão implementados.
+Emissão, reserva de número, snapshot, PDF de emissão e histórico não estão implementados.
 Uma futura emissão deverá revalidar a fonte, todos os dados aplicáveis, as
 aprovações e a autorização; não poderá depender somente desta conferência.
 O gate da fatia 5 permanece não cumprido e a aplicação não está autorizada
