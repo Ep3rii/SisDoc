@@ -1,7 +1,8 @@
 import type { ServerResponse } from 'node:http';
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import {
-  atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema, paginaUuidQuerySchema,
+  atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema,
+  encaminharRascunhoDofSchema, paginaUuidQuerySchema, recolherRascunhoDofSchema,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { z } from 'zod';
@@ -24,6 +25,22 @@ export class RascunhosController {
     const dados = paginaUuidQuerySchema.safeParse(consulta);
     if (!dados.success) throw new BadRequestException('Paginação inválida; o limite máximo é 50.');
     return this.rascunhos.listar(exigirSessao(req), ipRequisicao(req), dados.data.limite, dados.data.cursor);
+  }
+
+  @ExigirAcao('editar_rascunho')
+  @Get('coordenadores')
+  listarCoordenadores(@Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = paginaUuidQuerySchema.safeParse(consulta);
+    if (!dados.success) throw new BadRequestException('Paginação inválida; o limite máximo é 50.');
+    return this.rascunhos.listarCoordenadores(exigirSessao(req), ipRequisicao(req), dados.data.limite, dados.data.cursor);
+  }
+
+  @ExigirAcao('receber_encaminhamento')
+  @Get('encaminhados')
+  listarEncaminhados(@Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = paginaUuidQuerySchema.safeParse(consulta);
+    if (!dados.success) throw new BadRequestException('Paginação inválida; o limite máximo é 50.');
+    return this.rascunhos.listarEncaminhados(exigirSessao(req), ipRequisicao(req), dados.data.limite, dados.data.cursor);
   }
 
   @ExigirAcao('criar_rascunho')
@@ -73,5 +90,21 @@ export class RascunhosController {
     const dados = atualizarProcessoDofSchema.safeParse(corpo);
     if (!dados.success) throw new BadRequestException('Confira a revisão, o número do processo e o motivo da alteração.');
     return this.rascunhos.atualizarProcesso(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
+  }
+
+  @ExigirAcao('editar_rascunho')
+  @Post(':id/encaminhar')
+  encaminhar(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = encaminharRascunhoDofSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira a revisão e o coordenador selecionado.');
+    return this.rascunhos.encaminhar(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
+  }
+
+  @ExigirAcao('editar_rascunho')
+  @Post(':id/recolher')
+  recolher(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = recolherRascunhoDofSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira a revisão e informe o motivo do recolhimento.');
+    return this.rascunhos.recolher(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
   }
 }

@@ -2,6 +2,8 @@ import {
   paginaAuditoriaSchema,
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
+  paginaCoordenadoresDofSchema,
+  paginaEncaminhamentosDofSchema,
   paginaRascunhosDofSchema,
   paginaUsuariosSchema,
   detalheServidorSchema,
@@ -19,9 +21,13 @@ import {
   type PaginaAuditoria,
   type PaginaBuscaServidores,
   type PaginaEventosServidor,
+  type EncaminharRascunhoDof,
+  type PaginaCoordenadoresDof,
+  type PaginaEncaminhamentosDof,
   type PaginaRascunhosDof,
   type PaginaUsuarios,
   type RascunhoDof,
+  type RecolherRascunhoDof,
   type RespostaSessao,
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
@@ -140,6 +146,12 @@ export const api = {
   async listarRascunhosDof(cursor?: string): Promise<PaginaRascunhosDof> {
     return validar(paginaRascunhosDofSchema, await requisitar(`documentos?${parametros(cursor)}`));
   },
+  async listarCoordenadoresDof(cursor?: string): Promise<PaginaCoordenadoresDof> {
+    return validar(paginaCoordenadoresDofSchema, await requisitar(`documentos/coordenadores?${parametros(cursor)}`));
+  },
+  async listarEncaminhadosDof(cursor?: string): Promise<PaginaEncaminhamentosDof> {
+    return validar(paginaEncaminhamentosDofSchema, await requisitar(`documentos/encaminhados?${parametros(cursor)}`));
+  },
   async obterRascunhoDof(id: string): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}`));
   },
@@ -154,6 +166,12 @@ export const api = {
   },
   async atualizarProcessoDof(csrf: string, id: string, dados: AtualizarProcessoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/processo`, 'PATCH', dados, csrf));
+  },
+  async encaminharRascunhoDof(csrf: string, id: string, dados: EncaminharRascunhoDof): Promise<RascunhoDof> {
+    return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/encaminhar`, 'POST', dados, csrf));
+  },
+  async recolherRascunhoDof(csrf: string, id: string, dados: RecolherRascunhoDof): Promise<RascunhoDof> {
+    return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/recolher`, 'POST', dados, csrf));
   },
   async obterPreviaDof(id: string): Promise<number> {
     let resposta: Response;

@@ -14,13 +14,14 @@ type Props = {
   rascunho: RascunhoDof;
   csrf: string;
   bloqueado: boolean;
+  somenteLeitura?: boolean;
   onAtualizar: (rascunho: RascunhoDof) => void;
   onPendente: (valor: boolean) => void;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
 };
 
-export function BlocosDof({ rascunho, csrf, bloqueado, onAtualizar, onPendente, onErro, onLimpar }: Props) {
+export function BlocosDof({ rascunho, csrf, bloqueado, somenteLeitura = false, onAtualizar, onPendente, onErro, onLimpar }: Props) {
   const [blocos, setBlocos] = useState(rascunho.blocos);
   const [tipo, setTipo] = useState<CodigoBlocoDof>('contratacao');
   const [motivo, setMotivo] = useState('');
@@ -114,7 +115,7 @@ export function BlocosDof({ rascunho, csrf, bloqueado, onAtualizar, onPendente, 
       {bloqueado && <p className="aviso erro">Salve ou descarte as alterações do cálculo e do processo antes de editar os blocos.</p>}
       <div className="editor-previa">
         <form onSubmit={salvar}>
-          <fieldset disabled={ocupado || bloqueado}>
+          <fieldset disabled={ocupado || bloqueado || somenteLeitura}>
             <label>Tipo de bloco
               <select value={tipo} onChange={(evento) => {
                 const codigo = codigoBlocoDofSchema.safeParse(evento.target.value);

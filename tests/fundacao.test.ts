@@ -15,6 +15,8 @@ import {
   paginaAuditoriaSchema,
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
+  paginaCoordenadoresDofSchema,
+  paginaEncaminhamentosDofSchema,
   paginaUsuariosSchema,
   paginaRascunhosDofSchema,
   rascunhoDofSchema,
@@ -33,6 +35,7 @@ import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarBlocosDof } from '../apps/api/dist/migracoes/blocos-dof.js';
+import { aplicarEncaminhamentoDof } from '../apps/api/dist/migracoes/encaminhamento-dof.js';
 import { aplicarProcessoDof } from '../apps/api/dist/migracoes/processo-dof.js';
 import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
 import { aplicarRascunhoDof } from '../apps/api/dist/migracoes/rascunho-dof.js';
@@ -677,12 +680,16 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarProcessoDof(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarEncaminhamentoDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarRascunhoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarBlocosDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarProcessoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarEncaminhamentoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -2439,6 +2446,342 @@ describe('fundação em recursos descartáveis', () => {
         }
         expect((await cliente.query('SELECT count(*) FROM documentos.emissao')).rows[0].count)
           .toBe(estadoAntes.rows[0].emissoes);
+      } finally {
+        await encerrar();
+      }
+    } finally {
+      await cliente.end();
+    }
+  });
+
+  it('encaminha DOF somente ao coordenador escolhido e recolhe sem permitir edição concorrente', async () => {
+    const config = await carregarConfiguracao(arquivoConfig);
+    const protetor = new ProtetorDados(config.chaves);
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    const pessoaId = randomUUID();
+    const vinculoId = randomUUID();
+    const cpf = cpfSintetico(900000002);
+    const senha = 'EncaminhamentoFicticio!12345';
+    const hashSenha = await gerarHashSenha(senha);
+    const usuarios = [
+      { chave: 'autor', papel: 'analista' },
+      { chave: 'outro-analista', papel: 'analista' },
+      { chave: 'primeiro-coordenador', papel: 'coordenador' },
+      { chave: 'segundo-coordenador', papel: 'coordenador' },
+      { chave: 'secretario', papel: 'secretario_adjunto' },
+      { chave: 'administrador', papel: 'admin' },
+    ].map((usuario) => ({ ...usuario, id: randomUUID(), matricula: `ENC-${usuario.chave.toUpperCase()}` }));
+    try {
+      await cliente.query(`
+        INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
+        VALUES ($1, $2, $3, 'Pessoa encaminhada fictícia', 'pessoa encaminhada ficticia')
+      `, [pessoaId, protetor.cifrar(Buffer.from(cpf, 'ascii'), {
+        schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'cpf_cifrado',
+      }), protetor.hashCpf(cpf)]);
+      await cliente.query(`
+        INSERT INTO nucleo.vinculo (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem, admissao)
+        VALUES ($1, $2, 'ENC-FICTICIA', 'ENC-FICTICIA', 'fonte-encaminhamento-sintetica', $3, '1980-01-01')
+      `, [vinculoId, pessoaId, randomUUID()]);
+      for (const usuario of usuarios) {
+        await cliente.query(`
+          INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+          VALUES ($1, $2, $3, $4, $5, false)
+        `, [usuario.id, usuario.matricula, `Usuário fictício ${usuario.chave}`, hashSenha, usuario.papel]);
+      }
+      const porChave = (chave: string) => {
+        const usuario = usuarios.find((item) => item.chave === chave);
+        if (!usuario) throw new Error('Usuário sintético ausente.');
+        return usuario;
+      };
+      const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
+      try {
+        const sessoes = new Map<string, { cookie: string; csrf: string }>();
+        for (const usuario of usuarios) {
+          const login = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/auth/login', corpo: { matricula: usuario.matricula, senha },
+          });
+          expect(login.status, login.corpo).toBe(200);
+          const cookie = login.headers['set-cookie']?.[0].split(';')[0];
+          if (!cookie) throw new Error('Cookie sintético de encaminhamento ausente.');
+          sessoes.set(usuario.chave, { cookie, csrf: respostaSessaoSchema.parse(JSON.parse(login.corpo)).csrf });
+        }
+        const sessao = (chave: string) => {
+          const resultado = sessoes.get(chave);
+          if (!resultado) throw new Error('Sessão sintética de encaminhamento ausente.');
+          return resultado;
+        };
+        const autor = sessao('autor');
+        const primeiro = sessao('primeiro-coordenador');
+        const segundo = sessao('segundo-coordenador');
+        const anos = Array.from({ length: 45 }, (_, indice) => ({
+          ano: 1980 + indice, abrangencia: 'intervalo_declarado',
+          faltas: 0, ts: 0, pf: 0, ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
+        }));
+        const calculo = { pessoaId, vinculoId, inicio: '1980-01-01', fim: '2024-12-31', anos, confirmacaoDados: true };
+        const criado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos',
+          corpo: { calculo, admissaoEsperada: '1980-01-01', motivo: 'Lançamentos fictícios' }, ...autor,
+        });
+        expect(criado.status, criado.corpo).toBe(201);
+        const rascunho = rascunhoDofSchema.parse(JSON.parse(criado.corpo));
+        expect(rascunho.encaminhamento).toBeNull();
+        const bloco = { id: randomUUID(), codigo: 'complementares', ativo: true, texto: 'Bloco fictício {{nome}}' };
+        const blocos = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}/blocos`,
+          corpo: { revisao: 1, blocos: [bloco], motivo: 'Bloco fictício' }, ...autor,
+        });
+        expect(blocos.status, blocos.corpo).toBe(200);
+        const processo = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}/processo`,
+          corpo: { revisao: 2, processo: '1234/5678', motivo: 'Processo fictício' }, ...autor,
+        });
+        expect(processo.status, processo.corpo).toBe(200);
+        const rota = `/api/v1/documentos/${rascunho.id}`;
+        const destinatarioId = porChave('primeiro-coordenador').id;
+        const outroCoordenadorId = porChave('segundo-coordenador').id;
+        const pedido = { revisao: 3, destinatarioId };
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/documentos/encaminhados' })).status).toBe(401);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/documentos/encaminhados', cookie: autor.cookie,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/encaminhar`, corpo: pedido, cookie: autor.cookie,
+        })).status).toBe(403);
+        for (const chave of ['secretario', 'administrador']) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: '/api/v1/documentos/coordenadores', cookie: sessao(chave).cookie,
+          })).status).toBe(403);
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/encaminhar`, corpo: pedido, ...sessao(chave),
+          })).status).toBe(403);
+        }
+        const candidatos = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/documentos/coordenadores?limite=50', cookie: autor.cookie,
+        });
+        expect(candidatos.status, candidatos.corpo).toBe(200);
+        const coordenadores = paginaCoordenadoresDofSchema.parse(JSON.parse(candidatos.corpo)).itens;
+        expect(coordenadores.map((item) => item.id)).toEqual(expect.arrayContaining([destinatarioId, outroCoordenadorId]));
+        expect(coordenadores.map((item) => item.id)).not.toContain(porChave('outro-analista').id);
+        for (const invalido of [
+          { ...pedido, destinatarioId: porChave('outro-analista').id },
+          { ...pedido, destinatarioId: porChave('autor').id },
+          { ...pedido, destinatarioId: randomUUID() },
+          { ...pedido, status: 'conferido' },
+        ]) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/encaminhar`, corpo: invalido, ...autor,
+          })).status).toBe(400);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/encaminhar`, corpo: pedido, ...sessao('outro-analista'),
+        })).status).toBe(404);
+        const enviado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/encaminhar`, corpo: pedido, ...autor,
+        });
+        expect(enviado.status, enviado.corpo).toBe(201);
+        expect(rascunhoDofSchema.parse(JSON.parse(enviado.corpo))).toMatchObject({
+          status: 'rascunho', revisao: 4, encaminhamento: { destinatarioId, destinatarioDisponivel: true },
+        });
+        const recebidos = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/documentos/encaminhados', cookie: primeiro.cookie,
+        });
+        expect(paginaEncaminhamentosDofSchema.parse(JSON.parse(recebidos.corpo)).itens.map((item) => item.id)).toContain(rascunho.id);
+        const outrosRecebidos = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/documentos/encaminhados', cookie: segundo.cookie,
+        });
+        expect(paginaEncaminhamentosDofSchema.parse(JSON.parse(outrosRecebidos.corpo)).itens.map((item) => item.id))
+          .not.toContain(rascunho.id);
+        const recebido = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: primeiro.cookie });
+        expect(recebido.status, recebido.corpo).toBe(200);
+        expect(rascunhoDofSchema.parse(JSON.parse(recebido.corpo)).resultado.periodo.linhas).toHaveLength(45);
+        const previa = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: `${rota}/previa`, cookie: primeiro.cookie });
+        expect(previa.status, previa.corpo).toBe(200);
+        expect(previa.headers['x-sisdoc-revisao']).toBe('4');
+        expect(previa.corpo).toContain('Bloco fictício');
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: segundo.cookie })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota, cookie: sessao('outro-analista').cookie,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/recolher`, corpo: { revisao: 4, motivo: 'Tentativa indevida' }, ...primeiro,
+        })).status).toBe(404);
+        for (const alteracao of [
+          { rota, corpo: { revisao: 4, calculo, admissaoEsperada: '1980-01-01', motivo: 'Tentativa' } },
+          { rota: `${rota}/blocos`, corpo: { revisao: 4, blocos: [{ ...bloco, texto: 'Alteração' }], motivo: 'Tentativa' } },
+          { rota: `${rota}/processo`, corpo: { revisao: 4, processo: '4321/8765', motivo: 'Tentativa' } },
+        ]) {
+          expect((await requisitarApi(portaHttps, caPem, { metodo: 'PATCH', ...alteracao, ...autor })).status).toBe(409);
+          expect((await requisitarApi(portaHttps, caPem, { metodo: 'PATCH', ...alteracao, ...primeiro })).status).toBe(404);
+        }
+        const aplicativo = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_aplicativo', password: senhaAplicativo,
+        });
+        await aplicativo.connect();
+        try {
+          await aplicativo.query('BEGIN');
+          await rejeitarSql(aplicativo, 'UPDATE documentos.documento SET entrada_cifrada = $1 WHERE id = $2',
+            [Buffer.from('alteração fictícia'), rascunho.id], '55000');
+          await rejeitarSql(aplicativo, 'UPDATE documentos.documento SET processo_cifrado = $1 WHERE id = $2',
+            [Buffer.from('alteração fictícia'), rascunho.id], '55000');
+          await rejeitarSql(aplicativo, 'UPDATE documentos.documento_periodo SET fim = fim WHERE documento_id = $1',
+            [rascunho.id], '55000');
+          await rejeitarSql(aplicativo, 'UPDATE documentos.documento_bloco SET ativo = false WHERE id = $1',
+            [bloco.id], '55000');
+          await aplicativo.query('ROLLBACK');
+        } finally {
+          await aplicativo.end();
+        }
+        await cliente.query("UPDATE seguranca.usuario SET papel = 'analista' WHERE id = $1", [destinatarioId]);
+        try {
+          expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: primeiro.cookie })).status).toBe(404);
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: '/api/v1/documentos/encaminhados', cookie: primeiro.cookie,
+          })).status).toBe(403);
+          const indisponivel = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: autor.cookie });
+          expect(rascunhoDofSchema.parse(JSON.parse(indisponivel.corpo)).encaminhamento?.destinatarioDisponivel).toBe(false);
+        } finally {
+          await cliente.query("UPDATE seguranca.usuario SET papel = 'coordenador' WHERE id = $1", [destinatarioId]);
+        }
+        const motivo = 'Necessário corrigir dados fictícios';
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/recolher`, corpo: { revisao: 4, motivo: ' ' }, ...autor,
+        })).status).toBe(400);
+        const recolhido = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/recolher`, corpo: { revisao: 4, motivo }, ...autor,
+        });
+        expect(recolhido.status, recolhido.corpo).toBe(201);
+        expect(rascunhoDofSchema.parse(JSON.parse(recolhido.corpo))).toMatchObject({ revisao: 5, encaminhamento: null });
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: primeiro.cookie })).status).toBe(404);
+        const historico = await cliente.query<{ id: string; motivo_cifrado: Buffer }>(`
+          SELECT id, motivo_cifrado FROM documentos.encaminhamento_dof WHERE documento_id = $1
+        `, [rascunho.id]);
+        expect(historico.rows).toHaveLength(1);
+        expect(historico.rows[0].motivo_cifrado.includes(Buffer.from(motivo))).toBe(false);
+        expect(JSON.parse(protetor.decifrar(historico.rows[0].motivo_cifrado, {
+          schema: 'documentos', tabela: 'encaminhamento_dof',
+          registroId: historico.rows[0].id, campo: 'motivo_cifrado',
+        }).toString('utf8'))).toBe(motivo);
+        await cliente.query('BEGIN');
+        try {
+          await rejeitarSql(cliente, 'UPDATE documentos.encaminhamento_dof SET motivo_cifrado = $1 WHERE id = $2',
+            [Buffer.from('alteração fictícia'), historico.rows[0].id], '55000');
+          await rejeitarSql(cliente, 'DELETE FROM documentos.encaminhamento_dof WHERE id = $1',
+            [historico.rows[0].id], '55000');
+          await rejeitarSql(cliente, 'TRUNCATE documentos.encaminhamento_dof', [], '55000');
+        } finally {
+          await cliente.query('ROLLBACK');
+        }
+        const usuarioOcupado = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await usuarioOcupado.connect();
+        try {
+          await usuarioOcupado.query('BEGIN');
+          await usuarioOcupado.query('SELECT id FROM seguranca.usuario WHERE id = $1 FOR UPDATE', [destinatarioId]);
+          const ocupado = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/encaminhar`, corpo: { revisao: 5, destinatarioId }, ...autor,
+          });
+          expect(ocupado.status, ocupado.corpo).toBe(409);
+          expect(ocupado.corpo).toContain('destinatário está em outra operação');
+        } finally {
+          await usuarioOcupado.query('ROLLBACK');
+          await usuarioOcupado.end();
+        }
+        const concorrentes = await Promise.all([destinatarioId, outroCoordenadorId].map((destino) =>
+          requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/encaminhar`, corpo: { revisao: 5, destinatarioId: destino }, ...autor,
+          })));
+        expect(concorrentes.map((resposta) => resposta.status).sort()).toEqual([201, 409]);
+        const vencedor = concorrentes.find((resposta) => resposta.status === 201);
+        if (!vencedor) throw new Error('Encaminhamento concorrente sintético ausente.');
+        const ativo = rascunhoDofSchema.parse(JSON.parse(vencedor.corpo));
+        const destinatarioAtivo = ativo.encaminhamento?.destinatarioId;
+        if (!destinatarioAtivo) throw new Error('Destinatário sintético ausente.');
+        const receptor = destinatarioAtivo === destinatarioId ? primeiro : segundo;
+        const bloqueador = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await bloqueador.connect();
+        let confirmado = false;
+        try {
+          await bloqueador.query('BEGIN');
+          await bloqueador.query('SELECT id FROM documentos.documento WHERE id = $1 FOR UPDATE', [rascunho.id]);
+          const encaminhamentoAtivo = await bloqueador.query<{ id: string }>(`
+            SELECT id FROM documentos.encaminhamento_dof WHERE documento_id = $1 AND recolhido_em IS NULL
+          `, [rascunho.id]);
+          const encaminhamentoId = encaminhamentoAtivo.rows[0].id;
+          await bloqueador.query(`
+            UPDATE documentos.encaminhamento_dof SET recolhido_por = $1, recolhido_em = now(), motivo_cifrado = $2 WHERE id = $3
+          `, [porChave('autor').id, protetor.cifrar(Buffer.from(JSON.stringify('Recolhimento concorrente fictício')), {
+            schema: 'documentos', tabela: 'encaminhamento_dof', registroId: encaminhamentoId, campo: 'motivo_cifrado',
+          }), encaminhamentoId]);
+          await bloqueador.query('UPDATE documentos.documento SET revisao = revisao + 1 WHERE id = $1', [rascunho.id]);
+          let leituraFinalizada = false;
+          const leitura = requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: receptor.cookie });
+          void leitura.then(() => { leituraFinalizada = true; }, () => { leituraFinalizada = true; });
+          await delay(200);
+          expect(leituraFinalizada).toBe(false);
+          await bloqueador.query('COMMIT');
+          confirmado = true;
+          const resposta = await leitura;
+          expect(resposta.status, resposta.corpo).toBe(404);
+        } finally {
+          if (!confirmado) await bloqueador.query('ROLLBACK');
+          await bloqueador.end();
+        }
+        const eventos = await cliente.query<{ acao: string; detalhes: unknown }>(`
+          SELECT acao, detalhes FROM seguranca.auditoria WHERE entidade_id = $1
+        `, [rascunho.id]);
+        expect(eventos.rows.map((evento) => evento.acao)).toEqual(expect.arrayContaining([
+          'rascunho_encaminhado', 'rascunho_recolhido', 'rascunho_aberto', 'previa_dof_aberta',
+        ]));
+        expect(JSON.stringify(eventos.rows)).not.toContain(motivo);
+        expect(JSON.stringify(eventos.rows)).not.toContain(cpf);
+        expect((await cliente.query('SELECT count(*) FROM documentos.emissao WHERE documento_id = $1', [rascunho.id])).rows[0].count).toBe('0');
+
+        const gravador = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_aplicativo', password: senhaAplicativo,
+        });
+        const encaminhador = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await gravador.connect();
+        await encaminhador.connect();
+        let encaminhamentoConfirmado = false;
+        try {
+          await encaminhador.query('BEGIN');
+          await encaminhador.query('SELECT id FROM documentos.documento WHERE id = $1 FOR UPDATE', [rascunho.id]);
+          await encaminhador.query(`
+            INSERT INTO documentos.encaminhamento_dof (id, documento_id, encaminhado_por, destinatario_id)
+            VALUES ($1, $2, $3, $4)
+          `, [randomUUID(), rascunho.id, porChave('autor').id, destinatarioId]);
+          let alteracaoFinalizada = false;
+          const alteracao = gravador.query(`
+            UPDATE documentos.documento_periodo SET fim = '2024-12-30' WHERE documento_id = $1
+          `, [rascunho.id]);
+          void alteracao.then(() => { alteracaoFinalizada = true; }, () => { alteracaoFinalizada = true; });
+          await delay(200);
+          expect(alteracaoFinalizada).toBe(false);
+          await encaminhador.query('COMMIT');
+          encaminhamentoConfirmado = true;
+          await expect(alteracao).rejects.toMatchObject({ code: '55000' });
+          expect((await cliente.query(`
+            SELECT to_char(fim, 'YYYY-MM-DD') AS fim FROM documentos.documento_periodo WHERE documento_id = $1
+          `, [rascunho.id])).rows[0].fim).toBe('2024-12-31');
+        } finally {
+          if (!encaminhamentoConfirmado) await encaminhador.query('ROLLBACK');
+          await gravador.end();
+          await encaminhador.end();
+        }
       } finally {
         await encerrar();
       }

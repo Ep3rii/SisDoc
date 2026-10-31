@@ -7,6 +7,7 @@ const esperado: Record<Acao, Papel[]> = {
   calcular: ['analista', 'coordenador', 'secretario_adjunto'],
   criar_rascunho: ['analista', 'coordenador'],
   editar_rascunho: ['analista', 'coordenador'],
+  receber_encaminhamento: ['coordenador'],
   conferir: ['analista', 'coordenador'],
   emitir: ['coordenador'],
   cancelar_rascunho: ['analista', 'coordenador'],

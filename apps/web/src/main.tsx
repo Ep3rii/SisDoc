@@ -79,7 +79,7 @@ function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos'>('busca');
+  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
   const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
   const pendencias = useRef(false);
@@ -192,6 +192,9 @@ function App() {
             <nav className="acoes" aria-label="Navegação">
               {funcional && <button type="button" className="secundario" onClick={() => navegar('busca')}>Buscar servidores</button>}
               {podeSalvar && <button type="button" className="secundario" onClick={() => navegar('rascunhos')}>Meus rascunhos</button>}
+              {sessao.usuario.papel === 'coordenador' && (
+                <button type="button" className="secundario" onClick={() => navegar('encaminhados')}>Encaminhados a mim</button>
+              )}
               {sessao.usuario.papel === 'admin' && <button type="button" className="secundario" onClick={() => navegar('usuarios')}>Usuários</button>}
               {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && (
                 <button type="button" className="secundario" onClick={() => navegar('auditoria')}>Auditoria</button>
@@ -201,6 +204,10 @@ function App() {
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
+            {sessao.usuario.papel === 'coordenador' && tela === 'encaminhados' && (
+              <RascunhosDof key={chaveTela} csrf={sessao.csrf} recebidos
+                onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
+            )}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
               <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />
             )}

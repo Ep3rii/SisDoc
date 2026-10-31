@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import type { PaginaRascunhosDof, RascunhoDof } from '@sisdoc/contratos';
+import type { PaginaEncaminhamentosDof, PaginaRascunhosDof, RascunhoDof } from '@sisdoc/contratos';
 import { api } from './api';
 import { CalculoDof } from './calculo-dof';
 
 type Props = {
   csrf: string;
+  recebidos?: boolean;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
   confirmarSaida: () => boolean;
 };
 
-export function RascunhosDof({ csrf, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
-  const [pagina, setPagina] = useState<PaginaRascunhosDof | null>(null);
+export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
+  const [pagina, setPagina] = useState<PaginaRascunhosDof | PaginaEncaminhamentosDof | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [rascunho, setRascunho] = useState<RascunhoDof | null>(null);
   const [abrindo, setAbrindo] = useState<string | null>(null);
@@ -29,13 +30,14 @@ export function RascunhosDof({ csrf, onErro, onLimpar, onPendente, confirmarSaid
     let corrente = true;
     setPagina(null);
     setFalhou(false);
-    api.listarRascunhosDof(cursor).then((resultado) => {
+    const consulta = recebidos ? api.listarEncaminhadosDof(cursor) : api.listarRascunhosDof(cursor);
+    consulta.then((resultado) => {
       if (corrente) setPagina(resultado);
     }).catch((erro: unknown) => {
       if (corrente) { setFalhou(true); onErro(erro); }
     });
     return () => { corrente = false; };
-  }, [cursor, versao, onErro]);
+  }, [cursor, versao, onErro, recebidos]);
 
   async function abrir(id: string) {
     try {
@@ -55,7 +57,7 @@ export function RascunhosDof({ csrf, onErro, onLimpar, onPendente, confirmarSaid
       <CalculoDof
         key={rascunho.id} pessoaId={rascunho.pessoaId} vinculoId={rascunho.vinculoId}
         nome={rascunho.nome} matricula={rascunho.matricula} admissao={rascunho.admissao}
-        csrf={csrf} podeSalvar rascunhoInicial={rascunho} onErro={onErro} onLimpar={onLimpar}
+        csrf={csrf} podeSalvar={!recebidos} somenteLeitura={recebidos} rascunhoInicial={rascunho} onErro={onErro} onLimpar={onLimpar}
         onPendente={onPendente} confirmarSaida={confirmarSaida}
         onFechar={() => { setRascunho(null); setVersao((atual) => atual + 1); onLimpar(); }}
       />
@@ -64,8 +66,10 @@ export function RascunhosDof({ csrf, onErro, onLimpar, onPendente, confirmarSaid
 
   return (
     <section aria-labelledby="rascunhos-titulo">
-      <h2 id="rascunhos-titulo">Meus rascunhos de DOF</h2>
-      <p>Somente rascunhos de sua autoria são exibidos. Encaminhamento e conferência ainda não estão disponíveis.</p>
+      <h2 id="rascunhos-titulo">{recebidos ? 'Rascunhos encaminhados a mim' : 'Meus rascunhos de DOF'}</h2>
+      <p>{recebidos
+        ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta. A conferência ainda não está disponível.'
+        : 'Somente rascunhos de sua autoria são exibidos. Você pode encaminhá-los a um coordenador para análise.'}</p>
       {falhou ? (
         <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>
           Tentar carregar rascunhos novamente
@@ -74,16 +78,20 @@ export function RascunhosDof({ csrf, onErro, onLimpar, onPendente, confirmarSaid
         <>
           {pagina.itens.length === 0 ? <p>Nenhum rascunho encontrado.</p> : (
             <div className="tabela"><table>
-              <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Revisão</th><th scope="col">Atualizado</th><th scope="col">Rascunho</th></tr></thead>
-              <tbody>{pagina.itens.map((item) => (
+              <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th>{recebidos && <th scope="col">Autor</th>}<th scope="col">Revisão</th><th scope="col">Atualizado</th><th scope="col">Rascunho</th></tr></thead>
+              <tbody>{pagina.itens.map((item) => {
+                if (recebidos && !('autorNome' in item)) throw new Error('O encaminhamento não identifica o autor.');
+                return (
                 <tr key={item.id}>
-                  <td>{item.nome}</td><td>{item.matricula}</td><td>{item.revisao}</td>
+                  <td>{item.nome}</td><td>{item.matricula}</td>
+                  {recebidos && <td>{'autorNome' in item ? item.autorNome : null}</td>}<td>{item.revisao}</td>
                   <td>{new Date(item.atualizadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
                   <td><button type="button" className="secundario" disabled={Boolean(abrindo)} onClick={() => void abrir(item.id)}>
                     {abrindo === item.id ? 'Abrindo...' : 'Abrir'} <span className="sr-only">rascunho de {item.nome}, matrícula {item.matricula}</span>
                   </button></td>
                 </tr>
-              ))}</tbody>
+                );
+              })}</tbody>
             </table></div>
           )}
           <div className="acoes">

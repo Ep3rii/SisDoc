@@ -67,12 +67,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 006, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 007, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `006-processo-dof` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `007-encaminhamento-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -108,8 +108,9 @@ P/F e sua origem. Datas anteriores à admissão geram aviso de ajuste.
 
 O cálculo usa a regra provisória no servidor; calcular não grava rascunho nem
 emissão. Analista e coordenador podem salvar o resultado como rascunho com
-motivo e reabri-lo em **Meus rascunhos**. Cada perfil vê e edita somente seus
-próprios rascunhos; encaminhamento ainda não existe. Alterar valores exige
+motivo e reabri-lo em **Meus rascunhos**. A edição é restrita ao autor;
+um coordenador pode consultar apenas os rascunhos explicitamente encaminhados a
+ele. Alterar valores exige
 nova confirmação, cálculo e motivo. Antes de excluir anos por alteração do
 período, confira e confirme os anos exibidos; os valores anteriores permanecem
 cifrados no registro de ajustes.
@@ -157,6 +158,24 @@ compartilha a revisão com cálculo e blocos. Para remover um processo incorreto
 marque a confirmação e informe o motivo; a remoção permanece possível mesmo sem
 máscara configurada. O histórico de ajustes preserva os valores cifrados. A
 prévia usa o processo salvo, não o texto ainda em edição.
+
+## Encaminhamento para análise
+
+No rascunho próprio, salve ou descarte as alterações pendentes, escolha um
+coordenador ativo e selecione **Encaminhar rascunho**. O destinatário pode
+consultar o cálculo, os blocos, o processo e a prévia em **Encaminhados a mim**.
+O documento permanece rascunho; conferência e emissão ainda não estão
+disponíveis. Nenhum outro perfil ganha acesso ao rascunho por esse envio.
+
+Enquanto o encaminhamento estiver ativo, as edições ficam bloqueadas também
+para o autor. Para corrigir ou trocar o destinatário, informe um motivo e use
+**Recolher encaminhamento**. Se o destinatário ficar inativo ou deixar de ser
+coordenador, o acesso dele é bloqueado e o autor poderá recolher. Uma cópia já
+exibida antes do recolhimento não pode ser recuperada remotamente.
+
+Em caso de conflito, reabra o rascunho. Se a comunicação falhar, confira o
+estado antes de repetir: envio ou recolhimento podem ter sido concluídos.
+Se o destinatário estiver em outra operação, aguarde e tente novamente.
 
 ## Verificação de software
 

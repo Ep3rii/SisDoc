@@ -4,8 +4,10 @@ import {
   atualizarRascunhoDofSchema,
   atualizarBlocosDofSchema,
   atualizarProcessoDofSchema,
+  encaminharRascunhoDofSchema,
   processoCorrespondeMascara,
   criarRascunhoDofSchema,
+  recolherRascunhoDofSchema,
   resultadoCalculoDofSchema,
   solicitarCalculoDofSchema,
   type RascunhoDof,
@@ -21,6 +23,7 @@ const pessoaId = '11111111-1111-4111-8111-111111111111';
 const vinculoId = '22222222-2222-4222-8222-222222222222';
 const usuarioId = '33333333-3333-4333-8333-333333333333';
 const documentoId = '44444444-4444-4444-8444-444444444444';
+const coordenadorId = '55555555-5555-4555-8555-555555555555';
 const csrf = 'a'.repeat(43);
 const nome = 'Pessoa Ficticia';
 const matricula = 'FICTICIA-1';
@@ -92,7 +95,8 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === '/api/v1/auth/me') {
         return responder(rota, 200, {
           usuario: {
-            id: usuarioId, matricula: 'OPERADOR-FICTICIO', nome: 'Operador Ficticio',
+            id: estado.papel === 'coordenador' ? coordenadorId : usuarioId,
+            matricula: 'OPERADOR-FICTICIO', nome: 'Operador Ficticio',
             papel: estado.papel, trocaSenhaObrigatoria: false,
           },
           csrf,
@@ -129,6 +133,20 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho.startsWith('/api/v1/documentos') && !['analista', 'coordenador'].includes(estado.papel)) {
         return responder(rota, 403, { detail: 'Perfil sem permissão para rascunhos.' });
       }
+      if (caminho === '/api/v1/documentos/coordenadores' && metodo === 'GET') {
+        return responder(rota, 200, {
+          itens: [{ id: coordenadorId, nome: 'Coordenador Ficticio', matricula: 'COORD-FICTICIO' }],
+          proximoCursor: null,
+        });
+      }
+      if (caminho === '/api/v1/documentos/encaminhados' && metodo === 'GET') {
+        if (estado.papel !== 'coordenador') return responder(rota, 403, { detail: 'Perfil sem permissão.' });
+        const encaminhamento = estado.rascunho?.encaminhamento;
+        const itens = estado.rascunho && encaminhamento?.destinatarioId === coordenadorId
+          ? [{ ...resumo(estado.rascunho), autorNome: 'Analista Ficticio', encaminhadoEm: encaminhamento.encaminhadoEm }]
+          : [];
+        return responder(rota, 200, { itens, proximoCursor: null });
+      }
       if (caminho === '/api/v1/documentos' && metodo === 'GET') {
         if (estado.falhaListagem) return responder(rota, 503, { detail: 'Falha sintética de listagem.' });
         const extras = Array.from({ length: estado.extras }, (_, indice) => ({
@@ -155,7 +173,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           id: documentoId, pessoaId, vinculoId, nome, matricula, admissao: estado.admissao,
           revisao: 1, criadoEm: agora, atualizadoEm: agora, status: 'rascunho',
           entrada: dados.calculo, resultado: resultadoSintetico(dados.calculo, estado.admissao),
-          blocos: [], processo: null, mascarasProcesso: ['####/####'],
+          blocos: [], processo: null, mascarasProcesso: ['####/####'], encaminhamento: null,
         };
         estado.escritas += 1;
         return responder(rota, 201, estado.rascunho);
@@ -171,10 +189,42 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           body: renderizarPreviaDof(estado.rascunho),
         });
       }
+      if (caminho === `/api/v1/documentos/${documentoId}/encaminhar` && metodo === 'POST' && estado.rascunho) {
+        if (estado.falhaRede) return rota.abort('failed');
+        const dados = encaminharRascunhoDofSchema.parse(requisicao.postDataJSON());
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao || estado.rascunho.encaminhamento) {
+          return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
+        }
+        if (dados.destinatarioId !== coordenadorId) {
+          return responder(rota, 400, { detail: 'Selecione um coordenador ativo.' });
+        }
+        estado.rascunho = {
+          ...estado.rascunho, revisao: estado.rascunho.revisao + 1, atualizadoEm: new Date().toISOString(),
+          encaminhamento: {
+            destinatarioId: coordenadorId, destinatarioNome: 'Coordenador Ficticio',
+            destinatarioDisponivel: true, encaminhadoEm: new Date().toISOString(),
+          },
+        };
+        estado.escritas += 1;
+        return responder(rota, 201, estado.rascunho);
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/recolher` && metodo === 'POST' && estado.rascunho) {
+        if (estado.falhaRede) return rota.abort('failed');
+        const dados = recolherRascunhoDofSchema.parse(requisicao.postDataJSON());
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao || !estado.rascunho.encaminhamento) {
+          return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
+        }
+        estado.rascunho = {
+          ...estado.rascunho, revisao: estado.rascunho.revisao + 1,
+          atualizadoEm: new Date().toISOString(), encaminhamento: null,
+        };
+        estado.escritas += 1;
+        return responder(rota, 201, estado.rascunho);
+      }
       if (caminho === `/api/v1/documentos/${documentoId}/blocos` && metodo === 'PATCH' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
         const dados = atualizarBlocosDofSchema.parse(requisicao.postDataJSON());
-        if (estado.conflito || dados.revisao !== estado.rascunho.revisao) {
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao || estado.rascunho.encaminhamento) {
           return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
         }
         estado.rascunho = {
@@ -187,7 +237,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === `/api/v1/documentos/${documentoId}/processo` && metodo === 'PATCH' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
         const dados = atualizarProcessoDofSchema.parse(requisicao.postDataJSON());
-        if (estado.conflito || dados.revisao !== estado.rascunho.revisao) {
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao || estado.rascunho.encaminhamento) {
           return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
         }
         const processoNovo = dados.processo;
@@ -205,7 +255,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === `/api/v1/documentos/${documentoId}` && metodo === 'PATCH' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
         const dados = atualizarRascunhoDofSchema.parse(requisicao.postDataJSON());
-        if (estado.conflito || dados.revisao !== estado.rascunho.revisao) {
+        if (estado.conflito || dados.revisao !== estado.rascunho.revisao || estado.rascunho.encaminhamento) {
           return responder(rota, 409, { detail: 'O rascunho foi alterado; reabra-o antes de continuar.' });
         }
         if (!estado.admissao || estado.admissao !== dados.admissaoEsperada) {
@@ -583,6 +633,62 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
     await pagina.getByText('Processo salvo na revisão 5.', { exact: false }).waitFor();
     expect(estado.rascunho?.processo).toBeNull();
+  });
+
+  it('encaminha apenas rascunho salvo, mostra consulta ao destinatário e recolhe com motivo', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados fictícios conferidos');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+
+    await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
+    expect(await pagina.getByRole('button', { name: 'Escolher coordenador' }).isDisabled()).toBe(true);
+    await pagina.getByRole('button', { name: 'Remover bloco novo 1' }).click();
+    await pagina.getByRole('button', { name: 'Escolher coordenador' }).click();
+    await pagina.getByLabel('Coordenador destinatário').selectOption(coordenadorId);
+    estado.falhaRede = true;
+    await pagina.getByRole('button', { name: 'Encaminhar rascunho' }).click();
+    await pagina.getByRole('alert').getByText(/Não foi possível confirmar a operação/).waitFor();
+    expect(estado.rascunho?.encaminhamento).toBeNull();
+    estado.falhaRede = false;
+    await pagina.getByRole('button', { name: 'Encaminhar rascunho' }).click();
+    await pagina.getByText('Rascunho encaminhado na revisão 2.', { exact: false }).waitFor();
+    expect(await pagina.getByLabel('Faltas em 1980').isDisabled()).toBe(true);
+    expect(await pagina.getByLabel('Número do processo').isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Adicionar bloco' }).isDisabled()).toBe(true);
+    expect(estado.rascunho?.encaminhamento?.destinatarioId).toBe(coordenadorId);
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+
+    estado.papel = 'coordenador';
+    await pagina.reload();
+    await pagina.getByRole('button', { name: 'Encaminhados a mim' }).click();
+    await pagina.getByText('Analista Ficticio', { exact: true }).waitFor();
+    await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
+    await pagina.getByText('Rascunho encaminhado — revisão 2.', { exact: false }).waitFor();
+    expect(await pagina.getByLabel('Faltas em 1980').isDisabled()).toBe(true);
+    expect(await pagina.getByLabel('Número do processo').isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Recolher encaminhamento' }).count()).toBe(0);
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+
+    estado.papel = 'analista';
+    await pagina.reload();
+    await abrirRascunho(pagina);
+    await pagina.getByLabel('Motivo do recolhimento').fill('Correção fictícia necessária');
+    expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(1);
+    estado.falhaRede = true;
+    await pagina.getByRole('button', { name: 'Recolher encaminhamento' }).click();
+    await pagina.getByRole('alert').getByText(/Não foi possível confirmar a operação/).waitFor();
+    expect(await pagina.getByLabel('Motivo do recolhimento').inputValue()).toBe('Correção fictícia necessária');
+    estado.falhaRede = false;
+    await pagina.getByRole('button', { name: 'Recolher encaminhamento' }).click();
+    await pagina.getByText('Encaminhamento recolhido na revisão 3.', { exact: false }).waitFor();
+    expect(estado.rascunho?.encaminhamento).toBeNull();
+    expect(await pagina.getByLabel('Faltas em 1980').isEnabled()).toBe(true);
+    expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
   });
 
   it('restringe controles por perfil e apresenta falha de listagem com retentativa e paginação', async () => {

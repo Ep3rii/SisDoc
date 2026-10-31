@@ -48,6 +48,16 @@ export const atualizarProcessoDofSchema = z.strictObject({
   }
 });
 
+export const encaminharRascunhoDofSchema = z.strictObject({
+  revisao: revisaoSchema,
+  destinatarioId: z.uuid(),
+});
+
+export const recolherRascunhoDofSchema = z.strictObject({
+  revisao: revisaoSchema,
+  motivo: motivoSchema,
+});
+
 export const criarRascunhoDofSchema = z.strictObject({
   calculo: solicitarCalculoDofSchema,
   admissaoEsperada: dataFuncionalSchema,
@@ -75,6 +85,19 @@ export const paginaRascunhosDofSchema = z.strictObject({
   proximoCursor: z.uuid().nullable(),
 });
 
+export const paginaCoordenadoresDofSchema = z.strictObject({
+  itens: z.array(z.strictObject({ id: z.uuid(), nome: z.string(), matricula: z.string() })),
+  proximoCursor: z.uuid().nullable(),
+});
+
+export const paginaEncaminhamentosDofSchema = z.strictObject({
+  itens: z.array(resumoRascunhoDofSchema.extend({
+    autorNome: z.string(),
+    encaminhadoEm: z.iso.datetime(),
+  })),
+  proximoCursor: z.uuid().nullable(),
+});
+
 export const rascunhoDofSchema = resumoRascunhoDofSchema.extend({
   status: z.literal('rascunho'),
   admissao: dataFuncionalSchema.nullable(),
@@ -84,6 +107,12 @@ export const rascunhoDofSchema = resumoRascunhoDofSchema.extend({
   blocos: blocosDofSchema,
   processo: numeroProcessoSchema.nullable(),
   mascarasProcesso: z.array(mascaraProcessoSchema).max(10),
+  encaminhamento: z.strictObject({
+    destinatarioId: z.uuid(),
+    destinatarioNome: z.string(),
+    destinatarioDisponivel: z.boolean(),
+    encaminhadoEm: z.iso.datetime(),
+  }).nullable(),
 });
 
 export type AtualizarProcessoDof = z.infer<typeof atualizarProcessoDofSchema>;
@@ -91,5 +120,9 @@ export type BlocoRascunhoDof = z.infer<typeof blocoRascunhoDofSchema>;
 export type AtualizarBlocosDof = z.infer<typeof atualizarBlocosDofSchema>;
 export type CriarRascunhoDof = z.infer<typeof criarRascunhoDofSchema>;
 export type AtualizarRascunhoDof = z.infer<typeof atualizarRascunhoDofSchema>;
+export type EncaminharRascunhoDof = z.infer<typeof encaminharRascunhoDofSchema>;
+export type RecolherRascunhoDof = z.infer<typeof recolherRascunhoDofSchema>;
+export type PaginaCoordenadoresDof = z.infer<typeof paginaCoordenadoresDofSchema>;
+export type PaginaEncaminhamentosDof = z.infer<typeof paginaEncaminhamentosDofSchema>;
 export type PaginaRascunhosDof = z.infer<typeof paginaRascunhosDofSchema>;
 export type RascunhoDof = z.infer<typeof rascunhoDofSchema>;

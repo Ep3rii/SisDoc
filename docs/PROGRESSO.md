@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos e prévia provisória; conferência, emissão e PDF ainda não implementados |
+| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia provisória e encaminhamento para análise; conferência, emissão e PDF ainda não implementados |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -139,6 +139,19 @@ incluem configuração ausente, cifra, remoção, permissões e concorrência em
 infraestrutura descartável e API simulada. Essa preparação não implementa a
 conferência nem autoriza emissão.
 
+O autor agora pode encaminhar um rascunho a um coordenador específico, que o
+consulta sem poder editá-lo. Enquanto encaminhado, o conteúdo fica bloqueado
+até o autor recolhê-lo com motivo cifrado. O envio permanece em `rascunho` e não
+constitui conferência. Os testes direcionados passaram (34 testes em quatro
+arquivos), incluindo revogação, papéis, concorrência, gatilhos, auditoria e
+navegador com API simulada. A migração `007-encaminhamento-dof` é aplicada
+somente em banco novo; não há atualização autorizada de instalações existentes.
+`npm test` passou com 84 testes em 11 arquivos e `npm audit` não apontou
+vulnerabilidades. Nesta execução, a prévia HTTPS descartável de 45 anos levou
+7,7 ms; a atualização local no navegador simulado levou até 84,3 ms no limite
+de blocos. O bundle principal continua acima de 500 kB. Essas medições não
+substituem integração com a CA operacional nem demonstram capacidade de produção.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -153,4 +166,5 @@ Divergências e decisões estão em
 [006-calculo-interativo-dof.md](decisoes/006-calculo-interativo-dof.md) e
 [007-rascunhos-dof.md](decisoes/007-rascunhos-dof.md) e
 [008-blocos-e-previa-dof.md](decisoes/008-blocos-e-previa-dof.md) e
-[009-processo-dof.md](decisoes/009-processo-dof.md).
+[009-processo-dof.md](decisoes/009-processo-dof.md) e
+[010-encaminhamento-dof.md](decisoes/010-encaminhamento-dof.md).

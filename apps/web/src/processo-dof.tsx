@@ -6,13 +6,14 @@ type Props = {
   rascunho: RascunhoDof;
   csrf: string;
   bloqueado: boolean;
+  somenteLeitura?: boolean;
   onAtualizar: (rascunho: RascunhoDof) => void;
   onPendente: (valor: boolean) => void;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
 };
 
-export function ProcessoDof({ rascunho, csrf, bloqueado, onAtualizar, onPendente, onErro, onLimpar }: Props) {
+export function ProcessoDof({ rascunho, csrf, bloqueado, somenteLeitura = false, onAtualizar, onPendente, onErro, onLimpar }: Props) {
   const [processo, setProcesso] = useState(rascunho.processo ?? '');
   const [motivo, setMotivo] = useState('');
   const [remover, setRemover] = useState(false);
@@ -72,10 +73,11 @@ export function ProcessoDof({ rascunho, csrf, bloqueado, onAtualizar, onPendente
       <h4 id="processo-dof-titulo">Processo do rascunho</h4>
       {rascunho.mascarasProcesso.length ? (
         <p>Máscaras configuradas: {rascunho.mascarasProcesso.join(', ')}. # representa um dígito, @ uma letra e * uma letra ou dígito.</p>
-      ) : <p className="aviso erro">Nenhuma máscara de processo está configurada. Solicite a configuração ao administrador; um processo salvo ainda pode ser removido com confirmação e motivo.</p>}
+      ) : <p className="aviso erro">Nenhuma máscara de processo está configurada. Solicite a configuração ao administrador.
+        {!somenteLeitura && ' Um processo salvo ainda pode ser removido com confirmação e motivo.'}</p>}
       {bloqueado && <p className="aviso erro">Salve ou descarte as alterações de cálculo e blocos antes de editar o processo.</p>}
       <form onSubmit={salvar}>
-        <fieldset disabled={ocupado || bloqueado || (rascunho.mascarasProcesso.length === 0 && !rascunho.processo)}>
+        <fieldset disabled={ocupado || bloqueado || somenteLeitura || (rascunho.mascarasProcesso.length === 0 && !rascunho.processo)}>
           <label>Número do processo
             <input value={processo} maxLength={100} required={!remover} disabled={remover || rascunho.mascarasProcesso.length === 0}
               onChange={(evento) => alterar(evento.target.value, motivo)} />

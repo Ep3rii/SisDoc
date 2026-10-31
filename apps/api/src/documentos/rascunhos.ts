@@ -15,8 +15,12 @@ import {
   type CodigoBlocoDof,
   type Configuracao,
   type CriarRascunhoDof,
+  type EncaminharRascunhoDof,
+  type PaginaCoordenadoresDof,
+  type PaginaEncaminhamentosDof,
   type PaginaRascunhosDof,
   type RascunhoDof,
+  type RecolherRascunhoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
 import { DatabaseError, type Pool, type PoolClient } from 'pg';
@@ -34,6 +38,7 @@ type LinhaRascunho = {
   id: string;
   pessoa_id: string;
   vinculo_id: string;
+  criado_por: string;
   nome: string;
   matricula: string;
   admissao: string | null;
@@ -51,6 +56,13 @@ type LinhaRascunho = {
 type Falha = { tipo: 'invalido' | 'conflito' | 'nao_encontrado'; mensagem: string };
 type Tentativa<T> = { valor: T } | { falha: Falha };
 type Mudanca = { campo: string; anterior: unknown; novo: unknown };
+type LinhaEncaminhamento = {
+  id: string;
+  destinatario_id: string;
+  destinatario_nome: string;
+  destinatario_disponivel: boolean;
+  encaminhado_em: Date;
+};
 
 function concluir<T>(tentativa: Tentativa<T>): T {
   if ('valor' in tentativa) return tentativa.valor;
@@ -124,6 +136,17 @@ export class RascunhosService {
     });
   }
 
+  private async encaminhamento(cliente: PoolClient, documentoId: string): Promise<LinhaEncaminhamento | undefined> {
+    const consulta = await cliente.query<LinhaEncaminhamento>(`
+      SELECT e.id, e.destinatario_id, u.nome AS destinatario_nome,
+        (u.ativo AND u.papel = 'coordenador') AS destinatario_disponivel, e.encaminhado_em
+      FROM documentos.encaminhamento_dof e
+      JOIN seguranca.usuario u ON u.id = e.destinatario_id
+      WHERE e.documento_id = $1 AND e.recolhido_em IS NULL
+    `, [documentoId]);
+    return consulta.rows[0];
+  }
+
   private async apresentar(cliente: PoolClient, linha: LinhaRascunho): Promise<RascunhoDof> {
     if (!linha.resultado_calculo_cifrado) throw new Error('Rascunho sem resultado de cálculo protegido.');
     const entrada = solicitarCalculoDofSchema.parse(this.ler('documento', linha.id, 'entrada_cifrada', linha.entrada_cifrada));
@@ -141,6 +164,7 @@ export class RascunhosService {
         || resultado.periodo.fim !== entrada.fim) {
       throw new Error('Período calculado do rascunho é inconsistente.');
     }
+    const encaminhamento = await this.encaminhamento(cliente, linha.id);
     return rascunhoDofSchema.parse({
       id: linha.id,
       pessoaId: linha.pessoa_id,
@@ -158,6 +182,12 @@ export class RascunhosService {
       processo: linha.processo_cifrado
         ? numeroProcessoSchema.parse(this.ler('documento', linha.id, 'processo_cifrado', linha.processo_cifrado)) : null,
       mascarasProcesso: this.mascarasProcesso,
+      encaminhamento: encaminhamento ? {
+        destinatarioId: encaminhamento.destinatario_id,
+        destinatarioNome: encaminhamento.destinatario_nome,
+        destinatarioDisponivel: encaminhamento.destinatario_disponivel,
+        encaminhadoEm: encaminhamento.encaminhado_em.toISOString(),
+      } : null,
     });
   }
 
@@ -166,9 +196,13 @@ export class RascunhosService {
     id: string,
     autorId: string,
     bloquear?: 'leitura' | 'alteracao',
+    permitirEncaminhado = false,
   ): Promise<LinhaRascunho | undefined> {
+    if (permitirEncaminhado && bloquear !== 'leitura') {
+      throw new Error('Acesso a encaminhamento requer bloqueio de leitura do rascunho.');
+    }
     const consulta = await cliente.query<LinhaRascunho>(`
-      SELECT d.id, d.pessoa_id, d.vinculo_id, p.nome, v.matricula,
+      SELECT d.id, d.pessoa_id, d.vinculo_id, d.criado_por, p.nome, v.matricula,
         to_char(v.admissao, 'YYYY-MM-DD') AS admissao, d.revisao, d.criado_em, d.atualizado_em,
         d.entrada_cifrada, d.resultado_calculo_cifrado, d.processo_cifrado,
         r.codigo AS regra_codigo, r.versao AS regra_versao,
@@ -177,10 +211,19 @@ export class RascunhosService {
       JOIN nucleo.pessoa p ON p.id = d.pessoa_id
       JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
       JOIN documentos.regra_versao r ON r.id = d.regra_versao_id
-      WHERE d.id = $1 AND d.criado_por = $2 AND d.tipo = 'DOF' AND d.status = 'rascunho'
+      WHERE d.id = $1 AND (d.criado_por = $2 OR $6::boolean) AND d.tipo = 'DOF' AND d.status = 'rascunho'
       ${bloquear === 'alteracao' ? 'FOR UPDATE OF d' : bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
-    `, [id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA)]);
-    return consulta.rows[0];
+    `, [id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA), permitirEncaminhado]);
+    const linha = consulta.rows[0];
+    if (!linha || linha.criado_por === autorId) return linha;
+    // Revalida após bloquear o documento, para não aceitar um encaminhamento recolhido durante a espera.
+    const acesso = await cliente.query(`
+      SELECT 1 FROM documentos.encaminhamento_dof e
+      JOIN seguranca.usuario u ON u.id = e.destinatario_id
+      WHERE e.documento_id = $1 AND e.destinatario_id = $2 AND e.recolhido_em IS NULL
+        AND u.ativo AND u.papel = 'coordenador'
+    `, [id, autorId]);
+    return acesso.rowCount === 1 ? linha : undefined;
   }
 
   private async registrarAjustes(
@@ -229,12 +272,63 @@ export class RascunhosService {
     });
   }
 
+  async listarCoordenadores(
+    sessao: SessaoAutenticada, ip: string, limite: number, cursor?: string,
+  ): Promise<PaginaCoordenadoresDof> {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
+      const consulta = await cliente.query<{ id: string; nome: string; matricula: string }>(`
+        SELECT id, nome, matricula FROM seguranca.usuario
+        WHERE ativo AND papel = 'coordenador' AND id <> $1
+          AND ($2::uuid IS NULL OR id > $2::uuid)
+        ORDER BY id LIMIT $3
+      `, [sessao.usuario.id, cursor ?? null, limite + 1]);
+      await auditarConsultaFuncional(cliente, sessao, 'coordenadores_listados', 'usuario', null, null, ip);
+      return {
+        itens: consulta.rows.slice(0, limite),
+        proximoCursor: consulta.rows.length > limite ? consulta.rows[limite - 1].id : null,
+      };
+    });
+  }
+
+  async listarEncaminhados(
+    sessao: SessaoAutenticada, ip: string, limite: number, cursor?: string,
+  ): Promise<PaginaEncaminhamentosDof> {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('receber_encaminhamento'));
+      const consulta = await cliente.query<Pick<LinhaRascunho, 'id' | 'pessoa_id' | 'vinculo_id' | 'nome' | 'matricula' | 'revisao' | 'atualizado_em'> & {
+        autor_nome: string; encaminhado_em: Date;
+      }>(`
+        SELECT d.id, d.pessoa_id, d.vinculo_id, p.nome, v.matricula, d.revisao, d.atualizado_em,
+          u.nome AS autor_nome, e.encaminhado_em
+        FROM documentos.encaminhamento_dof e
+        JOIN documentos.documento d ON d.id = e.documento_id
+        JOIN nucleo.pessoa p ON p.id = d.pessoa_id
+        JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
+        JOIN seguranca.usuario u ON u.id = e.encaminhado_por
+        WHERE e.destinatario_id = $1 AND e.recolhido_em IS NULL
+          AND d.tipo = 'DOF' AND d.status = 'rascunho'
+          AND ($2::uuid IS NULL OR d.id > $2::uuid)
+        ORDER BY d.id LIMIT $3
+      `, [sessao.usuario.id, cursor ?? null, limite + 1]);
+      await auditarConsultaFuncional(cliente, sessao, 'encaminhamentos_listados', 'documento', null, null, ip);
+      return {
+        itens: consulta.rows.slice(0, limite).map((linha) => ({
+          id: linha.id, pessoaId: linha.pessoa_id, vinculoId: linha.vinculo_id, nome: linha.nome,
+          matricula: linha.matricula, revisao: linha.revisao, atualizadoEm: linha.atualizado_em.toISOString(),
+          autorNome: linha.autor_nome, encaminhadoEm: linha.encaminhado_em.toISOString(),
+        })),
+        proximoCursor: consulta.rows.length > limite ? consulta.rows[limite - 1].id : null,
+      };
+    });
+  }
+
   private async obterAuditado(
     sessao: SessaoAutenticada, ip: string, id: string, acao: 'rascunho_aberto' | 'previa_dof_aberta',
   ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
-      const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura');
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
       await auditarConsultaFuncional(cliente, sessao, linha ? acao : 'rascunho_nao_encontrado',
         'documento', id, linha?.pessoa_id ?? null, ip);
       if (!linha) return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -310,6 +404,9 @@ export class RascunhosService {
         return { falha: { tipo: 'conflito', mensagem: 'A versão de regra deste rascunho não é a versão disponível para cálculo. Contate o administrador.' } };
       }
       const anterior = await this.apresentar(cliente, linha);
+      if (anterior.encaminhamento) {
+        return { falha: { tipo: 'conflito', mensagem: 'Recolha o encaminhamento antes de editar o rascunho.' } };
+      }
       const entrada = entradaOrdenada(dados.calculo);
       if (entrada.pessoaId !== linha.pessoa_id || entrada.vinculoId !== linha.vinculo_id) {
         return { falha: { tipo: 'invalido', mensagem: 'Pessoa e vínculo do rascunho não podem ser alterados.' } };
@@ -373,6 +470,9 @@ export class RascunhosService {
         return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
       }
       const anterior = await this.apresentar(cliente, linha);
+      if (anterior.encaminhamento) {
+        return { falha: { tipo: 'conflito', mensagem: 'Recolha o encaminhamento antes de editar os blocos.' } };
+      }
       const antigos = new Map(anterior.blocos.map((bloco, indice) => [bloco.id, { ...bloco, ordem: indice + 1 }]));
       const novos = new Map(dados.blocos.map((bloco) => [bloco.id, bloco]));
       if ([...antigos.keys()].some((blocoId) => !novos.has(blocoId))) {
@@ -457,6 +557,10 @@ export class RascunhosService {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
       }
+      const anterior = await this.apresentar(cliente, linha);
+      if (anterior.encaminhamento) {
+        return { falha: { tipo: 'conflito', mensagem: 'Recolha o encaminhamento antes de editar o processo.' } };
+      }
       const processoNovo = dados.processo;
       if (processoNovo !== null && this.mascarasProcesso.length === 0) {
         throw new ServiceUnavailableException('Nenhuma máscara de processo foi configurada. Solicite a configuração ao administrador.');
@@ -465,7 +569,6 @@ export class RascunhosService {
           && !this.mascarasProcesso.some((mascara) => processoCorrespondeMascara(processoNovo, mascara))) {
         return { falha: { tipo: 'invalido', mensagem: 'O número do processo não corresponde às máscaras configuradas.' } };
       }
-      const anterior = await this.apresentar(cliente, linha);
       if (anterior.processo === dados.processo) {
         return { falha: { tipo: 'conflito', mensagem: 'O número de processo não foi alterado.' } };
       }
@@ -480,6 +583,104 @@ export class RascunhosService {
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_processo_editado', 'documento', id, linha.pessoa_id, ip);
       const atualizado = await this.linha(cliente, id, sessao.usuario.id);
       if (!atualizado) throw new Error('Rascunho com processo atualizado não pôde ser recuperado.');
+      return { valor: await this.apresentar(cliente, atualizado) };
+    });
+    return concluir(tentativa);
+  }
+
+  async encaminhar(
+    sessao: SessaoAutenticada, ip: string, id: string, dados: EncaminharRascunhoDof,
+  ): Promise<RascunhoDof> {
+    const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
+      const proprio = await cliente.query(`
+        SELECT 1 FROM documentos.documento
+        WHERE id = $1 AND criado_por = $2 AND tipo = 'DOF' AND status = 'rascunho'
+      `, [id, sessao.usuario.id]);
+      if (proprio.rowCount !== 1) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      if (dados.destinatarioId === sessao.usuario.id) {
+        return { falha: { tipo: 'invalido', mensagem: 'Selecione outro coordenador como destinatário.' } };
+      }
+      await cliente.query('SAVEPOINT destinatario_encaminhamento');
+      let destinatario: { id: string } | undefined;
+      try {
+        const consulta = await cliente.query<{ id: string }>(`
+          SELECT id FROM seguranca.usuario WHERE id = $1 AND ativo AND papel = 'coordenador' FOR UPDATE NOWAIT
+        `, [dados.destinatarioId]);
+        destinatario = consulta.rows[0];
+        await cliente.query('RELEASE SAVEPOINT destinatario_encaminhamento');
+      } catch (erro) {
+        await cliente.query('ROLLBACK TO SAVEPOINT destinatario_encaminhamento');
+        await cliente.query('RELEASE SAVEPOINT destinatario_encaminhamento');
+        if (erro instanceof DatabaseError && erro.code === '55P03') {
+          return { falha: { tipo: 'conflito', mensagem: 'O destinatário está em outra operação. Tente encaminhar novamente.' } };
+        }
+        throw erro;
+      }
+      if (!destinatario) {
+        return { falha: { tipo: 'invalido', mensagem: 'Selecione um coordenador ativo para receber o rascunho.' } };
+      }
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
+      }
+      if (await this.encaminhamento(cliente, id)) {
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho já está encaminhado; recolha-o antes de encaminhar novamente.' } };
+      }
+      await cliente.query(`
+        UPDATE documentos.documento SET atualizado_por = $1, atualizado_em = now(), revisao = revisao + 1 WHERE id = $2
+      `, [sessao.usuario.id, id]);
+      await cliente.query(`
+        INSERT INTO documentos.encaminhamento_dof (id, documento_id, encaminhado_por, destinatario_id)
+        VALUES ($1, $2, $3, $4)
+      `, [randomUUID(), id, sessao.usuario.id, dados.destinatarioId]);
+      await auditarConsultaFuncional(cliente, sessao, 'rascunho_encaminhado', 'documento', id, linha.pessoa_id, ip,
+        { destinatarioId: dados.destinatarioId });
+      const atualizado = await this.linha(cliente, id, sessao.usuario.id);
+      if (!atualizado) throw new Error('Rascunho encaminhado não pôde ser recuperado.');
+      return { valor: await this.apresentar(cliente, atualizado) };
+    });
+    return concluir(tentativa);
+  }
+
+  async recolher(
+    sessao: SessaoAutenticada, ip: string, id: string, dados: RecolherRascunhoDof,
+  ): Promise<RascunhoDof> {
+    const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
+      }
+      const encaminhamento = await this.encaminhamento(cliente, id);
+      if (!encaminhamento) {
+        return { falha: { tipo: 'conflito', mensagem: 'O rascunho não possui encaminhamento ativo.' } };
+      }
+      await cliente.query(`
+        UPDATE documentos.encaminhamento_dof
+        SET recolhido_por = $1, recolhido_em = now(), motivo_cifrado = $2 WHERE id = $3
+      `, [sessao.usuario.id, this.cifrar('encaminhamento_dof', encaminhamento.id, 'motivo_cifrado', dados.motivo),
+        encaminhamento.id]);
+      await cliente.query(`
+        UPDATE documentos.documento SET atualizado_por = $1, atualizado_em = now(), revisao = revisao + 1 WHERE id = $2
+      `, [sessao.usuario.id, id]);
+      await auditarConsultaFuncional(cliente, sessao, 'rascunho_recolhido', 'documento', id, linha.pessoa_id, ip,
+        { destinatarioId: encaminhamento.destinatario_id });
+      const atualizado = await this.linha(cliente, id, sessao.usuario.id);
+      if (!atualizado) throw new Error('Rascunho recolhido não pôde ser recuperado.');
       return { valor: await this.apresentar(cliente, atualizado) };
     });
     return concluir(tentativa);

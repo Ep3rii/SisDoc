@@ -10,6 +10,7 @@ import {
 } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { BlocosDof } from './blocos-dof';
+import { EncaminhamentoDof } from './encaminhamento-dof';
 import { ProcessoDof } from './processo-dof';
 
 type Props = {
@@ -20,6 +21,7 @@ type Props = {
   admissao: string | null;
   csrf: string;
   podeSalvar: boolean;
+  somenteLeitura?: boolean;
   rascunhoInicial?: RascunhoDof;
   onFechar: () => void;
   onErro: (erro: unknown) => void;
@@ -38,7 +40,7 @@ type Tabela = { inicio: string; fim: string; anos: number[] };
 const tamanhoPagina = 20;
 
 export function CalculoDof({
-  pessoaId, vinculoId, nome, matricula, admissao, csrf, podeSalvar, rascunhoInicial,
+  pessoaId, vinculoId, nome, matricula, admissao, csrf, podeSalvar, somenteLeitura = false, rascunhoInicial,
   onFechar, onErro, onLimpar, onPendente, confirmarSaida,
 }: Props) {
   const admissaoAlterada = Boolean(rascunhoInicial && admissao !== rascunhoInicial.resultado.admissaoConsiderada);
@@ -82,7 +84,9 @@ export function CalculoDof({
   const [calculoPendente, setCalculoPendente] = useState(false);
   const [blocosPendentes, setBlocosPendentes] = useState(false);
   const [processoPendente, setProcessoPendente] = useState(false);
-  const pendencias = useRef({ calculo: false, blocos: false, processo: false });
+  const [encaminhamentoPendente, setEncaminhamentoPendente] = useState(false);
+  const [operacaoEncaminhamento, setOperacaoEncaminhamento] = useState(false);
+  const pendencias = useRef({ calculo: false, blocos: false, processo: false, encaminhamento: false });
   const ativa = useRef(true);
   useEffect(() => {
     ativa.current = true;
@@ -92,19 +96,25 @@ export function CalculoDof({
   function marcarCalculo(valor: boolean) {
     pendencias.current.calculo = valor;
     setCalculoPendente(valor);
-    onPendente(valor || pendencias.current.blocos || pendencias.current.processo);
+    onPendente(valor || pendencias.current.blocos || pendencias.current.processo || pendencias.current.encaminhamento);
   }
 
   function marcarBlocos(valor: boolean) {
     pendencias.current.blocos = valor;
     setBlocosPendentes(valor);
-    onPendente(valor || pendencias.current.calculo || pendencias.current.processo);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.processo || pendencias.current.encaminhamento);
   }
 
   function marcarProcesso(valor: boolean) {
     pendencias.current.processo = valor;
     setProcessoPendente(valor);
-    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos || pendencias.current.encaminhamento);
+  }
+
+  function marcarEncaminhamento(valor: boolean) {
+    pendencias.current.encaminhamento = valor;
+    setEncaminhamentoPendente(valor);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos || pendencias.current.processo);
   }
 
   function invalidar() {
@@ -275,21 +285,25 @@ export function CalculoDof({
   const anosExcluidos = rascunho && tabela
     ? rascunho.entrada.anos.filter((ano) => !anosTabela.has(ano.ano)).map((ano) => ano.ano)
     : [];
+  const edicaoIndisponivel = somenteLeitura || Boolean(rascunho?.encaminhamento);
   return (
     <section className="painel separado" aria-labelledby="calculo-dof-titulo">
       <h4 id="calculo-dof-titulo">Cálculo de referência — DOF</h4>
       <p>{rascunho?.nome ?? nome} — matrícula {rascunho?.matricula ?? matricula}. Admissão na fonte: {admissaoAtual ?? 'não informada'}.</p>
-      {rascunho && <p>Rascunho próprio — revisão {rascunho.revisao}. Ainda não conferido nem emitido.</p>}
+      {rascunho && <p>{somenteLeitura ? 'Rascunho encaminhado' : 'Rascunho próprio'} — revisão {rascunho.revisao}. Ainda não conferido nem emitido.</p>}
       {rascunho && admissaoAtual !== rascunho.resultado.admissaoConsiderada && (
         <p className="aviso erro" role="alert">
           A admissão considerada no resultado salvo foi {rascunho.resultado.admissaoConsiderada}, diferente da fonte atual.
-          {admissaoAtual ? ' Prepare a tabela e confira novamente antes de salvar.' : ' A edição está indisponível até a correção na fonte.'}
+          {somenteLeitura
+            ? ' Solicite ao autor o recolhimento e a conferência dos dados.'
+            : admissaoAtual ? ' Prepare a tabela e confira novamente antes de salvar.' : ' A edição está indisponível até a correção na fonte.'}
         </p>
       )}
       <p className="etiqueta">Regra provisória (planilha). O cálculo não grava dados; salvar cria apenas um rascunho, sem conferir ou emitir.</p>
       <p>As ocorrências da fonte não são carregadas automaticamente. Confira os registros e informe os dias de cada intervalo; campos vazios serão tratados como zero somente após sua confirmação.</p>
       <form onSubmit={calcular}>
-        <fieldset disabled={ocupado || blocosPendentes || processoPendente || !admissaoAtual}>
+        <fieldset disabled={ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
+          || operacaoEncaminhamento || edicaoIndisponivel || !admissaoAtual}>
           <div className="grade">
             <label>Início do período<input type="date" value={inicio} required onChange={(evento) => { setInicio(evento.target.value); setTabela(null); invalidar(); }} /></label>
             <label>Fim do período<input type="date" value={fim} required onChange={(evento) => { setFim(evento.target.value); setTabela(null); invalidar(); }} /></label>
@@ -358,7 +372,8 @@ export function CalculoDof({
       )}
       {podeSalvar && resultado && pedidoCalculado && (
         <form className="separado" onSubmit={salvar}>
-          <fieldset disabled={ocupado || blocosPendentes || processoPendente}>
+          <fieldset disabled={ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
+            || operacaoEncaminhamento || edicaoIndisponivel}>
             {anosExcluidos.length > 0 && (
               <>
                 <p className="aviso erro">
@@ -379,19 +394,29 @@ export function CalculoDof({
           </fieldset>
         </form>
       )}
-      {rascunho && podeSalvar && (
-        <ProcessoDof rascunho={rascunho} csrf={csrf} bloqueado={calculoPendente || blocosPendentes || ocupado}
+      {rascunho && (podeSalvar || somenteLeitura) && (
+        <ProcessoDof rascunho={rascunho} csrf={csrf}
+          bloqueado={calculoPendente || blocosPendentes || encaminhamentoPendente || operacaoEncaminhamento || ocupado}
+          somenteLeitura={edicaoIndisponivel}
           onAtualizar={setRascunho} onPendente={marcarProcesso} onErro={onErro} onLimpar={onLimpar} />
       )}
-      {rascunho && podeSalvar && (
-        <BlocosDof rascunho={rascunho} csrf={csrf} bloqueado={calculoPendente || processoPendente || ocupado}
+      {rascunho && (podeSalvar || somenteLeitura) && (
+        <BlocosDof rascunho={rascunho} csrf={csrf}
+          bloqueado={calculoPendente || processoPendente || encaminhamentoPendente || operacaoEncaminhamento || ocupado}
+          somenteLeitura={edicaoIndisponivel}
           onAtualizar={setRascunho} onPendente={marcarBlocos} onErro={onErro} onLimpar={onLimpar} />
+      )}
+      {rascunho && podeSalvar && !somenteLeitura && (
+        <EncaminhamentoDof rascunho={rascunho} csrf={csrf}
+          bloqueado={calculoPendente || blocosPendentes || processoPendente || ocupado}
+          onAtualizar={setRascunho} onPendente={marcarEncaminhamento} onOcupado={setOperacaoEncaminhamento}
+          onErro={onErro} onLimpar={onLimpar} />
       )}
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       <div className="acoes"><button type="button" className="secundario" disabled={ocupado} onClick={() => {
         if (confirmarSaida()) { onPendente(false); onFechar(); }
       }}>
-        {rascunhoInicial ? 'Voltar aos meus rascunhos' : 'Fechar cálculo'}
+        {somenteLeitura ? 'Voltar aos encaminhados' : rascunhoInicial ? 'Voltar aos meus rascunhos' : 'Fechar cálculo'}
       </button></div>
     </section>
   );
