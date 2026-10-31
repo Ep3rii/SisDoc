@@ -8,7 +8,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 0 — fundação | gate técnico verificado | `npm run setup` e `npm start` em recursos descartáveis; HTTPS com CA e nome verificados; health e página inicial |
 | 1 — dados e contratos | gate técnico verificado | migração no banco vazio e em cópia sintética da fundação; contratos, restrições, privilégios e concorrência testados |
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
-| 3 — autenticação e perfis | parcial | migração e matriz de permissões testadas; login e controle de rotas ainda não implementados |
+| 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 a 9 — fluxos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -36,13 +36,22 @@ passaram: 55 testes no total, incluindo os GT e propriedades com
 `fast-check`. `npm audit` não apontou vulnerabilidades. A busca de GT-08 é
 uma função pura com vínculos sintéticos, não uma consulta operacional.
 
-Na fatia 3, a migração 002 e a matriz de perfis/autoria passaram em recursos
-descartáveis; `npm run typecheck` e `npm test` passaram com 57 testes. Ainda
-não há sessão, CSRF, controle de acesso das rotas ou telas de usuários.
+Na fatia 3, a migração 002, sessões, limites, CSRF, perfis, auditoria e
+administração foram exercitados com PostgreSQL e HTTPS descartáveis. Os
+testes cobrem mensagens de login, bloqueio por matrícula/IP, expiração,
+revogação, concorrência, matriz negativa para as rotas existentes, último
+administrador, falhas de infraestrutura, setup e criação por comando.
+O fluxo da interface foi exercitado no navegador com API simulada em
+1366×768 e 375×812, incluindo troca inicial, criação/edição/redefinição,
+auditoria, saída e foco inicial por teclado. Esse teste não valida o fluxo
+integrado de navegador com CA operacional. `npm run typecheck`, `npm test`
+(64 testes em sete arquivos) e `npm audit` passaram sem vulnerabilidades.
+A revisão humana está pendente. A compilação da interface avisa que o bundle
+principal excede 500 kB; ainda não foi feita aferição de carregamento em rede.
 
-Nenhum banco, serviço, certificado ou dado real foi alterado. A fundação não
-possui autenticação, fluxo de cálculo na interface, emissão ou instalação como
-serviço; não está pronta para uso operacional. Requisitos de certificado,
+Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
+possui consulta funcional, fluxo de cálculo na interface, emissão ou instalação
+como serviço; não está pronta para uso operacional. Requisitos de certificado,
 conta de serviço, proxy, backup e suporte do sistema operacional permanecem
 sem aceite.
 Divergências e decisões estão em

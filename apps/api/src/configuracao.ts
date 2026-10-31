@@ -67,5 +67,20 @@ export async function carregarConfiguracao(arquivo: string | undefined): Promise
       throw new Error('Os arquivos TLS devem usar caminhos absolutos fora do repositório.');
     }
   }
+  if (resultado.data.seguranca) {
+    const lista = resultado.data.seguranca.listaSenhas;
+    if (!path.isAbsolute(lista)) {
+      throw new Error('A lista de senhas deve usar caminho absoluto fora do repositório.');
+    }
+    let listaReal: string;
+    try {
+      listaReal = await caminhoReal(lista);
+    } catch {
+      throw new Error('Não foi possível localizar a lista local de senhas comuns.');
+    }
+    if (estaDentro(listaReal, repositorio)) {
+      throw new Error('A lista de senhas deve ficar fora do repositório.');
+    }
+  }
   return resultado.data;
 }

@@ -5,45 +5,61 @@
   line-height: 1.5;
 }
 
-body {
-  margin: 0;
-}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .6; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #d78300; outline-offset: 2px; }
 
 .cabecalho {
   display: flex;
-  gap: 1rem;
+  justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   padding: 1rem 2rem;
   color: #fff;
   background: #102b46;
 }
-
-.marca {
-  font-weight: 700;
-  font-size: 1.25rem;
-}
-
-.cartao {
-  max-width: 46rem;
-  margin: 3rem auto;
-  padding: 2rem;
+.cabecalho > div { display: flex; align-items: center; gap: 1rem; }
+.marca { font-weight: 700; font-size: 1.25rem; }
+.conteudo { max-width: 76rem; margin: 0 auto; padding: 1.5rem 2rem 3rem; }
+.etiqueta { color: #075768; font-weight: 700; }
+.grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; align-items: start; }
+.painel { padding: 1.5rem; background: #fff; border: 1px solid #b8cbd5; border-radius: .5rem; }
+.login { max-width: 32rem; margin-top: 1.5rem; }
+.painel h2, .painel h3, .painel h4 { margin-top: 0; }
+.painel label { display: block; font-weight: 600; margin-bottom: 1rem; }
+.painel input:not([type="checkbox"]), .painel select {
+  display: block;
+  width: 100%;
+  margin-top: .25rem;
+  padding: .55rem;
+  color: #172b3a;
   background: #fff;
-  border: 1px solid #d5e0e6;
-  border-radius: 0.5rem;
+  border: 1px solid #627988;
+  border-radius: .25rem;
 }
-
-.etiqueta {
-  color: #075768;
-  font-weight: 700;
-}
+button { padding: .55rem .9rem; color: #fff; background: #075768; border: 1px solid #075768; border-radius: .25rem; font-weight: 600; }
+button.secundario { color: #075768; background: #fff; }
+button.cabecalho-botao { color: #fff; background: transparent; border-color: #fff; }
+.acoes { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }
+.separado { border-top: 1px solid #b8cbd5; margin-top: 1.5rem; padding-top: 1.5rem; }
+.marcador { display: flex !important; align-items: center; gap: .5rem; }
+.marcador input { width: 1.1rem; height: 1.1rem; }
+.aviso { padding: .8rem 1rem; border-left: .3rem solid; }
+.erro { color: #7d1717; background: #fff0ef; border-color: #a52a2a; }
+.sucesso { color: #14532d; background: #eaf7ed; border-color: #18753a; }
+.tabela { overflow-x: auto; background: #fff; }
+table { width: 100%; border-collapse: collapse; text-align: left; }
+th, td { padding: .7rem; border: 1px solid #b8cbd5; vertical-align: top; }
+th { background: #e7eef2; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 600px) {
-  .cabecalho {
-    padding: 1rem;
-  }
-
-  .cartao {
-    margin: 1rem;
-    padding: 1.25rem;
-  }
+  .cabecalho { padding: 1rem; }
+  .cabecalho > div { display: block; }
+  .cabecalho span { display: block; }
+  .conteudo { padding: 1rem; }
+  .painel { padding: 1rem; }
 }

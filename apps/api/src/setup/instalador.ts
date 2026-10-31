@@ -1,18 +1,16 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { execFile as execFileCallback } from 'node:child_process';
-import { createReadStream } from 'node:fs';
 import { mkdir, open, readFile, rmdir, unlink } from 'node:fs/promises';
 import https from 'node:https';
 import path from 'node:path';
-import { createInterface } from 'node:readline';
 import { promisify } from 'node:util';
-import { hash, argon2id } from 'argon2';
 import { Client } from 'pg';
 import { z } from 'zod';
 import { configuracaoSchema, type Configuracao } from '@sisdoc/contratos';
 import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
 import { aplicarAutenticacao } from '../migracoes/autenticacao';
 import { aplicarModelo } from '../migracoes/modelo';
+import { ErroPoliticaSenha, gerarHashSenha, verificarSenha } from '../seguranca/senhas';
 
 const execFile = promisify(execFileCallback);
 const identificador = z.string().regex(/^[A-Za-z_][A-Za-z0-9_]*$/).max(63);
@@ -106,30 +104,6 @@ async function validarRaiz(raiz: string, repositorio: string): Promise<string> {
     }
   }
   return destino;
-}
-
-async function verificarSenha(senha: string, arquivo: string): Promise<void> {
-  let quantidade = 0;
-  let encontrada = false;
-  const entrada = createReadStream(arquivo, { encoding: 'utf8' });
-  const linhas = createInterface({ input: entrada, crlfDelay: Infinity });
-  try {
-    await new Promise<void>((resolve, reject) => {
-      entrada.once('error', reject);
-      linhas.on('line', (linha: string) => {
-        if (linha.length === 0) return;
-        quantidade += 1;
-        if (linha === senha) encontrada = true;
-      });
-      linhas.once('close', resolve);
-    });
-  } catch {
-    throw new ErroInstalacao('Não foi possível ler a lista local de senhas comuns.');
-  } finally {
-    linhas.close();
-  }
-  if (quantidade === 0) throw new ErroInstalacao('A lista local de senhas comuns está vazia.');
-  if (encontrada) throw new ErroInstalacao('A senha do administrador consta da lista local de senhas comuns.');
 }
 
 async function verificarTls(tls: z.infer<typeof opcoesSchema>['tls']): Promise<void> {
@@ -341,14 +315,14 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     nome: opcoes.tls.nome,
   };
   const listaSenhas = await caminhoExternoExistente(opcoes.listaSenhas, repositorio);
-  await verificarSenha(opcoes.administrador.senha, listaSenhas);
+  try {
+    await verificarSenha(opcoes.administrador.senha, listaSenhas);
+  } catch (erro) {
+    if (erro instanceof ErroPoliticaSenha) throw new ErroInstalacao(erro.message);
+    throw erro;
+  }
   await verificarTls(tls);
-  const senhaHash = await hash(opcoes.administrador.senha, {
-    type: argon2id,
-    memoryCost: 19456,
-    timeCost: 2,
-    parallelism: 1,
-  });
+  const senhaHash = await gerarHashSenha(opcoes.administrador.senha);
   await conectarAplicativo(opcoes);
 
   const cliente = new Client({
@@ -429,6 +403,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
       },
       tls,
       chaves: { cifra: randomBytes(32).toString('base64'), hmac: randomBytes(32).toString('base64') },
+      seguranca: { listaSenhas },
     });
     const arquivo = path.join(raiz, 'config', 'aplicacao.json');
     const handle = await open(arquivo, 'wx', 0o600);

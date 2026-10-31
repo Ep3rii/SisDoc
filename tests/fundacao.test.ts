@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from 'node:child_process';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import type { IncomingHttpHeaders } from 'node:http';
@@ -10,12 +10,15 @@ import path from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import * as pty from '@lydell/node-pty';
+import { paginaAuditoriaSchema, paginaUsuariosSchema, respostaSessaoSchema, usuarioAdministrativoSchema } from '@sisdoc/contratos';
 import { verify } from 'argon2';
 import EmbeddedPostgres from 'embedded-postgres';
 import forge from 'node-forge';
-import { Client } from 'pg';
+import { Client, Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { HealthController } from '../apps/api/dist/app.module.js';
+import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
@@ -27,6 +30,7 @@ import { cpfSintetico } from './dados-sinteticos.js';
 const senhaMigrador = 'MigracaoFicticia!12345';
 const senhaAplicativo = 'AplicativoFicticio!12345';
 const senhaAdmin = 'AdministradorFicticio!12345';
+const senhaAdminNova = 'NovaSenhaFicticia!12345';
 const senhaComum = 'SenhaComumFicticia!12345';
 const nomeTls = 'sisdoc.local';
 const execFile = promisify(execFileCallback);
@@ -131,25 +135,30 @@ function ambiente(): Record<string, string> {
 
 type Pergunta = { texto: string; resposta: string };
 
-async function executarSetup(perguntas: Pergunta[]): Promise<string> {
-  const terminal = pty.spawn(process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe', ['/d', '/s', '/c', 'npm run setup'], {
+async function executarInterativo(
+  comando: string,
+  perguntas: Pergunta[],
+  variaveis: Record<string, string> = {},
+  segredos: string[] = [senhaMigrador, senhaAplicativo, senhaAdmin],
+): Promise<string> {
+  const terminal = pty.spawn(process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe', ['/d', '/s', '/c', comando], {
     name: 'xterm-color',
     cols: 240,
     rows: 50,
     cwd: process.cwd(),
-    env: ambiente(),
+    env: { ...ambiente(), ...variaveis },
   });
   return new Promise<string>((resolve, reject) => {
     let texto = '';
     let pendente = '';
     let proxima = 0;
-    const sanitizar = () => [senhaMigrador, senhaAplicativo, senhaAdmin].reduce(
+    const sanitizar = () => segredos.reduce(
       (valor, senha) => valor.replaceAll(senha, '[segredo fictício]'), texto,
     );
     const prazo = setTimeout(() => {
       terminal.kill();
-      reject(new Error(`O setup interativo excedeu o tempo na pergunta ${proxima + 1}: ${sanitizar().slice(-3000)}`));
-    }, 20000);
+      reject(new Error(`O comando interativo excedeu o tempo na pergunta ${proxima + 1}: ${sanitizar().slice(-3000)}`));
+    }, 30000);
     terminal.onData((dados) => {
       texto += dados;
       pendente += dados;
@@ -165,7 +174,7 @@ async function executarSetup(perguntas: Pergunta[]): Promise<string> {
     terminal.onExit(({ exitCode }) => {
       clearTimeout(prazo);
       if (exitCode !== 0 || proxima !== perguntas.length) {
-        reject(new Error(`Setup interativo falhou (${exitCode}, pergunta ${proxima + 1}): ${sanitizar().slice(-3000)}`));
+        reject(new Error(`Comando interativo falhou (${exitCode}, pergunta ${proxima + 1}): ${sanitizar().slice(-3000)}`));
       } else {
         resolve(texto);
       }
@@ -197,6 +206,42 @@ async function requisitar(porta: number, ca: string, nome = nomeTls, rota = '/ap
   });
 }
 
+async function requisitarApi(
+  porta: number,
+  ca: string,
+  opcoes: { metodo: 'GET' | 'POST' | 'PATCH'; rota: string; corpo?: unknown; cookie?: string; csrf?: string; origem?: string },
+): Promise<{ status: number | undefined; corpo: string; headers: IncomingHttpHeaders }> {
+  const conteudo = opcoes.corpo === undefined ? undefined : JSON.stringify(opcoes.corpo);
+  return new Promise((resolve, reject) => {
+    const pedido = https.request({
+      host: '127.0.0.1',
+      port: porta,
+      servername: nomeTls,
+      path: opcoes.rota,
+      method: opcoes.metodo,
+      ca,
+      rejectUnauthorized: true,
+      agent: false,
+      timeout: 5000,
+      headers: {
+        Origin: opcoes.origem ?? `https://${nomeTls}:${porta}`,
+        ...(conteudo === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...(opcoes.cookie ? { Cookie: opcoes.cookie } : {}),
+        ...(opcoes.csrf ? { 'X-CSRF-Token': opcoes.csrf } : {}),
+      },
+    }, (resposta) => {
+      let corpo = '';
+      resposta.setEncoding('utf8');
+      resposta.on('data', (parte: string) => { corpo += parte; });
+      resposta.on('end', () => resolve({ status: resposta.statusCode, corpo, headers: resposta.headers }));
+      resposta.on('error', reject);
+    });
+    pedido.once('timeout', () => pedido.destroy(new Error('Tempo HTTPS esgotado.')));
+    pedido.once('error', reject);
+    pedido.end(conteudo);
+  });
+}
+
 async function aguardarResposta(porta: number, ca: string): Promise<void> {
   const limite = Date.now() + 30000;
   while (Date.now() < limite) {
@@ -207,6 +252,34 @@ async function aguardarResposta(porta: number, ca: string): Promise<void> {
     }
   }
   throw new Error('O serviço HTTPS não ficou disponível no prazo.');
+}
+
+async function iniciarServico(porta: number, ca: string, arquivoConfig: string): Promise<() => Promise<void>> {
+  const terminal = pty.spawn(process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe', ['/d', '/s', '/c', 'npm start'], {
+    name: 'xterm-color', cols: 200, rows: 40, cwd: process.cwd(),
+    env: { ...ambiente(), SISDOC_CONFIG: arquivoConfig },
+  });
+  let saiu = false;
+  const termino = new Promise<number>((resolve) => terminal.onExit(({ exitCode }) => {
+    saiu = true;
+    resolve(exitCode);
+  }));
+  const encerrar = async () => {
+    if (!saiu) {
+      terminal.write('\u0003');
+      await Promise.race([termino, delay(3000)]);
+      if (!saiu) terminal.kill();
+      await Promise.race([termino, delay(3000)]);
+    }
+    if (!saiu) throw new Error('O serviço temporário não foi encerrado.');
+  };
+  try {
+    await aguardarResposta(porta, ca);
+  } catch (erro) {
+    await encerrar();
+    throw erro;
+  }
+  return encerrar;
 }
 
 async function rejeitarSql(cliente: Client, sql: string, valores: unknown[], codigo: string): Promise<void> {
@@ -420,7 +493,7 @@ describe('fundação em recursos descartáveis', () => {
       { texto: 'Confirme a senha inicial: ', resposta: senhaAdmin },
       { texto: 'Digite CRIAR para confirmar a inicialização do banco vazio e da nova raiz: ', resposta: 'CRIAR' },
     ];
-    const saida = await executarSetup(perguntas);
+    const saida = await executarInterativo('npm run setup', perguntas);
     expect(saida).not.toContain(senhaMigrador);
     expect(saida).not.toContain(senhaAplicativo);
     expect(saida).not.toContain(senhaAdmin);
@@ -450,6 +523,54 @@ describe('fundação em recursos descartáveis', () => {
     );
     expect(privilegios.rows[0]).toEqual({ pode_apagar: false, superusuario: false });
     await cliente.end();
+  });
+
+  it('reverte erros e descarta a conexão quando o commit não pode ser confirmado', async () => {
+    const pool = new Pool({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    try {
+      let pidRollback = 0;
+      await expect(transacao(pool, async (cliente) => {
+        pidRollback = (await cliente.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        await cliente.query('CREATE TEMP TABLE verificacao_rollback (id integer)');
+        throw new Error('Falha sintética antes do commit.');
+      })).rejects.toThrow('Falha sintética antes do commit.');
+      const depoisRollback = await pool.query<{ pid: number; tabela: string | null }>(
+        "SELECT pg_backend_pid() AS pid, to_regclass('pg_temp.verificacao_rollback')::text AS tabela",
+      );
+      expect(depoisRollback.rows[0]).toEqual({ pid: pidRollback, tabela: null });
+      let pidCommit = 0;
+      await expect(transacao(pool, async (cliente) => {
+        pidCommit = (await cliente.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+        await cliente.query('CREATE TEMP TABLE verificacao_pai (id integer PRIMARY KEY)');
+        await cliente.query(`
+          CREATE TEMP TABLE verificacao_filho (
+            pai integer REFERENCES verificacao_pai(id) DEFERRABLE INITIALLY DEFERRED
+          )
+        `);
+        await cliente.query('INSERT INTO verificacao_filho (pai) VALUES (1)');
+      })).rejects.toThrow('Não foi possível confirmar a transação');
+      const depoisCommit = await pool.query<{ pid: number }>('SELECT pg_backend_pid() AS pid');
+      expect(depoisCommit.rows[0].pid).not.toBe(pidCommit);
+    } finally {
+      await pool.end();
+    }
+  });
+
+  it('recusa inicialização quando falta o histórico de migrações', async () => {
+    const config = await carregarConfiguracao(arquivoConfig);
+    config.banco.nome = 'sisdoc_ocupado';
+    const arquivoIncompleto = path.join(temporario, 'configuracao-sem-migracao.json');
+    await writeFile(arquivoIncompleto, JSON.stringify(config), 'utf8');
+    await expect(execFile(process.execPath, [path.join(process.cwd(), 'apps', 'api', 'dist', 'main.js')], {
+      env: { ...ambiente(), SISDOC_CONFIG: arquivoIncompleto },
+      timeout: 10000,
+      windowsHide: true,
+    })).rejects.toMatchObject({
+      stderr: expect.stringContaining('não possui o histórico de migrações necessário'),
+    });
   });
 
   it('aplica a migração versão 001 de forma transacional e idempotente sobre a fundação', async () => {
@@ -927,17 +1048,8 @@ describe('fundação em recursos descartáveis', () => {
   });
 
   it('inicia npm start em HTTPS verificado, com health e página inicial', async () => {
-    const terminal = pty.spawn(process.env.ComSpec ?? 'C:\\Windows\\System32\\cmd.exe', ['/d', '/s', '/c', 'npm start'], {
-      name: 'xterm-color', cols: 200, rows: 40, cwd: process.cwd(),
-      env: { ...ambiente(), SISDOC_CONFIG: arquivoConfig },
-    });
-    let saiu = false;
-    const termino = new Promise<number>((resolve) => terminal.onExit(({ exitCode }) => {
-      saiu = true;
-      resolve(exitCode);
-    }));
+    const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
     try {
-      await aguardarResposta(portaHttps, caPem);
       const health = await requisitar(portaHttps, caPem);
       expect(health.status).toBe(200);
       expect(JSON.parse(health.corpo)).toEqual({ status: 'ok' });
@@ -950,14 +1062,388 @@ describe('fundação em recursos descartáveis', () => {
       expect((await requisitar(portaHttps, caPem, nomeTls, '/api/v1/servidores')).status).toBe(404);
       await expect(requisitar(portaHttps, caPem, 'outro.local')).rejects.toThrow();
     } finally {
-      if (!saiu) {
-        terminal.write('\u0003');
-        await Promise.race([termino, delay(3000)]);
-        if (!saiu) terminal.kill();
-        await Promise.race([termino, delay(3000)]);
-      }
+      await encerrar();
     }
-    expect(saiu).toBe(true);
+  });
+
+  it('autentica por HTTPS, exige CSRF e revoga a sessão ao trocar a senha ou sair', async () => {
+    const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
+    const formatoSessao = z.object({
+      csrf: z.string(),
+      usuario: z.object({ id: z.uuid(), matricula: z.string(), papel: z.string(), trocaSenhaObrigatoria: z.boolean() }),
+    });
+    try {
+      const semSessao = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/auth/me' });
+      expect(semSessao.status).toBe(401);
+      expect(semSessao.headers['content-type']).toContain('application/problem+json');
+      const origemInvalida = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login', origem: 'https://outro.local',
+        corpo: { matricula: opcoes.administrador.matricula, senha: senhaAdmin },
+      });
+      expect(origemInvalida.status).toBe(403);
+      const inexistente = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login', corpo: { matricula: 'INEXISTENTE-SINTETICA', senha: senhaAdmin },
+      });
+      const incorreta = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login',
+        corpo: { matricula: opcoes.administrador.matricula, senha: 'SenhaErradaFicticia!12345' },
+      });
+      expect(inexistente.status).toBe(401);
+      expect(incorreta.status).toBe(401);
+      expect(inexistente.corpo).toBe(incorreta.corpo);
+      const login = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login',
+        corpo: { matricula: opcoes.administrador.matricula, senha: senhaAdmin },
+      });
+      expect(login.status).toBe(200);
+      const dados = formatoSessao.parse(JSON.parse(login.corpo));
+      expect(dados.usuario.trocaSenhaObrigatoria).toBe(true);
+      expect(login.corpo).not.toContain(senhaAdmin);
+      const cookieCompleto = login.headers['set-cookie']?.[0];
+      if (!cookieCompleto) throw new Error('Cookie de sessão ausente.');
+      expect(cookieCompleto).toContain('Path=/; HttpOnly; Secure; SameSite=Lax');
+      expect(cookieCompleto).not.toContain('Domain=');
+      const cookie = cookieCompleto.split(';')[0];
+      const token = cookie.slice(cookie.indexOf('=') + 1);
+      expect(login.corpo).not.toContain(token);
+      const cliente = new Client({
+        host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+        user: 'sisdoc_migrador', password: senhaMigrador,
+      });
+      await cliente.connect();
+      try {
+        const sessao = await cliente.query<{ id_hash: Buffer; duracao: number }>(
+          'SELECT id_hash, extract(epoch FROM expira_em - criada_em)::integer AS duracao FROM seguranca.sessao WHERE usuario_id = $1',
+          [dados.usuario.id],
+        );
+        expect(sessao.rows[0].id_hash).toEqual(createHash('sha256').update(Buffer.from(token, 'base64url')).digest());
+        expect(sessao.rows[0].id_hash).not.toEqual(Buffer.from(token, 'base64url'));
+        expect(sessao.rows[0].duracao).toBe(8 * 60 * 60);
+      } finally {
+        await cliente.end();
+      }
+      const me = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/auth/me', cookie });
+      expect(me.status).toBe(200);
+      expect(formatoSessao.parse(JSON.parse(me.corpo)).csrf).toBe(dados.csrf);
+      expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/admin/usuarios', cookie })).status).toBe(403);
+      const semCsrf = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/trocar-senha', cookie,
+        corpo: { senhaAtual: senhaAdmin, senhaNova: senhaAdminNova },
+      });
+      expect(semCsrf.status).toBe(403);
+      const outraOrigem = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/trocar-senha', cookie, csrf: dados.csrf, origem: 'https://outro.local',
+        corpo: { senhaAtual: senhaAdmin, senhaNova: senhaAdminNova },
+      });
+      expect(outraOrigem.status).toBe(403);
+      const senhaComumResposta = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/trocar-senha', cookie, csrf: dados.csrf,
+        corpo: { senhaAtual: senhaAdmin, senhaNova: senhaComum },
+      });
+      expect(senhaComumResposta.status).toBe(400);
+      expect(senhaComumResposta.corpo).toContain('lista local de senhas comuns');
+      const mesmaSenha = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/trocar-senha', cookie, csrf: dados.csrf,
+        corpo: { senhaAtual: senhaAdmin, senhaNova: senhaAdmin },
+      });
+      expect(mesmaSenha.status).toBe(400);
+      const troca = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/trocar-senha', cookie, csrf: dados.csrf,
+        corpo: { senhaAtual: senhaAdmin, senhaNova: senhaAdminNova },
+      });
+      expect(troca.status).toBe(200);
+      expect(troca.headers['set-cookie']?.[0]).toContain('Max-Age=0');
+      expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/auth/me', cookie })).status).toBe(401);
+      const novoLogin = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login',
+        corpo: { matricula: opcoes.administrador.matricula, senha: senhaAdminNova },
+      });
+      expect(novoLogin.status).toBe(200);
+      const novaSessao = formatoSessao.parse(JSON.parse(novoLogin.corpo));
+      expect(novaSessao.usuario.trocaSenhaObrigatoria).toBe(false);
+      const novoCookie = novoLogin.headers['set-cookie']?.[0].split(';')[0];
+      if (!novoCookie) throw new Error('Novo cookie ausente.');
+      expect(novoCookie).not.toBe(cookie);
+      const rotacao = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login', cookie: novoCookie,
+        corpo: { matricula: opcoes.administrador.matricula, senha: senhaAdminNova },
+      });
+      expect(rotacao.status).toBe(200);
+      const sessaoRotacionada = formatoSessao.parse(JSON.parse(rotacao.corpo));
+      const cookieRotacionado = rotacao.headers['set-cookie']?.[0].split(';')[0];
+      if (!cookieRotacionado) throw new Error('Cookie rotacionado ausente.');
+      expect(cookieRotacionado).not.toBe(novoCookie);
+      expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/auth/me', cookie: novoCookie })).status).toBe(401);
+      expect((await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/logout', cookie: cookieRotacionado, csrf: 'invalido',
+      })).status).toBe(403);
+      const logout = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/logout', cookie: cookieRotacionado, csrf: sessaoRotacionada.csrf,
+      });
+      expect(logout.status).toBe(200);
+      expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/auth/me', cookie: cookieRotacionado })).status).toBe(401);
+    } finally {
+      await encerrar();
+    }
+  });
+
+  it('administra usuários com perfis isolados, auditoria, expiração e proteção do último admin', async () => {
+    const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    const senhaInicial = 'SenhaInicialSintetica!12345';
+    const senhaAlterada = 'SenhaAlteradaSintetica!12345';
+    const senhaRedefinida = 'SenhaRedefinidaSintetica!12345';
+    type SessaoTeste = { cookie: string; csrf: string; usuario: z.infer<typeof respostaSessaoSchema>['usuario'] };
+    const entrar = async (matricula: string, senha: string): Promise<SessaoTeste> => {
+      const resposta = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login', corpo: { matricula, senha },
+      });
+      expect(resposta.status, resposta.corpo).toBe(200);
+      const dados = respostaSessaoSchema.parse(JSON.parse(resposta.corpo));
+      const cookie = resposta.headers['set-cookie']?.[0].split(';')[0];
+      if (!cookie) throw new Error('Cookie de sessão ausente.');
+      return { cookie, ...dados };
+    };
+    const chamada = (sessao: SessaoTeste, metodo: 'GET' | 'POST' | 'PATCH', rota: string, corpo?: unknown) =>
+      requisitarApi(portaHttps, caPem, { metodo, rota, corpo, cookie: sessao.cookie, csrf: sessao.csrf });
+    const criar = async (sessao: SessaoTeste, matricula: string, papel: string) => {
+      const resposta = await chamada(sessao, 'POST', '/api/v1/admin/usuarios', {
+        matricula, nome: `Usuário sintético ${matricula}`, papel, senha: senhaInicial,
+      });
+      expect(resposta.status, resposta.corpo).toBe(201);
+      expect(resposta.corpo).not.toContain(senhaInicial);
+      return usuarioAdministrativoSchema.parse(JSON.parse(resposta.corpo));
+    };
+    const completarTroca = async (matricula: string): Promise<SessaoTeste> => {
+      const primeira = await entrar(matricula, senhaInicial);
+      expect(primeira.usuario.trocaSenhaObrigatoria).toBe(true);
+      const troca = await chamada(primeira, 'POST', '/api/v1/auth/trocar-senha', {
+        senhaAtual: senhaInicial, senhaNova: senhaAlterada,
+      });
+      expect(troca.status, troca.corpo).toBe(200);
+      return entrar(matricula, senhaAlterada);
+    };
+    const hashCookie = (sessao: SessaoTeste) => createHash('sha256')
+      .update(Buffer.from(sessao.cookie.slice(sessao.cookie.indexOf('=') + 1), 'base64url')).digest();
+    try {
+      const admin = await entrar(opcoes.administrador.matricula, senhaAdminNova);
+      expect((await chamada(admin, 'GET', '/api/v1/admin/usuarios?limite=51')).status).toBe(400);
+      expect((await chamada(admin, 'GET', '/api/v1/admin/usuarios?cursor=invalido')).status).toBe(400);
+      expect((await chamada(admin, 'PATCH', `/api/v1/admin/usuarios/${admin.usuario.id}`, { ativo: false })).status).toBe(409);
+      expect((await chamada(admin, 'PATCH', `/api/v1/admin/usuarios/${admin.usuario.id}`, { papel: 'analista' })).status).toBe(409);
+      const analista = await criar(admin, 'ANALISTA-SINTETICO', 'analista');
+      await criar(admin, 'COORDENADOR-SINTETICO', 'coordenador');
+      await criar(admin, 'SECRETARIO-SINTETICO', 'secretario_adjunto');
+      const duplicado = await chamada(admin, 'POST', '/api/v1/admin/usuarios', {
+        matricula: ' analista-sintetico ', nome: 'Outro sintético', papel: 'analista', senha: senhaInicial,
+      });
+      expect(duplicado.status, duplicado.corpo).toBe(409);
+      expect((await chamada(admin, 'POST', '/api/v1/admin/usuarios', {
+        matricula: 'SENHA-COMUM', nome: 'Usuário sintético', papel: 'analista', senha: senhaComum,
+      })).status).toBe(400);
+
+      const ids = new Set<string>();
+      let cursor: string | null = null;
+      do {
+        const consulta: string = `/api/v1/admin/usuarios?limite=2${cursor ? `&cursor=${cursor}` : ''}`;
+        const resposta = await chamada(admin, 'GET', consulta);
+        expect(resposta.status, resposta.corpo).toBe(200);
+        const pagina = paginaUsuariosSchema.parse(JSON.parse(resposta.corpo));
+        expect(pagina.itens.length).toBeLessThanOrEqual(2);
+        for (const usuario of pagina.itens) {
+          expect(ids.has(usuario.id)).toBe(false);
+          ids.add(usuario.id);
+        }
+        cursor = pagina.proximoCursor;
+      } while (cursor);
+      expect(ids.size).toBe(4);
+      expect(ids.has(analista.id)).toBe(true);
+
+      const sessaoAnalista = await completarTroca('ANALISTA-SINTETICO');
+      const sessaoCoordenador = await completarTroca('COORDENADOR-SINTETICO');
+      const sessaoSecretario = await completarTroca('SECRETARIO-SINTETICO');
+      for (const sessao of [sessaoAnalista, sessaoCoordenador, sessaoSecretario]) {
+        expect((await chamada(sessao, 'GET', '/api/v1/admin/usuarios')).status).toBe(403);
+        expect((await chamada(sessao, 'POST', '/api/v1/admin/usuarios', {
+          matricula: 'NEGADO-SINTETICO', nome: 'Usuário sintético', papel: 'admin', senha: senhaInicial,
+        })).status).toBe(403);
+      }
+      for (const sessao of [sessaoAnalista, sessaoCoordenador]) {
+        expect((await chamada(sessao, 'GET', '/api/v1/admin/auditoria')).status).toBe(403);
+      }
+      for (const sessao of [admin, sessaoSecretario]) {
+        const resposta = await chamada(sessao, 'GET', '/api/v1/admin/auditoria?limite=2');
+        expect(resposta.status, resposta.corpo).toBe(200);
+        const pagina = paginaAuditoriaSchema.parse(JSON.parse(resposta.corpo));
+        expect(pagina.itens).toHaveLength(2);
+        expect(pagina.proximoCursor).not.toBeNull();
+        const seguinte = await chamada(sessao, 'GET', `/api/v1/admin/auditoria?limite=2&cursor=${pagina.proximoCursor}`);
+        const proximaPagina = paginaAuditoriaSchema.parse(JSON.parse(seguinte.corpo));
+        expect(proximaPagina.itens.every((evento) => !pagina.itens.some((primeiro) => primeiro.id === evento.id))).toBe(true);
+      }
+      const consultaAuditoria = await chamada(admin, 'GET', '/api/v1/admin/auditoria?limite=50');
+      const registros = paginaAuditoriaSchema.parse(JSON.parse(consultaAuditoria.corpo));
+      expect(registros.itens.some((evento) => evento.acao === 'usuario_criado' && evento.entidadeId === analista.id)).toBe(true);
+      const reset = await chamada(admin, 'POST', `/api/v1/admin/usuarios/${analista.id}/redefinir-senha`, {
+        senha: senhaRedefinida,
+      });
+      expect(reset.status, reset.corpo).toBe(200);
+      expect((await chamada(sessaoAnalista, 'GET', '/api/v1/auth/me')).status).toBe(401);
+      const aposReset = await entrar('ANALISTA-SINTETICO', senhaRedefinida);
+      expect(aposReset.usuario.trocaSenhaObrigatoria).toBe(true);
+      const atualizado = await chamada(admin, 'PATCH', `/api/v1/admin/usuarios/${analista.id}`, {
+        nome: 'Analista sintético atualizado', papel: 'coordenador', email: 'sintetico@example.invalid',
+      });
+      expect(atualizado.status, atualizado.corpo).toBe(200);
+      expect(usuarioAdministrativoSchema.parse(JSON.parse(atualizado.corpo)).papel).toBe('coordenador');
+      expect((await chamada(aposReset, 'GET', '/api/v1/auth/me')).status).toBe(401);
+      const aposAtualizar = await entrar('ANALISTA-SINTETICO', senhaRedefinida);
+      expect(aposAtualizar.usuario.papel).toBe('coordenador');
+      await cliente.query("UPDATE seguranca.sessao SET ultimo_uso = now() - interval '31 minutes' WHERE id_hash = $1", [hashCookie(aposAtualizar)]);
+      expect((await chamada(aposAtualizar, 'GET', '/api/v1/auth/me')).status).toBe(401);
+      const outraSessao = await entrar('ANALISTA-SINTETICO', senhaRedefinida);
+      await cliente.query(`
+        UPDATE seguranca.sessao SET criada_em = now() - interval '9 hours', expira_em = now() - interval '1 minute'
+        WHERE id_hash = $1
+      `, [hashCookie(outraSessao)]);
+      expect((await chamada(outraSessao, 'GET', '/api/v1/auth/me')).status).toBe(401);
+
+      const bloqueado = await criar(admin, 'BLOQUEIO-SINTETICO', 'analista');
+      const falhas = await Promise.all(Array.from({ length: 5 }, () => requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login',
+        corpo: { matricula: 'BLOQUEIO-SINTETICO', senha: 'SenhaErradaFicticia!12345' },
+      })));
+      expect(falhas.every((resposta) => resposta.status === 401)).toBe(true);
+      const estadoBloqueio = await cliente.query<{ tentativas_falhas: number; bloqueado: boolean }>(`
+        SELECT tentativas_falhas, bloqueado_ate > now() AS bloqueado FROM seguranca.usuario WHERE id = $1
+      `, [bloqueado.id]);
+      expect(estadoBloqueio.rows[0]).toEqual({ tentativas_falhas: 5, bloqueado: true });
+      expect((await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login', corpo: { matricula: 'BLOQUEIO-SINTETICO', senha: senhaInicial },
+      })).status).toBe(401);
+      await cliente.query("UPDATE seguranca.usuario SET bloqueado_ate = now() - interval '1 second' WHERE id = $1", [bloqueado.id]);
+      await cliente.query(`
+        UPDATE seguranca.limite_login SET bloqueado_ate = now() - interval '1 second'
+        WHERE escopo = 'matricula' AND bloqueado_ate IS NOT NULL
+      `);
+      expect((await entrar('BLOQUEIO-SINTETICO', senhaInicial)).usuario.id).toBe(bloqueado.id);
+
+      await cliente.query("UPDATE seguranca.limite_login SET falhas = 0, bloqueado_ate = NULL, janela_inicio = now() WHERE escopo = 'ip'");
+      const falhasIp = await Promise.all(Array.from({ length: 20 }, (_, indice) => requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login',
+        corpo: { matricula: `IP-INVALIDO-SINTETICO-${indice}`, senha: senhaInicial },
+      })));
+      expect(falhasIp.every((resposta) => resposta.status === 401)).toBe(true);
+      const estadoIp = await cliente.query<{ falhas: number; bloqueado: boolean }>(
+        "SELECT falhas, bloqueado_ate > now() AS bloqueado FROM seguranca.limite_login WHERE escopo = 'ip'",
+      );
+      expect(estadoIp.rows).toEqual([{ falhas: 20, bloqueado: true }]);
+      expect((await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login',
+        corpo: { matricula: opcoes.administrador.matricula, senha: senhaAdminNova },
+      })).status).toBe(401);
+      await cliente.query("UPDATE seguranca.limite_login SET falhas = 0, bloqueado_ate = NULL, janela_inicio = now() WHERE escopo = 'ip'");
+
+      const saidaCli = await executarInterativo('npm run usuario -- criar', [
+        { texto: 'Matrícula do administrador: ', resposta: opcoes.administrador.matricula },
+        { texto: 'Senha do administrador: ', resposta: senhaAdminNova },
+        { texto: 'Matrícula do novo usuário: ', resposta: 'USUARIO-CLI-SINTETICO' },
+        { texto: 'Nome do novo usuário: ', resposta: 'Usuário de linha de comando sintético' },
+        { texto: 'E-mail do novo usuário (opcional): ', resposta: '' },
+        { texto: 'Perfil (analista, coordenador, secretario_adjunto ou admin): ', resposta: 'analista' },
+        { texto: 'Senha inicial do novo usuário: ', resposta: senhaInicial },
+        { texto: 'Confirme a senha inicial: ', resposta: senhaInicial },
+        { texto: 'Digite CRIAR para confirmar: ', resposta: 'CRIAR' },
+      ], { SISDOC_CONFIG: arquivoConfig }, [senhaAdminNova, senhaInicial]);
+      expect(saidaCli).toContain('Usuário criado.');
+      expect(saidaCli).not.toContain(senhaAdminNova);
+      expect(saidaCli).not.toContain(senhaInicial);
+      const usuarioCli = await cliente.query<{ senha_hash: string; papel: string; troca_senha_obrigatoria: boolean }>(
+        "SELECT senha_hash, papel, troca_senha_obrigatoria FROM seguranca.usuario WHERE matricula = 'USUARIO-CLI-SINTETICO'",
+      );
+      expect(usuarioCli.rows).toHaveLength(1);
+      expect(usuarioCli.rows[0].papel).toBe('analista');
+      expect(usuarioCli.rows[0].troca_senha_obrigatoria).toBe(true);
+      expect(await verify(usuarioCli.rows[0].senha_hash, senhaInicial)).toBe(true);
+
+      const semLista = await carregarConfiguracao(arquivoConfig);
+      delete semLista.seguranca;
+      semLista.porta = await portaLivre();
+      const arquivoSemLista = path.join(temporario, 'configuracao-sem-lista.json');
+      await writeFile(arquivoSemLista, JSON.stringify(semLista), 'utf8');
+      const encerrarSemLista = await iniciarServico(semLista.porta, caPem, arquivoSemLista);
+      try {
+        const loginSemLista = await requisitarApi(semLista.porta, caPem, {
+          metodo: 'POST', rota: '/api/v1/auth/login',
+          corpo: { matricula: opcoes.administrador.matricula, senha: senhaAdminNova },
+        });
+        expect(loginSemLista.status).toBe(200);
+        const dadosSemLista = respostaSessaoSchema.parse(JSON.parse(loginSemLista.corpo));
+        const cookieSemLista = loginSemLista.headers['set-cookie']?.[0].split(';')[0];
+        if (!cookieSemLista) throw new Error('Cookie da configuração sem lista ausente.');
+        const falhaLista = await requisitarApi(semLista.porta, caPem, {
+          metodo: 'POST', rota: '/api/v1/admin/usuarios', cookie: cookieSemLista, csrf: dadosSemLista.csrf,
+          corpo: { matricula: 'SEM-LISTA-SINTETICO', nome: 'Usuário sintético', papel: 'analista', senha: senhaInicial },
+        });
+        expect(falhaLista.status).toBe(503);
+        expect(falhaLista.corpo).toContain('Configure a lista local de senhas comuns');
+        expect((await requisitarApi(semLista.porta, caPem, {
+          metodo: 'GET', rota: '/api/v1/auth/me', cookie: cookieSemLista,
+        })).status).toBe(200);
+      } finally {
+        await encerrarSemLista();
+      }
+
+      const credencialInvalida = await criar(admin, 'HASH-INVALIDO-SINTETICO', 'analista');
+      await cliente.query("UPDATE seguranca.usuario SET senha_hash = 'hash-ficticio-invalido' WHERE id = $1", [credencialInvalida.id]);
+      const erroHash = await requisitarApi(portaHttps, caPem, {
+        metodo: 'POST', rota: '/api/v1/auth/login', corpo: { matricula: 'HASH-INVALIDO-SINTETICO', senha: senhaInicial },
+      });
+      expect(erroHash.status).toBe(503);
+      expect(erroHash.corpo).toContain('Não foi possível verificar a credencial');
+      await cliente.query('REVOKE SELECT ON seguranca.usuario FROM sisdoc_aplicativo');
+      try {
+        const falhaBanco = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/auth/login',
+          corpo: { matricula: opcoes.administrador.matricula, senha: senhaAdminNova },
+        });
+        expect(falhaBanco.status).toBe(500);
+        expect(falhaBanco.corpo).not.toContain(senhaAdminNova);
+      } finally {
+        await cliente.query('GRANT SELECT ON seguranca.usuario TO sisdoc_aplicativo');
+      }
+
+      const adminNovo = await criar(admin, 'ADMIN-SECUNDARIO-SINTETICO', 'admin');
+      const sessaoAdminNovo = await completarTroca('ADMIN-SECUNDARIO-SINTETICO');
+      const respostas = await Promise.all([
+        chamada(admin, 'PATCH', `/api/v1/admin/usuarios/${admin.usuario.id}`, { ativo: false }),
+        chamada(sessaoAdminNovo, 'PATCH', `/api/v1/admin/usuarios/${adminNovo.id}`, { ativo: false }),
+      ]);
+      expect(respostas.map((resposta) => resposta.status).sort()).toEqual([200, 409]);
+      const administradores = await cliente.query<{ total: string }>(
+        "SELECT count(*) AS total FROM seguranca.usuario WHERE papel = 'admin' AND ativo",
+      );
+      expect(administradores.rows[0].total).toBe('1');
+      const eventos = await cliente.query<{ acao: string; registro: unknown }>(
+        'SELECT acao, row_to_json(a) AS registro FROM seguranca.auditoria a ORDER BY id',
+      );
+      const acoes = eventos.rows.map((evento) => evento.acao);
+      for (const acao of ['login', 'logout', 'troca_senha', 'usuario_criado', 'usuario_atualizado',
+        'senha_redefinida', 'acesso_negado', 'auditoria_consultada']) {
+        expect(acoes).toContain(acao);
+      }
+      const auditoria = JSON.stringify(eventos.rows);
+      for (const segredo of [senhaAdmin, senhaAdminNova, senhaInicial, senhaAlterada, senhaRedefinida, admin.cookie, admin.csrf]) {
+        expect(auditoria).not.toContain(segredo);
+      }
+    } finally {
+      await cliente.end();
+      await encerrar();
+    }
   });
 
   it('não expõe detalhes de erro no health', async () => {

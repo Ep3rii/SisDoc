@@ -6,9 +6,11 @@ import path from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Configuracao } from '@sisdoc/contratos';
-import { AppModule, type BancoSaude } from './app.module';
+import type { Pool } from 'pg';
+import { AppModule } from './app.module';
+import { FiltroProblemas } from './problemas';
 
-export async function criarAplicacao(configuracao: Configuracao, banco: BancoSaude): Promise<NestExpressApplication> {
+export async function criarAplicacao(configuracao: Configuracao, banco: Pool): Promise<NestExpressApplication> {
   let key: Buffer;
   let cert: Buffer;
   try {
@@ -23,12 +25,13 @@ export async function criarAplicacao(configuracao: Configuracao, banco: BancoSau
     ServerOptions,
     'key' | 'cert' | 'minVersion'
   >;
-  const app = await NestFactory.create<NestExpressApplication>(AppModule.registrar(banco), {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule.registrar(banco, configuracao), {
     httpsOptions,
     abortOnError: false,
     logger: ['error', 'warn'],
   });
   app.setGlobalPrefix('api/v1');
+  app.useGlobalFilters(new FiltroProblemas());
   app.use((_req: IncomingMessage, res: ServerResponse, next: () => void) => {
     res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'");
     res.setHeader('Strict-Transport-Security', 'max-age=31536000');

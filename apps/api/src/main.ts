@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
 
@@ -13,11 +13,25 @@ async function iniciar(): Promise<void> {
     connectionTimeoutMillis: 5000,
   });
   banco.on('error', () => process.stderr.write('Conexão de banco indisponível.\n'));
+  let migracaoAtual: boolean;
   try {
-    await banco.query('SELECT 1');
-  } catch {
+    const resultado = await banco.query<{ atual: boolean }>(
+      "SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = '002-autenticacao') AS atual",
+    );
+    migracaoAtual = resultado.rows[0].atual;
+  } catch (erro) {
     await banco.end();
-    throw new Error('Não foi possível conectar ao banco configurado.');
+    if (erro instanceof DatabaseError && (erro.code === '3F000' || erro.code === '42P01')) {
+      throw new Error('O banco não possui o histórico de migrações necessário; atualizações existentes exigem procedimento seguro.');
+    }
+    if (erro instanceof DatabaseError && erro.code === '42501') {
+      throw new Error('O papel do aplicativo não pode consultar o histórico de migrações; confira os privilégios.');
+    }
+    throw new Error('Não foi possível consultar o histórico de migrações; confira a conexão e o banco configurado.');
+  }
+  if (!migracaoAtual) {
+    await banco.end();
+    throw new Error('O banco não possui a migração de autenticação; atualizações existentes ainda exigem procedimento seguro.');
   }
   let app;
   try {

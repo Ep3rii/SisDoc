@@ -1,40 +1,15 @@
-import { Writable } from 'node:stream';
-import { createInterface } from 'node:readline/promises';
+import { EntradaInterativa } from '../entrada-interativa';
 import { instalar, type OpcoesInstalacao } from './instalador';
 
-class SaidaLeitura extends Writable {
-  silenciosa = false;
-
-  override _write(chunk: Buffer, _encoding: BufferEncoding, callback: (erro?: Error | null) => void): void {
-    if (this.silenciosa) callback();
-    else process.stdout.write(chunk, callback);
-  }
-}
-
 async function executar(): Promise<void> {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) {
-    throw new Error('A instalação exige um terminal interativo; senhas não são aceitas por argumentos.');
-  }
-  const saida = new SaidaLeitura();
-  const leitura = createInterface({ input: process.stdin, output: saida, terminal: true });
-  const abortar = new AbortController();
-  leitura.on('SIGINT', () => abortar.abort());
-  const perguntar = (texto: string) => leitura.question(texto, { signal: abortar.signal });
-  const segredo = async (texto: string): Promise<string> => {
-    process.stdout.write(texto);
-    saida.silenciosa = true;
-    try {
-      return await leitura.question('', { signal: abortar.signal });
-    } finally {
-      saida.silenciosa = false;
-      process.stdout.write('\n');
-    }
-  };
+  const entrada = new EntradaInterativa('A instalação exige um terminal interativo; senhas não são aceitas por argumentos.');
+  const perguntar = (texto: string) => entrada.perguntar(texto);
+  const segredo = (texto: string) => entrada.segredo(texto);
 
   try {
     process.stdout.write(
       'Inicialização de uma nova instalação: use um banco PostgreSQL 16 vazio e uma raiz ainda inexistente.\n' +
-      'Este estágio não disponibiliza autenticação, cálculos ou emissão operacional.\n',
+      'A consulta funcional, os cálculos pela interface e a emissão operacional ainda não estão disponíveis.\n',
     );
     const raiz = await perguntar('Caminho absoluto da nova raiz: ');
     const porta = Number(await perguntar('Porta HTTPS em loopback: '));
@@ -72,7 +47,7 @@ async function executar(): Promise<void> {
     process.stdout.write('Defina SISDOC_CONFIG com esse caminho antes de executar npm start.\n');
     process.stdout.write('A instalação ainda não está autorizada para uso operacional.\n');
   } finally {
-    leitura.close();
+    entrada.fechar();
   }
 }
 
