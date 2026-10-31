@@ -67,12 +67,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 010, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 011, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `010-devolucao-dof` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `011-revisao-fonte-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -210,6 +210,14 @@ A consulta mostra bloqueios e avisos para a revisão salva. Ela não registra
 conferência, não aprova o modelo e não autoriza emissão. Após alterações na
 fonte ou no rascunho, execute novamente; uma consulta anterior não garante que
 os dados continuem válidos.
+
+Se a prévia estiver aberta, a consulta compara as revisões do documento, da
+pessoa e do vínculo com as usadas ao abri-la. Divergência retorna conflito:
+feche e reabra a prévia e execute a verificação novamente. Sem prévia aberta,
+a consulta continua disponível, mas informa que não foi vinculada a ela.
+Essa comparação não comprova revisão humana, não cobre outras tabelas da fonte
+e não assegura que os dados permaneçam iguais após a consulta. Uma futura
+conferência precisará revalidar tudo na mesma transação.
 
 A verificação identifica, entre outras pendências, CPF protegido inválido ou
 inconsistente, matrícula divergente ou duplicada entre vínculos ativos,

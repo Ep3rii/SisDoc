@@ -57,4 +57,29 @@ describe('proteção de dados pessoais', () => {
     expect(() => new ProtetorDados({ cifra: chaves.cifra, hmac: chaves.cifra })).toThrow('devem ser diferentes');
     expect(() => new ProtetorDados({ cifra: 'inválida', hmac: chaves.hmac })).toThrow('32 bytes');
   });
+
+  it('assina as revisões da fonte vinculadas ao documento sem expor seus dados', () => {
+    const protetor = new ProtetorDados(chavesFicticias());
+    const revisoes = {
+      documentoId: randomUUID(), documentoRevisao: 7,
+      pessoaId: randomUUID(), pessoaRevisao: '9223372036854775807',
+      vinculoId: randomUUID(), vinculoRevisao: '10',
+    };
+    const assinatura = protetor.assinarRevisaoFonteDof(revisoes);
+    expect(assinatura).toHaveLength(32);
+    expect(assinatura).toEqual(protetor.assinarRevisaoFonteDof({
+      ...revisoes, documentoId: revisoes.documentoId.toUpperCase(),
+    }));
+    for (const alterada of [
+      { ...revisoes, documentoId: randomUUID() },
+      { ...revisoes, documentoRevisao: 8 },
+      { ...revisoes, pessoaId: randomUUID() },
+      { ...revisoes, pessoaRevisao: '9' },
+      { ...revisoes, vinculoId: randomUUID() },
+      { ...revisoes, vinculoRevisao: '11' },
+    ]) expect(protetor.assinarRevisaoFonteDof(alterada)).not.toEqual(assinatura);
+    expect(new ProtetorDados(chavesFicticias()).assinarRevisaoFonteDof(revisoes)).not.toEqual(assinatura);
+    expect(() => protetor.assinarRevisaoFonteDof({ ...revisoes, pessoaRevisao: '01' })).toThrow();
+    expect(() => protetor.assinarRevisaoFonteDof({ ...revisoes, documentoRevisao: 0 })).toThrow();
+  });
 });

@@ -39,6 +39,7 @@ export async function verificarPreconferenciaDof(
   rascunho: RascunhoDof,
   regraAtual: boolean,
   protetor: ProtetorDados,
+  fontePreviaValidada: boolean,
 ): Promise<PreconferenciaDof> {
   const consulta = await cliente.query<LinhaFonte>(`
     SELECT p.cpf_cifrado, p.cpf_hash, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
@@ -212,6 +213,7 @@ export async function verificarPreconferenciaDof(
     verificadoEm: fonte.verificado_em.toISOString(),
     status: 'nao_conferido',
     conferenciaDisponivel: false,
+    fontePreviaValidada,
     bloqueios,
     avisos,
   });

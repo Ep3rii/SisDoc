@@ -45,6 +45,7 @@ type Simulacao = {
   escritas: number;
   anosConfirmados: number[];
   previas: number;
+  revisaoFonte: number;
   adiarPrevia: boolean;
   liberarPrevia: (() => void) | null;
   adiarPreconferencia: boolean;
@@ -89,9 +90,10 @@ function resumo(rascunho: RascunhoDof) {
   };
 }
 
-function fonteSintetica(rascunho: RascunhoDof, admissao: string | null) {
+function fonteSintetica(rascunho: RascunhoDof, admissao: string | null, revisaoFonte: number) {
   return {
     documentoId: rascunho.id, revisao: rascunho.revisao, consultadoEm: new Date().toISOString(),
+    provaFonte: (rascunho.revisao * 1000000 + revisaoFonte).toString(16).padStart(64, '0'),
     nome: rascunho.nome, matricula: rascunho.matricula, cpf: cpfSintetico(),
     nascimento: '1960-05-04', nomeMae: 'Mãe fictícia <img src=x>', regimeJuridico: 'ESTATUTARIO',
     cargo: 'Cargo fictício', nivel: null, avisoNivel: 'Referência sem hífen; confira o nível.',
@@ -106,7 +108,8 @@ async function responder(rota: Route, status: number, corpo: unknown) {
 async function simularApi(pagina: Page): Promise<Simulacao> {
   const estado: Simulacao = {
     papel: 'analista', admissao: '1980-01-01', rascunho: null, autorId: null,
-    conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [], previas: 0,
+    conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [],
+    previas: 0, revisaoFonte: 1,
     adiarPrevia: false, liberarPrevia: null, adiarPreconferencia: false, liberarPreconferencia: null,
     devolucao: null,
     falhaConsultaDevolucao: false,
@@ -225,19 +228,24 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === `/api/v1/documentos/${documentoId}/dados-previa` && metodo === 'GET' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
         estado.previas += 1;
-        const fonte = fonteSintetica(estado.rascunho, estado.admissao);
+        const fonte = fonteSintetica(estado.rascunho, estado.admissao, estado.revisaoFonte);
         if (estado.adiarPrevia) {
           await new Promise<void>((resolve) => { estado.liberarPrevia = resolve; });
         }
         return responder(rota, 200, fonte);
       }
       if (caminho === `/api/v1/documentos/${documentoId}/preconferencia` && metodo === 'GET' && estado.rascunho) {
+        const provaFonte = requisicao.headers()['x-sisdoc-fonte-dof'];
+        const fonte = fonteSintetica(estado.rascunho, estado.admissao, estado.revisaoFonte);
+        if (provaFonte !== undefined && provaFonte !== fonte.provaFonte) {
+          return responder(rota, 409, { detail: 'A fonte ou a revisão do rascunho mudou desde a prévia. Feche e reabra a prévia antes de verificar.' });
+        }
         const variaveis = verificarVariaveisDof({
-          ...estado.rascunho, fonte: fonteSintetica(estado.rascunho, estado.admissao),
+          ...estado.rascunho, fonte,
         });
         const resposta = {
           documentoId, revisao: estado.rascunho.revisao, verificadoEm: new Date().toISOString(),
-          status: 'nao_conferido', conferenciaDisponivel: false,
+          status: 'nao_conferido', conferenciaDisponivel: false, fontePreviaValidada: provaFonte !== undefined,
           bloqueios: [
             { codigo: 'conferencia_indisponivel', mensagem: 'A transição para conferido ainda não foi implementada.' },
             { codigo: 'aprovacao_modelo_nao_verificada', mensagem: 'A aprovação do modelo ainda não foi verificada.' },
@@ -675,6 +683,45 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').count()).toBe(0);
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText('Processo: 1234/5678.', { exact: false }).waitFor();
+  });
+
+  it('vincula a verificação à prévia aberta e rejeita alteração da fonte ou resposta antiga', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados fictícios');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Esta consulta não foi vinculada a uma prévia aberta.', { exact: false }).waitFor();
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    expect(await pagina.getByText('Esta consulta não foi vinculada a uma prévia aberta.', { exact: false }).count()).toBe(0);
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).waitFor();
+
+    estado.revisaoFonte += 1;
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByRole('alert').getByText(/A fonte ou a revisão do rascunho mudou desde a prévia/).waitFor();
+    expect(await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).count()).toBe(0);
+    await pagina.getByRole('button', { name: 'Fechar prévia' }).click();
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).waitFor();
+
+    estado.adiarPreconferencia = true;
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await expect.poll(() => estado.liberarPreconferencia !== null).toBe(true);
+    await pagina.getByRole('button', { name: 'Fechar prévia' }).click();
+    estado.revisaoFonte += 1;
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    estado.adiarPreconferencia = false;
+    estado.liberarPreconferencia?.();
+    await pagina.getByRole('alert').getByText(/a prévia foi alterada/).waitFor();
+    expect(await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).count()).toBe(0);
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).waitFor();
   });
 
   it('mantém a prévia abaixo de um segundo no limite técnico de blocos', async () => {

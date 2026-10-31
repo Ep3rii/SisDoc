@@ -24,8 +24,9 @@ O mesmo resolvedor é usado pela prévia e pela verificação preliminar das
 variáveis; dados e conteúdo dos blocos são escapados. O iframe permanece
 isolado por `sandbox` e a prévia não representa layout oficial. A fonte é um
 retrato pontual: alterações após a abertura não são atualizadas automaticamente.
-Antes de registrar uma futura conferência, será necessário garantir que o
-usuário revisou os mesmos dados que o servidor voltou a validar.
+A comparação das revisões da prévia com a verificação preliminar é descrita na
+[decisão 016](016-revisao-fonte-previa-dof.md). Ela não comprova revisão humana
+nem substitui a revalidação atômica necessária para futura conferência.
 
 ## Evidência e limites
 

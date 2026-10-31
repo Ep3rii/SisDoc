@@ -6,6 +6,8 @@ import { mascaraProcessoSchema, numeroProcessoSchema } from './processo';
 const motivoSchema = z.string().trim().min(1, 'Informe o motivo dos lançamentos.').max(2000);
 const revisaoSchema = z.number().int().min(1).max(2147483647);
 
+export const provaFonteDofSchema = z.string().regex(/^[0-9a-f]{64}$/);
+
 export const codigoBlocoDofSchema = z.enum(['contratacao', 'transposicao', 'progressao', 'complementares']);
 export type CodigoBlocoDof = z.infer<typeof codigoBlocoDofSchema>;
 export const TITULOS_BLOCOS_DOF: Record<CodigoBlocoDof, string> = {
@@ -124,6 +126,7 @@ export const paginaEncaminhamentosDofSchema = z.strictObject({
 export const dadosFontePreviaDofSchema = z.strictObject({
   documentoId: z.uuid(),
   revisao: revisaoSchema,
+  provaFonte: provaFonteDofSchema,
   consultadoEm: z.iso.datetime(),
   nome: z.string(),
   matricula: z.string(),
@@ -181,6 +184,7 @@ export const preconferenciaDofSchema = z.strictObject({
   verificadoEm: z.iso.datetime(),
   status: z.literal('nao_conferido'),
   conferenciaDisponivel: z.literal(false),
+  fontePreviaValidada: z.boolean(),
   bloqueios: z.array(z.strictObject({ codigo: codigoPendenciaConferenciaDofSchema, mensagem: z.string().min(1) })).min(1),
   avisos: z.array(z.strictObject({ codigo: codigoAvisoConferenciaDofSchema, mensagem: z.string().min(1) })),
 }).superRefine((dados, contexto) => {
@@ -236,5 +240,6 @@ export type PaginaCoordenadoresDof = z.infer<typeof paginaCoordenadoresDofSchema
 export type PaginaEncaminhamentosDof = z.infer<typeof paginaEncaminhamentosDofSchema>;
 export type PaginaRascunhosDof = z.infer<typeof paginaRascunhosDofSchema>;
 export type DadosFontePreviaDof = z.infer<typeof dadosFontePreviaDofSchema>;
+export type ProvaFontePreviaDof = Pick<DadosFontePreviaDof, 'documentoId' | 'revisao' | 'provaFonte'>;
 export type PreconferenciaDof = z.infer<typeof preconferenciaDofSchema>;
 export type RascunhoDof = z.infer<typeof rascunhoDofSchema>;

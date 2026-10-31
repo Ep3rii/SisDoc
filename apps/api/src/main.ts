@@ -1,7 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
-import { VERSAO_DEVOLUCAO_DOF } from './migracoes/devolucao-dof';
+import { VERSAO_REVISAO_FONTE_DOF } from './migracoes/revisao-fonte-dof';
 
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
@@ -18,7 +18,7 @@ async function iniciar(): Promise<void> {
   try {
     const resultado = await banco.query<{ atual: boolean }>(
       'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
-      [VERSAO_DEVOLUCAO_DOF],
+      [VERSAO_REVISAO_FONTE_DOF],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {
@@ -33,7 +33,7 @@ async function iniciar(): Promise<void> {
   }
   if (!migracaoAtual) {
     await banco.end();
-    throw new Error('O banco não possui a migração de devolução DOF; atualizações existentes ainda exigem procedimento seguro.');
+    throw new Error('O banco não possui a migração de revisão da fonte DOF; atualizações existentes ainda exigem procedimento seguro.');
   }
   let app;
   try {

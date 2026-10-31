@@ -56,6 +56,7 @@ async function requisitar(
   metodo: 'GET' | 'POST' | 'PATCH' = 'GET',
   corpo?: unknown,
   csrf?: string,
+  provaFonte?: string,
 ): Promise<unknown> {
   let resposta: Response;
   try {
@@ -67,6 +68,7 @@ async function requisitar(
         Accept: 'application/json',
         ...(corpo === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+        ...(provaFonte === undefined ? {} : { 'X-Sisdoc-Fonte-Dof': provaFonte }),
       },
       ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
     });
@@ -192,8 +194,10 @@ export const api = {
   async recolherRascunhoDof(csrf: string, id: string, dados: RecolherRascunhoDof): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}/recolher`, 'POST', dados, csrf));
   },
-  async verificarPreconferenciaDof(id: string): Promise<PreconferenciaDof> {
-    return validar(preconferenciaDofSchema, await requisitar(`documentos/${id}/preconferencia`));
+  async verificarPreconferenciaDof(id: string, provaFonte?: string): Promise<PreconferenciaDof> {
+    return validar(preconferenciaDofSchema, await requisitar(
+      `documentos/${id}/preconferencia`, 'GET', undefined, undefined, provaFonte,
+    ));
   },
   async obterPreviaDof(id: string): Promise<DadosFontePreviaDof> {
     return validar(dadosFontePreviaDofSchema, await requisitar(`documentos/${id}/dados-previa`));

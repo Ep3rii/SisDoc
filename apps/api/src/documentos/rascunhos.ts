@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { nivelDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
@@ -78,6 +78,7 @@ type LinhaEncaminhamento = {
   destinatario_disponivel: boolean;
   encaminhado_em: Date;
 };
+type RevisoesFonte = { pessoa_revisao: string; vinculo_revisao: string };
 const confirmacaoInicioProtegidaSchema = z.strictObject({
   inicio: dataFuncionalSchema,
   admissao: dataFuncionalSchema,
@@ -141,6 +142,17 @@ export class RascunhosService {
     return JSON.parse(this.protetor.decifrar(valor, {
       schema: 'documentos', tabela, registroId: id, campo,
     }).toString('utf8'));
+  }
+
+  private assinarFonte(linha: LinhaRascunho, revisoes: RevisoesFonte): Buffer {
+    return this.protetor.assinarRevisaoFonteDof({
+      documentoId: linha.id,
+      documentoRevisao: linha.revisao,
+      pessoaId: linha.pessoa_id,
+      pessoaRevisao: revisoes.pessoa_revisao,
+      vinculoId: linha.vinculo_id,
+      vinculoRevisao: revisoes.vinculo_revisao,
+    });
   }
 
   private async blocos(cliente: PoolClient, documentoId: string): Promise<BlocoRascunhoDof[]> {
@@ -447,13 +459,14 @@ export class RascunhosService {
         }
         const atual = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
         if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a abertura da prévia.');
-        const consulta = await cliente.query<{
+        const consulta = await cliente.query<RevisoesFonte & {
           cpf_cifrado: Buffer; cpf_hash: Buffer; nascimento: string | null; nome_mae_cifrado: Buffer | null;
           regime_juridico: string | null; cargo: string | null; referencia: string | null; orgao_nome: string | null;
           removido: boolean; consultado_em: Date;
         }>(`
           SELECT p.cpf_cifrado, p.cpf_hash, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
             p.nome_mae_cifrado, v.regime_juridico, v.cargo, v.referencia, v.orgao_nome,
+            p.revisao_fonte::text AS pessoa_revisao, v.revisao_fonte::text AS vinculo_revisao,
             v.removido_na_fonte_em IS NOT NULL AS removido, clock_timestamp() AS consultado_em
           FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
           WHERE p.id = $1 AND v.id = $2
@@ -475,6 +488,7 @@ export class RascunhosService {
         const fonte = dadosFontePreviaDofSchema.safeParse({
           documentoId: id,
           revisao: atual.revisao,
+          provaFonte: this.assinarFonte(atual, origem).toString('hex'),
           consultadoEm: origem.consultado_em.toISOString(),
           nome: atual.nome,
           matricula: atual.matricula,
@@ -502,7 +516,9 @@ export class RascunhosService {
     return concluir(tentativa);
   }
 
-  async verificarPreconferencia(sessao: SessaoAutenticada, ip: string, id: string): Promise<PreconferenciaDof> {
+  async verificarPreconferencia(
+    sessao: SessaoAutenticada, ip: string, id: string, provaFonte?: string,
+  ): Promise<PreconferenciaDof> {
     const tentativa = await transacao<Tentativa<PreconferenciaDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('conferir'));
       const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
@@ -516,8 +532,30 @@ export class RascunhosService {
       }
       const atual = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
       if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a pré-conferência.');
+      if (provaFonte !== undefined) {
+        const consulta = await cliente.query<RevisoesFonte>(`
+          SELECT p.revisao_fonte::text AS pessoa_revisao, v.revisao_fonte::text AS vinculo_revisao
+          FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
+          WHERE p.id = $1 AND v.id = $2
+        `, [atual.pessoa_id, atual.vinculo_id]);
+        const revisoes = consulta.rows[0];
+        if (!revisoes) throw new Error('Pessoa ou vínculo da pré-conferência deixou de existir.');
+        const recebida = Buffer.from(provaFonte, 'hex');
+        const esperada = this.assinarFonte(atual, revisoes);
+        if (recebida.length !== esperada.length || !timingSafeEqual(recebida, esperada)) {
+          await auditarConsultaFuncional(cliente, sessao, 'preconferencia_fonte_alterada', 'documento', id, atual.pessoa_id, ip);
+          return {
+            falha: {
+              tipo: 'conflito',
+              mensagem: 'A fonte ou a revisão do rascunho mudou desde a prévia. Feche e reabra a prévia antes de verificar.',
+            },
+          };
+        }
+      }
       const rascunho = await this.apresentar(cliente, atual);
-      const resultado = await verificarPreconferenciaDof(cliente, sessao, ip, rascunho, atual.regra_atual, this.protetor);
+      const resultado = await verificarPreconferenciaDof(
+        cliente, sessao, ip, rascunho, atual.regra_atual, this.protetor, provaFonte !== undefined,
+      );
       await auditarConsultaFuncional(cliente, sessao, 'preconferencia_verificada', 'documento', id, atual.pessoa_id, ip);
       return { valor: resultado };
     });

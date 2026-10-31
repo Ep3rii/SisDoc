@@ -9,6 +9,15 @@ const contextoSchema = z.strictObject({
   campo: z.string().regex(/^[a-z][a-z0-9_]{0,62}$/),
 });
 
+const revisaoFonteDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  documentoRevisao: z.number().int().min(1).max(2147483647),
+  pessoaId: z.uuid(),
+  pessoaRevisao: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  vinculoId: z.uuid(),
+  vinculoRevisao: z.string().regex(/^[1-9][0-9]{0,18}$/),
+});
+
 export type ContextoCifra = z.input<typeof contextoSchema>;
 
 const versao = 1;
@@ -73,5 +82,16 @@ export class ProtetorDados {
   hashCpf(valor: string): Buffer {
     const cpf = cpfSchema.parse(valor);
     return createHmac('sha256', this.chaveHmac).update('sisdoc/cpf/v1\0', 'utf8').update(cpf, 'ascii').digest();
+  }
+
+  assinarRevisaoFonteDof(entrada: z.input<typeof revisaoFonteDofSchema>): Buffer {
+    const dados = revisaoFonteDofSchema.parse(entrada);
+    const revisoes = [
+      dados.documentoId.toLowerCase(), dados.documentoRevisao,
+      dados.pessoaId.toLowerCase(), dados.pessoaRevisao,
+      dados.vinculoId.toLowerCase(), dados.vinculoRevisao,
+    ];
+    return createHmac('sha256', this.chaveHmac).update('sisdoc/dof/revisao-fonte/v1\0', 'utf8')
+      .update(JSON.stringify(revisoes), 'utf8').digest();
   }
 }

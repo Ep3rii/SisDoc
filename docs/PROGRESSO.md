@@ -245,6 +245,19 @@ revisão, concorrência e a interface com dados sintéticos. A prévia HTTPS de
 45 anos levou 11,7 ms; no navegador simulado, a atualização no limite dos
 blocos chegou a 87,3 ms, ou 167,7 ms com delimitadores malformados.
 
+A prévia aberta fornece uma prova autenticada das revisões do documento, da
+pessoa e do vínculo selecionados; a verificação preliminar a compara quando
+presente e informa conflito se elas mudaram. Sem prévia, a verificação continua
+disponível sem essa comparação. A migração `011-revisao-fonte-dof` incrementa
+as revisões a cada atualização e é aplicada apenas em banco novo. A prova não
+representa conferência nem revisão humana e não cobre outras tabelas da fonte.
+Os testes direcionados passaram (46 testes em cinco arquivos), incluindo
+PostgreSQL/HTTPS descartáveis e navegador com API simulada. `npm run typecheck`
+e a suíte completa passaram (98 testes em 14 arquivos); `npm audit` não apontou
+vulnerabilidades. Nesta execução, a prévia HTTPS de 45 anos levou 11,5 ms; a
+atualização no limite dos blocos chegou a 86,6 ms, ou 158,6 ms com
+delimitadores malformados.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -265,4 +278,5 @@ Divergências e decisões estão em
 [012-confirmacao-inicio-dof.md](decisoes/012-confirmacao-inicio-dof.md) e
 [013-identidade-fonte-dof.md](decisoes/013-identidade-fonte-dof.md) e
 [014-dados-fonte-previa-dof.md](decisoes/014-dados-fonte-previa-dof.md) e
-[015-devolucao-rascunho-dof.md](decisoes/015-devolucao-rascunho-dof.md).
+[015-devolucao-rascunho-dof.md](decisoes/015-devolucao-rascunho-dof.md) e
+[016-revisao-fonte-previa-dof.md](decisoes/016-revisao-fonte-previa-dof.md).

@@ -1,9 +1,9 @@
 import type { ServerResponse } from 'node:http';
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import {
   atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema,
   confirmarInicioDofSchema, devolverRascunhoDofSchema, encaminharRascunhoDofSchema, paginaUuidQuerySchema,
-  recolherRascunhoDofSchema,
+  provaFonteDofSchema, recolherRascunhoDofSchema,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { z } from 'zod';
@@ -76,8 +76,12 @@ export class RascunhosController {
 
   @ExigirAcao('conferir')
   @Get(':id/preconferencia')
-  verificarPreconferencia(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
-    return this.rascunhos.verificarPreconferencia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
+  verificarPreconferencia(
+    @Param('id') id: string, @Headers('x-sisdoc-fonte-dof') cabecalho: unknown, @Req() req: RequisicaoAutenticada,
+  ) {
+    const prova = provaFonteDofSchema.optional().safeParse(cabecalho);
+    if (!prova.success) throw new BadRequestException('Identificador da prévia inválido. Feche e reabra a prévia.');
+    return this.rascunhos.verificarPreconferencia(exigirSessao(req), ipRequisicao(req), idDocumento(id), prova.data);
   }
 
   @ExigirAcao('criar_rascunho')

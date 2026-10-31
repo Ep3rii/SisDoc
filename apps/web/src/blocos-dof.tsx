@@ -6,6 +6,7 @@ import {
   type BlocoRascunhoDof,
   type CodigoBlocoDof,
   type DadosFontePreviaDof,
+  type ProvaFontePreviaDof,
   type RascunhoDof,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
@@ -18,11 +19,14 @@ type Props = {
   somenteLeitura?: boolean;
   onAtualizar: (rascunho: RascunhoDof) => void;
   onPendente: (valor: boolean) => void;
+  onPrevia: (prova: ProvaFontePreviaDof | null) => void;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
 };
 
-export function BlocosDof({ rascunho, csrf, bloqueado, somenteLeitura = false, onAtualizar, onPendente, onErro, onLimpar }: Props) {
+export function BlocosDof({
+  rascunho, csrf, bloqueado, somenteLeitura = false, onAtualizar, onPendente, onPrevia, onErro, onLimpar,
+}: Props) {
   const [blocos, setBlocos] = useState(rascunho.blocos);
   const [tipo, setTipo] = useState<CodigoBlocoDof>('contratacao');
   const [motivo, setMotivo] = useState('');
@@ -38,7 +42,8 @@ export function BlocosDof({ rascunho, csrf, bloqueado, somenteLeitura = false, o
   }, []);
   useEffect(() => {
     setFonte(null);
-  }, [rascunho.id, rascunho.revisao]);
+    onPrevia(null);
+  }, [rascunho.id, rascunho.revisao, onPrevia]);
 
   function alterar(novos: BlocoRascunhoDof[], novoMotivo = motivo) {
     setBlocos(novos);
@@ -103,7 +108,10 @@ export function BlocosDof({ rascunho, csrf, bloqueado, somenteLeitura = false, o
       if (resposta.documentoId !== revisaoAtual.current.id || resposta.revisao !== revisaoAtual.current.revisao) {
         throw new ErroApi(409, 'O rascunho foi alterado. Reabra-o antes de visualizar a prévia.');
       }
-      if (ativa.current) setFonte(resposta);
+      if (ativa.current) {
+        setFonte(resposta);
+        onPrevia({ documentoId: resposta.documentoId, revisao: resposta.revisao, provaFonte: resposta.provaFonte });
+      }
     } catch (erro) {
       if (ativa.current) onErro(erro);
     } finally {
@@ -164,7 +172,9 @@ export function BlocosDof({ rascunho, csrf, bloqueado, somenteLeitura = false, o
           <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Os dados da fonte são consultados ao abrir; feche e reabra para atualizá-los. Não possui validade oficial.</p>
           {fonte && fonte.documentoId === rascunho.id && fonte.revisao === rascunho.revisao ? (
             <>
-              <button type="button" className="secundario" onClick={() => setFonte(null)}>Fechar prévia</button>
+              <button type="button" className="secundario" onClick={() => { setFonte(null); onPrevia(null); }}>
+                Fechar prévia
+              </button>
               <iframe
                 title="Prévia provisória da DOF"
                 sandbox=""

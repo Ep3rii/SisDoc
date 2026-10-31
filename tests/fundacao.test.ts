@@ -43,6 +43,7 @@ import { aplicarConfirmacaoInicioDof } from '../apps/api/dist/migracoes/confirma
 import { aplicarDevolucaoDof } from '../apps/api/dist/migracoes/devolucao-dof.js';
 import { aplicarEncaminhamentoDof } from '../apps/api/dist/migracoes/encaminhamento-dof.js';
 import { aplicarPreconferenciaDof, CHAVE_BLOQUEIO_FONTE_DOF } from '../apps/api/dist/migracoes/preconferencia-dof.js';
+import { aplicarRevisaoFonteDof } from '../apps/api/dist/migracoes/revisao-fonte-dof.js';
 import { aplicarProcessoDof } from '../apps/api/dist/migracoes/processo-dof.js';
 import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
 import { aplicarRascunhoDof } from '../apps/api/dist/migracoes/rascunho-dof.js';
@@ -236,7 +237,10 @@ async function requisitar(porta: number, ca: string, nome = nomeTls, rota = '/ap
 async function requisitarApi(
   porta: number,
   ca: string,
-  opcoes: { metodo: 'GET' | 'POST' | 'PATCH'; rota: string; corpo?: unknown; cookie?: string; csrf?: string; origem?: string },
+  opcoes: {
+    metodo: 'GET' | 'POST' | 'PATCH'; rota: string; corpo?: unknown; cookie?: string; csrf?: string;
+    origem?: string; provaFonte?: string;
+  },
 ): Promise<{ status: number | undefined; corpo: string; headers: IncomingHttpHeaders }> {
   const conteudo = opcoes.corpo === undefined ? undefined : JSON.stringify(opcoes.corpo);
   return new Promise((resolve, reject) => {
@@ -255,6 +259,7 @@ async function requisitarApi(
         ...(conteudo === undefined ? {} : { 'Content-Type': 'application/json' }),
         ...(opcoes.cookie ? { Cookie: opcoes.cookie } : {}),
         ...(opcoes.csrf ? { 'X-CSRF-Token': opcoes.csrf } : {}),
+        ...(opcoes.provaFonte === undefined ? {} : { 'X-Sisdoc-Fonte-Dof': opcoes.provaFonte }),
       },
     }, (resposta) => {
       let corpo = '';
@@ -699,6 +704,9 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarDevolucaoDof(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
+      expect(await aplicarRevisaoFonteDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConsulta(cliente, 'sisdoc_aplicativo')).toBe(false);
@@ -709,6 +717,7 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarPreconferenciaDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarConfirmacaoInicioDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarDevolucaoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarRevisaoFonteDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -3666,6 +3675,211 @@ describe('fundação em recursos descartáveis', () => {
         expect(motivoAoCoordenador.status, motivoAoCoordenador.corpo).toBe(200);
         expect(ultimaDevolucaoDofSchema.parse(JSON.parse(motivoAoCoordenador.corpo)).devolucao?.motivo)
           .toBe('Ajuste ao autor coordenador');
+      } finally {
+        await encerrar();
+      }
+    } finally {
+      await cliente.end();
+    }
+  });
+
+  it('vincula a pré-conferência à revisão da fonte mostrada na prévia', async () => {
+    const config = await carregarConfiguracao(arquivoConfig);
+    const protetor = new ProtetorDados(config.chaves);
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    const pessoaId = randomUUID();
+    const vinculoId = randomUUID();
+    const cpf = cpfSintetico(900000003);
+    const senha = 'RevisaoFonteFicticia!12345';
+    const senhaHash = await gerarHashSenha(senha);
+    const usuarios = [
+      { chave: 'autor', papel: 'analista' },
+      { chave: 'destinatario', papel: 'coordenador' },
+      { chave: 'outro', papel: 'coordenador' },
+    ].map((usuario) => ({
+      ...usuario, id: randomUUID(), matricula: `REVISAO-${usuario.chave.toUpperCase()}`,
+    }));
+    try {
+      await cliente.query(`
+        INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca, revisao_fonte)
+        VALUES ($1, $2, $3, 'Pessoa de revisão fictícia', 'pessoa de revisao ficticia', 99)
+      `, [pessoaId, protetor.cifrar(Buffer.from(cpf, 'ascii'), {
+        schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'cpf_cifrado',
+      }), protetor.hashCpf(cpf)]);
+      await cliente.query(`
+        INSERT INTO nucleo.vinculo
+          (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem, admissao, referencia, revisao_fonte)
+        VALUES ($1, $2, 'REVISAO-FICTICIA', 'REVISAO-FICTICIA', 'fonte-revisao-sintetica', $3, '2020-01-01', 'PNS-A', 99)
+      `, [vinculoId, pessoaId, randomUUID()]);
+      for (const usuario of usuarios) {
+        await cliente.query(`
+          INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+          VALUES ($1, $2, $3, $4, $5, false)
+        `, [usuario.id, usuario.matricula, `Usuário sintético ${usuario.chave}`, senhaHash, usuario.papel]);
+      }
+      const versoesIniciais = await cliente.query<{ pessoa: string; vinculo: string }>(`
+        SELECT p.revisao_fonte::text AS pessoa, v.revisao_fonte::text AS vinculo
+        FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id WHERE p.id = $1 AND v.id = $2
+      `, [pessoaId, vinculoId]);
+      expect(versoesIniciais.rows[0]).toEqual({ pessoa: '1', vinculo: '1' });
+      const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
+      try {
+        const sessoes = new Map<string, { cookie: string; csrf: string }>();
+        for (const usuario of usuarios) {
+          const login = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/auth/login', corpo: { matricula: usuario.matricula, senha },
+          });
+          expect(login.status, login.corpo).toBe(200);
+          const cookie = login.headers['set-cookie']?.[0].split(';')[0];
+          if (!cookie) throw new Error('Cookie sintético da revisão de fonte ausente.');
+          sessoes.set(usuario.chave, { cookie, csrf: respostaSessaoSchema.parse(JSON.parse(login.corpo)).csrf });
+        }
+        const sessao = (chave: string) => {
+          const resultado = sessoes.get(chave);
+          if (!resultado) throw new Error('Sessão sintética da revisão de fonte ausente.');
+          return resultado;
+        };
+        const autor = sessao('autor');
+        const destinatario = sessao('destinatario');
+        const destinatarioId = usuarios.find((usuario) => usuario.chave === 'destinatario')?.id;
+        if (!destinatarioId) throw new Error('Destinatário sintético ausente.');
+        const calculo = {
+          pessoaId, vinculoId, inicio: '2020-01-01', fim: '2020-12-31', confirmacaoDados: true,
+          anos: [{
+            ano: 2020, abrangencia: 'intervalo_declarado',
+            faltas: 0, ts: 0, pf: 0, ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
+          }],
+        };
+        const criado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos',
+          corpo: { calculo, admissaoEsperada: '2020-01-01', motivo: 'Revisão sintética da fonte' }, ...autor,
+        });
+        expect(criado.status, criado.corpo).toBe(201);
+        const rascunho = rascunhoDofSchema.parse(JSON.parse(criado.corpo));
+        const rota = `/api/v1/documentos/${rascunho.id}`;
+        const abrir = async (cookie = autor.cookie) => {
+          const resposta = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: `${rota}/dados-previa`, cookie });
+          expect(resposta.status, resposta.corpo).toBe(200);
+          expect(resposta.headers['cache-control']).toContain('no-store');
+          return dadosFontePreviaDofSchema.parse(JSON.parse(resposta.corpo));
+        };
+        const verificar = (provaFonte?: string, cookie = autor.cookie) => requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rota}/preconferencia`, cookie, provaFonte,
+        });
+        const previaInicial = await abrir();
+        expect(previaInicial.provaFonte).toMatch(/^[0-9a-f]{64}$/);
+        const semPrevia = await verificar();
+        expect(semPrevia.status, semPrevia.corpo).toBe(200);
+        expect(preconferenciaDofSchema.parse(JSON.parse(semPrevia.corpo)).fontePreviaValidada).toBe(false);
+        const vinculada = await verificar(previaInicial.provaFonte);
+        expect(vinculada.status, vinculada.corpo).toBe(200);
+        expect(preconferenciaDofSchema.parse(JSON.parse(vinculada.corpo))).toMatchObject({
+          fontePreviaValidada: true, status: 'nao_conferido', conferenciaDisponivel: false,
+        });
+        expect(vinculada.corpo).not.toContain(previaInicial.provaFonte);
+        expect(vinculada.corpo).not.toContain(cpf);
+        expect((await verificar('inválida')).status).toBe(400);
+        const adulterada = `${previaInicial.provaFonte[0] === 'a' ? 'b' : 'a'}${previaInicial.provaFonte.slice(1)}`;
+        expect((await verificar(adulterada)).status).toBe(409);
+        expect((await verificar(previaInicial.provaFonte, sessao('outro').cookie)).status).toBe(404);
+        const html = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: `${rota}/previa`, cookie: autor.cookie });
+        expect(html.status, html.corpo).toBe(200);
+        expect(html.corpo).not.toContain(previaInicial.provaFonte);
+
+        const outraFonte = await inserirPessoaEVinculo(cliente);
+        await cliente.query('UPDATE nucleo.pessoa SET nome = nome WHERE id = $1', [outraFonte.pessoa]);
+        await cliente.query('UPDATE nucleo.vinculo SET cargo = cargo WHERE id = $1', [outraFonte.vinculo]);
+        expect((await verificar(previaInicial.provaFonte)).status).toBe(200);
+
+        await cliente.query("UPDATE nucleo.pessoa SET nome = 'Nome temporário fictício' WHERE id = $1", [pessoaId]);
+        await cliente.query("UPDATE nucleo.pessoa SET nome = 'Pessoa de revisão fictícia', revisao_fonte = 1 WHERE id = $1", [pessoaId]);
+        expect((await cliente.query<{ revisao: string }>(
+          'SELECT revisao_fonte::text AS revisao FROM nucleo.pessoa WHERE id = $1', [pessoaId],
+        )).rows[0].revisao).toBe('3');
+        const pessoaMudou = await verificar(previaInicial.provaFonte);
+        expect(pessoaMudou.status, pessoaMudou.corpo).toBe(409);
+        expect(pessoaMudou.corpo).toContain('Feche e reabra a prévia');
+        const previaPessoaAtual = await abrir();
+        expect(previaPessoaAtual.nome).toBe(previaInicial.nome);
+        expect(previaPessoaAtual.provaFonte).not.toBe(previaInicial.provaFonte);
+        expect((await verificar(previaPessoaAtual.provaFonte)).status).toBe(200);
+
+        await cliente.query("UPDATE nucleo.vinculo SET referencia = 'PNS-B' WHERE id = $1", [vinculoId]);
+        await cliente.query("UPDATE nucleo.vinculo SET referencia = 'PNS-A', revisao_fonte = 1 WHERE id = $1", [vinculoId]);
+        expect((await cliente.query<{ revisao: string }>(
+          'SELECT revisao_fonte::text AS revisao FROM nucleo.vinculo WHERE id = $1', [vinculoId],
+        )).rows[0].revisao).toBe('3');
+        expect((await verificar(previaPessoaAtual.provaFonte)).status).toBe(409);
+        const previaVinculoAtual = await abrir();
+        expect(previaVinculoAtual.referencia).toBe(previaInicial.referencia);
+        expect(previaVinculoAtual.provaFonte).not.toBe(previaPessoaAtual.provaFonte);
+
+        const processo = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `${rota}/processo`,
+          corpo: { revisao: rascunho.revisao, processo: '1122/3344', motivo: 'Processo fictício' }, ...autor,
+        });
+        expect(processo.status, processo.corpo).toBe(200);
+        const comProcesso = rascunhoDofSchema.parse(JSON.parse(processo.corpo));
+        expect((await verificar(previaVinculoAtual.provaFonte)).status).toBe(409);
+        expect(preconferenciaDofSchema.parse(JSON.parse((await verificar()).corpo)).fontePreviaValidada).toBe(false);
+        const previaAtual = await abrir();
+        expect(previaAtual.revisao).toBe(comProcesso.revisao);
+
+        const bloqueador = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await bloqueador.connect();
+        let confirmado = false;
+        try {
+          await bloqueador.query('BEGIN');
+          await bloqueador.query('UPDATE nucleo.pessoa SET nome = nome WHERE id = $1', [pessoaId]);
+          const ocupada = await verificar(previaAtual.provaFonte);
+          expect(ocupada.status, ocupada.corpo).toBe(409);
+          expect(ocupada.corpo).toContain('sendo atualizada');
+          await bloqueador.query('COMMIT');
+          confirmado = true;
+        } finally {
+          if (!confirmado) await bloqueador.query('ROLLBACK');
+          await bloqueador.end();
+        }
+        expect((await verificar(previaAtual.provaFonte)).status).toBe(409);
+        const depoisDaEscrita = await abrir();
+        expect((await verificar(depoisDaEscrita.provaFonte)).status).toBe(200);
+
+        const segundoCriado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos',
+          corpo: { calculo, admissaoEsperada: '2020-01-01', motivo: 'Segundo documento fictício' }, ...autor,
+        });
+        expect(segundoCriado.status, segundoCriado.corpo).toBe(201);
+        const segundoDocumento = rascunhoDofSchema.parse(JSON.parse(segundoCriado.corpo));
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${segundoDocumento.id}/preconferencia`,
+          cookie: autor.cookie, provaFonte: depoisDaEscrita.provaFonte,
+        })).status).toBe(409);
+
+        const encaminhado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/encaminhar`,
+          corpo: { revisao: comProcesso.revisao, destinatarioId }, ...autor,
+        });
+        expect(encaminhado.status, encaminhado.corpo).toBe(201);
+        expect((await verificar(depoisDaEscrita.provaFonte, destinatario.cookie)).status).toBe(409);
+        const previaDestinatario = await abrir(destinatario.cookie);
+        const consultaDestinatario = await verificar(previaDestinatario.provaFonte, destinatario.cookie);
+        expect(consultaDestinatario.status, consultaDestinatario.corpo).toBe(200);
+        expect(preconferenciaDofSchema.parse(JSON.parse(consultaDestinatario.corpo)).fontePreviaValidada).toBe(true);
+
+        const auditoria = await cliente.query<{ acao: string; detalhes: unknown }>(`
+          SELECT acao, detalhes FROM seguranca.auditoria WHERE entidade_id = $1
+        `, [rascunho.id]);
+        expect(auditoria.rows.map((evento) => evento.acao)).toContain('preconferencia_fonte_alterada');
+        expect(JSON.stringify(auditoria.rows)).not.toContain(cpf);
+        expect(JSON.stringify(auditoria.rows)).not.toContain(previaInicial.provaFonte);
+        expect((await cliente.query('SELECT count(*) FROM documentos.emissao WHERE documento_id = $1', [rascunho.id])).rows[0].count).toBe('0');
       } finally {
         await encerrar();
       }

@@ -4,6 +4,7 @@ import {
   criarRascunhoDofSchema,
   solicitarCalculoDofSchema,
   type AnoCalculo,
+  type ProvaFontePreviaDof,
   type RascunhoDof,
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
@@ -79,6 +80,7 @@ export function CalculoDof({
     rascunhoInicial && !admissaoAlterada ? rascunhoInicial.entrada : null,
   );
   const [rascunho, setRascunho] = useState<RascunhoDof | null>(rascunhoInicial ?? null);
+  const [provaPrevia, setProvaPrevia] = useState<ProvaFontePreviaDof | null>(null);
   const [resultadoSalvo, setResultadoSalvo] = useState(Boolean(rascunhoInicial));
   const [motivo, setMotivo] = useState('');
   const [confirmouRemocao, setConfirmouRemocao] = useState(false);
@@ -416,10 +418,12 @@ export function CalculoDof({
         <BlocosDof rascunho={rascunho} csrf={csrf}
           bloqueado={calculoPendente || processoPendente || encaminhamentoPendente || operacaoEncaminhamento || ocupado}
           somenteLeitura={edicaoIndisponivel}
-          onAtualizar={setRascunho} onPendente={marcarBlocos} onErro={onErro} onLimpar={onLimpar} />
+          onAtualizar={setRascunho} onPendente={marcarBlocos} onPrevia={setProvaPrevia} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && (podeSalvar || somenteLeitura) && (
         <VerificacaoConferenciaDof rascunho={rascunho}
+          provaFonte={provaPrevia?.documentoId === rascunho.id && provaPrevia.revisao === rascunho.revisao
+            ? provaPrevia.provaFonte : undefined}
           bloqueado={calculoPendente || blocosPendentes || processoPendente || encaminhamentoPendente
             || operacaoEncaminhamento || ocupado}
           onErro={onErro} onLimpar={onLimpar} />

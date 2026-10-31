@@ -115,7 +115,7 @@ describe('blocos e prévia provisória de DOF', () => {
 
   it('exibe os campos consultados e escapa tanto a identidade como as variáveis', () => {
     const fonte = dadosFontePreviaDofSchema.parse({
-      documentoId: randomUUID(), revisao: 3, consultadoEm: '2026-01-01T12:00:00.000Z',
+      documentoId: randomUUID(), revisao: 3, provaFonte: 'a'.repeat(64), consultadoEm: '2026-01-01T12:00:00.000Z',
       nome: 'Pessoa <img src=x>', matricula: 'FICTICIA&1', cpf: cpfSintetico(),
       nascimento: '1960-05-04', nomeMae: 'Mãe <script>fictícia</script>',
       regimeJuridico: 'Regime fictício', cargo: 'Cargo <b>fictício</b>',
@@ -127,6 +127,7 @@ describe('blocos e prévia provisória de DOF', () => {
       blocos: [{ ...bloco, texto: '{{nome_mae}} {{cpf}} {{cargo}} {{nivel}} {{orgao}}' }],
     };
     const html = renderizarPreviaDof(dados);
+    expect(html).not.toContain(fonte.provaFonte);
     expect(html).toContain('Pessoa &lt;img src=x&gt;');
     expect(html).toContain('Mãe &lt;script&gt;fictícia&lt;/script&gt;');
     expect(html).toContain('Cargo &lt;b&gt;fictício&lt;/b&gt;');
