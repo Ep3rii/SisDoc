@@ -7,8 +7,10 @@ Estão liberados consulta de servidores e cálculo, rascunho, blocos, prévia e
 conferência de DOF pela interface. A emissão da DOF (numeração, snapshot,
 PDF, histórico, cópia e cancelamento) está implementada, mas **fica bloqueada
 até o registro da aprovação formal** da regra e do template
-([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)). **Não há DTCs,
-importação, backup ou serviço Windows da aplicação implementados**. A prévia
+([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)). As DTCs IPAM,
+Comissionado e INSS têm o mesmo fluxo e o mesmo bloqueio por tipo; o modelo
+INSS é provisório ([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)).
+**Não há importação, backup ou serviço Windows da aplicação implementados**. A prévia
 segue identificada como provisória; confira o conteúdo antes de qualquer uso
 oficial.
 
@@ -81,8 +83,8 @@ lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `013-emissao` ao banco novo. Uma instalação anterior sem essa
-migração não inicia com esta versão. Para atualizar uma instalação existente,
+O setup aplica até `014-dtc` ao banco novo. Uma instalação anterior sem essa
+migração (por exemplo, em `013-emissao`) não inicia com esta versão. Para atualizar uma instalação existente,
 pare a aplicação e execute na raiz do repositório:
 
 ```powershell
@@ -105,12 +107,16 @@ operador autorizado registra a aprovação, em terminal interativo:
 
 ```powershell
 npm run build
-npm run aprovar-modelo
+npm run aprovar-modelo -- DOF
 ```
 
-O comando mostra regra e template vigentes, pede nome/cargo de quem aprovou e
-a referência da decisão (ofício, processo ou `docs/decisoes/0NN`) e exige a
-digitação de `APROVAR DOF`. O registro é permanente, imutável e auditado; o
+O tipo pode ser `DOF`, `DTC_IPAM`, `DTC_COMISSIONADO` ou `DTC_INSS` (sem
+argumento, o comando pergunta). A aprovação é por tipo: aprovar a DOF não
+libera as DTCs. O comando mostra regra e template vigentes, pede nome/cargo
+de quem aprovou e a referência da decisão (ofício, processo ou
+`docs/decisoes/0NN`) e exige a digitação de `APROVAR <TIPO>` (por exemplo,
+`APROVAR DOF`). Não aprove `DTC_INSS` enquanto o template
+`emissao-dtc-inss-provisorio-1` não tiver os textos oficiais. O registro é permanente, imutável e auditado; o
 papel da aplicação não consegue gravá-lo, e não existe chave ou configuração
 que substitua a aprovação. Uma nova versão de regra ou template exige nova
 aprovação.
@@ -124,6 +130,21 @@ automaticamente com o mesmo número. A tela Histórico lista as últimas cinco
 emissões, permite baixar o PDF (acesso auditado), copiar como novo rascunho
 (analista/coordenador) e cancelar com motivo obrigatório (secretário adjunto e
 administrador). O número cancelado não é reutilizado.
+
+## DTC IPAM, DTC Comissionado e DTC INSS
+
+Analista e coordenador abrem **DTC IPAM**, **DTC Comissionado** ou **DTC INSS**
+no menu, buscam o servidor e criam o rascunho com até quatro períodos (anos
+gerados automaticamente para lançamento de faltas e afastamentos), até três
+cargos em comissão (Comissionado) ou cargo/função e categoria funcional por
+período, licenças, documentação-base e observação (INSS), além do processo.
+Edições exigem motivo. A conferência é feita na prévia pelo autor ou por
+coordenador; o coordenador pode devolver com motivo ou emitir. A numeração é
+própria por tipo (`N° n/AAAA`), o PDF segue o mesmo worker da DOF e o
+histórico mostra as cinco últimas DTCs emitidas, com cópia e cancelamento como
+na DOF. Os totais do Comissionado e do INSS e as linhas de incorporação são
+provisórios, e o PDF do INSS traz marca de modelo provisório
+([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)).
 
 O limite é de cinco falhas por matrícula e 20 por IP em 15 minutos. O IP é o
 endereço da conexão, sem confiar em cabeçalhos encaminhados. A origem aceita
@@ -158,7 +179,7 @@ há alterações não salvas. No celular, abra **Menu** para navegar.
 No desktop, a prévia fica à direita e os totais/ação de salvamento ficam na
 barra inferior. As deduções exibidas são as deduções de contribuição do
 resultado, não a diferença entre dias brutos e contribuição, que pode incluir
-incorporações. DTCs, histórico e emissão aparecem indisponíveis. A situação
+incorporações. A situação
 da fonte informa consulta local, sem inventar data de sincronização.
 
 Nos detalhes de um vínculo com admissão informada, selecione **Calcular DOF**,

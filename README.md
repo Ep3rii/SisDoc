@@ -8,8 +8,11 @@ nas funções existentes: consulta de servidores, cálculo, rascunhos, prévia e
 conferência da DOF. A emissão da DOF com numeração, PDF, histórico, cópia e
 cancelamento está implementada, mas **bloqueada até a aprovação formal** da
 regra e do template ([decisão 022](docs/decisoes/022-aprovacao-formal-e-emissao.md)).
-DTCs, importação das fontes, backup e serviço automático da aplicação ainda
-não estão implementados.
+As DTCs IPAM, Comissionado e INSS seguem o mesmo fluxo e também ficam
+bloqueadas até a aprovação formal de cada tipo; o modelo INSS é provisório
+([decisão 023](docs/decisoes/023-dtc-ipam-comissionado-inss.md)). Importação
+das fontes, backup e serviço automático da aplicação ainda não estão
+implementados.
 
 ## Estado atual
 
@@ -20,7 +23,8 @@ não estão implementados.
 - Autenticação, usuários, auditoria, busca e fluxo provisório de rascunhos DOF.
 - Layout inspirado no [protótipo](Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg):
   menu lateral, busca global, abas, editor com prévia à direita e totais fixos.
-- Emissão da DOF dependente de aprovação formal; sincronização indisponível;
+- Emissão da DOF e das DTCs dependente de aprovação formal por tipo;
+  sincronização indisponível;
   nenhuma fonte é alterada pela edição de rascunhos.
 
 ## Acesso à instalação desta máquina
@@ -38,8 +42,8 @@ npm start
 Se o código mudou, pare a aplicação, execute `npm run build` e
 `npm run migrar` (aplica só migrações pendentes, com o papel de migração
 lido de `C:\ProgramData\SisDoc\provisionamento\banco.json`) antes de iniciar.
-A aprovação formal da regra e do template, quando houver, é registrada com
-`npm run aprovar-modelo`; veja [operação](docs/OPERACAO.md). Não inicie outra
+A aprovação formal da regra e do template, quando houver, é registrada por
+tipo com `npm run aprovar-modelo -- DOF|DTC_IPAM|DTC_COMISSIONADO|DTC_INSS`; veja [operação](docs/OPERACAO.md). Não inicie outra
 cópia enquanto a porta estiver ocupada. Configuração, senhas, certificados e
 chaves ficam fora do Git; não publique nem cole seus conteúdos em logs.
 

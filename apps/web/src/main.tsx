@@ -4,6 +4,7 @@ import type { RespostaSessao } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { Auditoria } from './auditoria';
 import { ConferidosDof } from './conferidos-dof';
+import { TelaDtc } from './dtc';
 import { Historico } from './historico';
 import { RascunhosDof } from './rascunhos-dof';
 import { BuscaGlobal, Servidores, type Consulta } from './servidores';
@@ -81,7 +82,8 @@ function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos' | 'historico'>('busca');
+  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos' | 'historico'
+    | 'DTC_IPAM' | 'DTC_COMISSIONADO' | 'DTC_INSS'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [menuAberto, setMenuAberto] = useState(false);
@@ -200,10 +202,15 @@ function App() {
                 </>}
                 {sessao.usuario.papel === 'coordenador' && <button type="button"
                   aria-current={tela === 'encaminhados' ? 'page' : undefined} onClick={() => navegar('encaminhados')}>Encaminhados a mim</button>}
-                <p className="grupo-menu">DTCs · Em desenvolvimento</p>
-                <button type="button" disabled>DTC IPAM<span>Anexo III</span></button>
-                <button type="button" disabled>DTC Comissionado<span>Benefício junto ao INSS</span></button>
-                <button type="button" disabled>DTC INSS<span>RGPS</span></button>
+                {podeSalvar && <>
+                  <p className="grupo-menu">DTCs</p>
+                  <button type="button" aria-current={tela === 'DTC_IPAM' ? 'page' : undefined}
+                    onClick={() => navegar('DTC_IPAM')}>DTC IPAM<span>Anexo III</span></button>
+                  <button type="button" aria-current={tela === 'DTC_COMISSIONADO' ? 'page' : undefined}
+                    onClick={() => navegar('DTC_COMISSIONADO')}>DTC Comissionado<span>Benefício junto ao INSS</span></button>
+                  <button type="button" aria-current={tela === 'DTC_INSS' ? 'page' : undefined}
+                    onClick={() => navegar('DTC_INSS')}>DTC INSS<span>RGPS · modelo provisório</span></button>
+                </>}
                 <div className="menu-separado"><button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
                   onClick={() => navegar('historico')}>Histórico<span>Emissões, PDF e cópias</span></button></div>
               </>}
@@ -233,8 +240,8 @@ function App() {
       <div className="conteudo">
         <h1 className="sr-only">DOF e DTC</h1>
         <details className="situacao-implantacao">
-          <summary>Uso operacional autorizado em 31/10/2026 — emissão da DOF depende de aprovação formal; DTCs ainda indisponíveis</summary>
-          <p>Consulta, cálculo, rascunhos, prévia e conferência da DOF estão liberados. A emissão da DOF com número e PDF já existe, mas só é liberada depois que a regra e o modelo forem aprovados formalmente pelo administrador com npm run aprovar-modelo. Até lá, as regras e a prévia seguem identificadas como provisórias.</p>
+          <summary>Uso operacional autorizado em 31/10/2026 — emissão de DOF e DTCs depende de aprovação formal de cada modelo</summary>
+          <p>Consulta, cálculo, rascunhos, prévia e conferência da DOF e das DTCs (IPAM, Comissionado e INSS) estão liberados. A emissão com número e PDF só é liberada, por tipo, depois que a regra e o modelo forem aprovados formalmente pelo administrador com npm run aprovar-modelo. Até lá, as regras e a prévia seguem identificadas como provisórias. Os totais da DTC Comissionado são inferidos e o modelo da DTC INSS é provisório (textos oficiais pendentes).</p>
         </details>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
@@ -256,6 +263,10 @@ function App() {
               onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {sessao.usuario.papel === 'coordenador' && tela === 'encaminhados' && (
               <RascunhosDof key={chaveTela} csrf={sessao.csrf} recebidos
+                onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
+            )}
+            {podeSalvar && (tela === 'DTC_IPAM' || tela === 'DTC_COMISSIONADO' || tela === 'DTC_INSS') && (
+              <TelaDtc key={`dtc-${tela}-${chaveTela}`} tipo={tela} csrf={sessao.csrf} papel={sessao.usuario.papel}
                 onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
             )}
             {tela === 'historico' && (

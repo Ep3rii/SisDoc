@@ -1,11 +1,11 @@
 import type { OnModuleDestroy, OnApplicationBootstrap } from '@nestjs/common';
-import { snapshotEmissaoDofSchema, type Configuracao } from '@sisdoc/contratos';
+import { snapshotEmissaoDofSchema, snapshotEmissaoDtcSchema, type Configuracao, type TipoDtc } from '@sisdoc/contratos';
 import type { Pool } from 'pg';
 import type { Browser } from 'playwright';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { ArmazenamentoPdf } from './armazenamento-pdf';
-import { renderizarPdfEmissaoDof } from './pdf-emissao-dof';
-import { ProcessadorPdfEmissao } from './processador-pdf-emissao';
+import { renderizarPdfEmissaoDof, renderizarPdfEmissaoDtc } from './pdf-emissao-dof';
+import { ProcessadorPdfEmissao, type RenderizadorEmissao } from './processador-pdf-emissao';
 
 const INTERVALO_MS = 1000;
 const POSSE_MS = 120000;
@@ -20,6 +20,13 @@ export class WorkerPdfEmissao implements OnApplicationBootstrap, OnModuleDestroy
 
   constructor(banco: Pool, configuracao: Configuracao) {
     if (!configuracao.pdf) return;
+    const dtc = (tipo: TipoDtc): RenderizadorEmissao => async (snapshot, contexto) => {
+      const dados = snapshotEmissaoDtcSchema.parse(snapshot);
+      if (dados.tipo !== tipo || dados.documentoId !== contexto.documentoId || dados.emissaoId !== contexto.emissaoId) {
+        throw new Error('O snapshot não pertence à emissão processada.');
+      }
+      return renderizarPdfEmissaoDtc(await this.obterNavegador(), dados);
+    };
     this.processador = new ProcessadorPdfEmissao(
       banco,
       new ProtetorDados(configuracao.chaves),
@@ -32,6 +39,9 @@ export class WorkerPdfEmissao implements OnApplicationBootstrap, OnModuleDestroy
           }
           return renderizarPdfEmissaoDof(await this.obterNavegador(), dados);
         },
+        DTC_IPAM: dtc('DTC_IPAM'),
+        DTC_COMISSIONADO: dtc('DTC_COMISSIONADO'),
+        DTC_INSS: dtc('DTC_INSS'),
       },
       POSSE_MS,
     );

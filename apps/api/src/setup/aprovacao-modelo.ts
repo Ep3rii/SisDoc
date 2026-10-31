@@ -2,12 +2,21 @@ import { randomUUID } from 'node:crypto';
 import { REGRAS_PLANILHA } from '@sisdoc/calculo';
 import type { Client } from 'pg';
 import { z } from 'zod';
+import { TEMPLATES_DTC } from '../migracoes/dtc';
 import { TEMPLATE_EMISSAO_DOF } from '../migracoes/emissao';
 
 const textoAprovacaoSchema = z.string().trim().min(3).max(200);
 
+export const tipoAprovacaoSchema = z.enum(['DOF', 'DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS']);
+export type TipoAprovacao = z.infer<typeof tipoAprovacaoSchema>;
+
+export const TEMPLATES_EMISSAO: Readonly<Record<TipoAprovacao, string>> = Object.freeze({
+  DOF: TEMPLATE_EMISSAO_DOF,
+  ...TEMPLATES_DTC,
+});
+
 export const aprovacaoModeloSchema = z.strictObject({
-  tipo: z.literal('DOF'),
+  tipo: tipoAprovacaoSchema,
   aprovadoPor: textoAprovacaoSchema,
   referenciaDecisao: textoAprovacaoSchema,
 });
@@ -21,7 +30,12 @@ export type ModeloVigente = {
 
 export const CONFIRMACAO_APROVACAO = 'APROVAR DOF';
 
-export async function consultarModeloVigente(cliente: Client): Promise<ModeloVigente> {
+export function confirmacaoAprovacao(tipo: TipoAprovacao): string {
+  return `APROVAR ${tipo}`;
+}
+
+export async function consultarModeloVigente(cliente: Client, tipo: TipoAprovacao = 'DOF'): Promise<ModeloVigente> {
+  tipoAprovacaoSchema.parse(tipo);
   const consulta = await cliente.query<{
     regra_id: string; regra_codigo: string; regra_versao: string; template_id: string; template_versao: string;
     aprovacao_id: string | null; aprovado_por: string | null; referencia_decisao: string | null; aprovado_em: Date | null;
@@ -30,11 +44,11 @@ export async function consultarModeloVigente(cliente: Client): Promise<ModeloVig
       t.id AS template_id, t.versao AS template_versao,
       a.id AS aprovacao_id, a.aprovado_por, a.referencia_decisao, a.aprovado_em
     FROM documentos.regra_versao r
-    JOIN documentos.template_versao t ON t.tipo = 'DOF' AND t.versao = $4
+    JOIN documentos.template_versao t ON t.tipo = $5 AND t.versao = $4
     LEFT JOIN documentos.aprovacao_modelo a
-      ON a.tipo = 'DOF' AND a.regra_versao_id = r.id AND a.template_versao_id = t.id
+      ON a.tipo = $5 AND a.regra_versao_id = r.id AND a.template_versao_id = t.id
     WHERE r.codigo = $1 AND r.versao = $2 AND r.configuracao = $3::jsonb
-  `, [REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA), TEMPLATE_EMISSAO_DOF]);
+  `, [REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA), TEMPLATES_EMISSAO[tipo], tipo]);
   const linha = consulta.rows[0];
   if (!linha) {
     throw new Error('A regra vigente ou o template de emissão não estão registrados; execute npm run migrar antes de aprovar.');
@@ -56,9 +70,9 @@ export async function registrarAprovacaoModelo(cliente: Client, entrada: Aprovac
   const dados = aprovacaoModeloSchema.parse(entrada);
   await cliente.query('BEGIN');
   try {
-    const modelo = await consultarModeloVigente(cliente);
+    const modelo = await consultarModeloVigente(cliente, dados.tipo);
     if (modelo.aprovacaoExistente) {
-      throw new Error('A regra e o template vigentes da DOF já possuem aprovação registrada.');
+      throw new Error(`A regra e o template vigentes de ${dados.tipo} já possuem aprovação registrada.`);
     }
     const id = randomUUID();
     await cliente.query(`

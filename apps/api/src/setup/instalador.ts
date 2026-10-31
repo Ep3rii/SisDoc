@@ -14,6 +14,7 @@ import { aplicarConfirmacaoInicioDof } from '../migracoes/confirmacao-inicio-dof
 import { aplicarConferenciaDof } from '../migracoes/conferencia-dof';
 import { aplicarDevolucaoDof } from '../migracoes/devolucao-dof';
 import { aplicarEmissao } from '../migracoes/emissao';
+import { aplicarDtc } from '../migracoes/dtc';
 import { aplicarEncaminhamentoDof } from '../migracoes/encaminhamento-dof';
 import { aplicarPreconferenciaDof } from '../migracoes/preconferencia-dof';
 import { aplicarRevisaoFonteDof } from '../migracoes/revisao-fonte-dof';
@@ -414,6 +415,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarRevisaoFonteDof(cliente, opcoes.banco.usuario);
     await aplicarConferenciaDof(cliente, opcoes.banco.usuario);
     await aplicarEmissao(cliente, opcoes.banco.usuario);
+    await aplicarDtc(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

@@ -2,6 +2,9 @@
 
 - A emissão operacional exige autorização, dados conferidos e regra e template
   aprovados; aviso ou configuração não transforma material provisório em oficial.
+  A aprovação é por tipo (DOF, DTC IPAM, DTC Comissionado, DTC INSS) e a de um
+  tipo não libera outro; textos não extraídos da fonte oficial permanecem
+  marcados como provisórios.
 - O cálculo recebe suas entradas, inclusive data de referência, e não acessa
   relógio, banco ou rede. Ajustes pertencem ao documento, nunca à fonte.
 - Pessoas não são apagadas por ausência na API; remoção lógica só ocorre após

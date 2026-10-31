@@ -5,6 +5,7 @@ import { aplicarConferenciaDof } from './conferencia-dof';
 import { aplicarConfirmacaoInicioDof } from './confirmacao-inicio-dof';
 import { aplicarConsulta } from './consulta';
 import { aplicarDevolucaoDof } from './devolucao-dof';
+import { aplicarDtc } from './dtc';
 import { aplicarEmissao } from './emissao';
 import { aplicarEncaminhamentoDof } from './encaminhamento-dof';
 import { aplicarModelo } from './modelo';
@@ -29,6 +30,7 @@ export const SEQUENCIA_MIGRACOES: readonly Migracao[] = [
   { versao: '011-revisao-fonte-dof', aplicar: aplicarRevisaoFonteDof },
   { versao: '012-conferencia-dof', aplicar: aplicarConferenciaDof },
   { versao: '013-emissao', aplicar: aplicarEmissao },
+  { versao: '014-dtc', aplicar: aplicarDtc },
 ];
 
 // Deve ser chamada dentro de uma transação aberta pelo papel de migração; devolve as versões aplicadas agora.

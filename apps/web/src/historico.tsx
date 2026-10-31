@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import type { GrupoHistorico, HistoricoEmissoes, ItemHistorico } from '@sisdoc/contratos';
+import { ROTULOS_DTC, type GrupoHistorico, type HistoricoEmissoes, type ItemHistorico } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { baixarPdfEmissao, rotuloPdf } from './emissao';
 
@@ -62,11 +62,15 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
     try {
       onLimpar();
       setOcupado(true);
-      const resultado = await api.copiarEmitido(csrf, item.documentoId);
+      const resultado = await api.copiarEmitido(csrf, item.documentoId, item.tipo);
       if (resultado.origemEmissaoId !== item.emissaoId) {
         throw new ErroApi(0, 'Não foi possível confirmar a cópia. Consulte os rascunhos antes de tentar novamente.');
       }
-      if (ativa.current) setMensagem(`Rascunho criado a partir da emissão ${item.numero}. Ele está em Meus rascunhos.`);
+      if (ativa.current) {
+        setMensagem(item.tipo === 'DOF'
+          ? `Rascunho criado a partir da emissão ${item.numero}. Ele está em Meus rascunhos.`
+          : `Rascunho criado a partir da emissão ${item.numero}. Ele está na tela da ${ROTULOS_DTC[item.tipo]}.`);
+      }
     } catch (erro) {
       if (ativa.current) onErro(erro);
     } finally {
@@ -154,15 +158,15 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
           Tentar carregar o Histórico novamente
         </button>
       ) : !dados ? <p role="status">Carregando Histórico...</p> : dados.itens.length === 0 ? (
-        <p>{grupo === 'DTC' ? 'Nenhuma DTC emitida. A emissão de DTCs ainda está em desenvolvimento.' : 'Nenhuma DOF emitida encontrada.'}</p>
+        <p>{grupo === 'DTC' ? 'Nenhuma DTC emitida encontrada.' : 'Nenhuma DOF emitida encontrada.'}</p>
       ) : (
         <div className="tabela"><table>
-          <thead><tr><th scope="col">Número</th><th scope="col">Nome</th><th scope="col">Matrícula</th>
+          <thead><tr><th scope="col">Tipo</th><th scope="col">Número</th><th scope="col">Nome</th><th scope="col">Matrícula</th>
             <th scope="col">Emitida em</th><th scope="col">Emitida por</th><th scope="col">Situação</th>
             <th scope="col">PDF</th><th scope="col">Ações</th></tr></thead>
           <tbody>{dados.itens.map((item) => (
             <tr key={item.emissaoId}>
-              <td>{item.numero}</td><td>{item.nome ?? '—'}</td><td>{item.matricula ?? '—'}</td>
+              <td>{item.tipo === 'DOF' ? 'DOF' : ROTULOS_DTC[item.tipo]}</td><td>{item.numero}</td><td>{item.nome ?? '—'}</td><td>{item.matricula ?? '—'}</td>
               <td>{new Date(item.emitidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
               <td>{item.emitidoPorNome}</td>
               <td>{item.status === 'cancelado' ? 'Cancelada' : 'Emitida'}</td>

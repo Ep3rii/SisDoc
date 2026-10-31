@@ -10,7 +10,10 @@ Campos, índices, restrições e regras detalhadas estão no anexo A.2 do prompt
 - `documentos`: documento, períodos, cargos comissionados, blocos e suas
   versões, versões de templates, numeração, emissão, job de PDF e ajustes
   justificados. Metadados do artefato PDF são associados ao job/emissão,
-  sem alterar o snapshot.
+  sem alterar o snapshot. A conferência da DOF fica em `conferencia_dof`; a
+  das DTCs em `conferencia_dtc`/`devolucao_conferido_dtc` (decisão 023), e
+  `documento_periodo` guarda também `categoria` e `cargo` (DTC INSS).
+  Aprovação formal e numeração são por tipo de documento.
 - `seguranca`: usuário, sessão e auditoria append-only. Sessões armazenam hash,
   não o identificador opaco; o acesso ao banco segue menor privilégio.
 - `legado`: cópia fiel importada, com lote e origem; tradução para o modelo

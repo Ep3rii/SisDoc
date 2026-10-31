@@ -35,7 +35,7 @@ export const solicitarCalculoDofSchema = z.strictObject({
   message: 'A data final não pode ser anterior à inicial.',
 });
 
-const linhaAnualSchema = z.strictObject({
+export const linhaAnualSchema = z.strictObject({
   ano: z.number().int().min(1).max(9999),
   inicio: dataFuncionalSchema,
   fim: dataFuncionalSchema,
@@ -56,7 +56,7 @@ const linhaAnualSchema = z.strictObject({
   licencaPremio: quantidade,
 });
 
-const totaisSchema = z.strictObject({
+export const totaisCalculoSchema = z.strictObject({
   diasBrutos: quantidade,
   contribuicaoMunicipio: quantidade,
   efetivoExercicio: quantidade,
@@ -79,7 +79,7 @@ export const resultadoCalculoDofSchema = z.strictObject({
     fim: dataFuncionalSchema,
     linhas: z.array(linhaAnualSchema).min(1),
   }),
-  totais: totaisSchema,
+  totais: totaisCalculoSchema,
   declaracao: z.array(z.string()),
   avisos: z.array(z.strictObject({
     codigo: z.string(),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SituacaoEmissao } from '@sisdoc/contratos';
+import { ROTULOS_DTC, type SituacaoEmissao } from '@sisdoc/contratos';
 import { api } from './api';
 
 const rotulosPdf: Record<SituacaoEmissao['pdf']['status'], string> = {
@@ -74,7 +74,7 @@ export function PainelEmissao({ situacao: inicial, onErro, onLimpar }: Props) {
   return (
     <div className="painel-emissao" aria-live="polite">
       <p className="aviso sucesso" role="status">
-        DOF emitida: {situacao.numero}, em{' '}
+        {situacao.tipo === 'DOF' ? 'DOF' : ROTULOS_DTC[situacao.tipo]} emitida: {situacao.numero}, em{' '}
         {new Date(situacao.emitidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} por {situacao.emitidoPorNome}.
       </p>
       <p>Situação do PDF: <strong>{rotuloPdf(situacao)}</strong>

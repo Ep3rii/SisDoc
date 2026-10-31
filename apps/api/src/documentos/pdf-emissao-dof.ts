@@ -1,12 +1,20 @@
-import { snapshotEmissaoDofSchema, type SnapshotEmissaoDof } from '@sisdoc/contratos';
-import { renderizarEmissaoDof } from '@sisdoc/templates';
+import {
+  snapshotEmissaoDofSchema, snapshotEmissaoDtcSchema, type SnapshotEmissaoDof, type SnapshotEmissaoDtc,
+} from '@sisdoc/contratos';
+import { renderizarEmissaoDof, renderizarEmissaoDtc } from '@sisdoc/templates';
 import type { Browser } from 'playwright';
 
 const rodape = '<div style="width:100%;text-align:center;font:8px Arial,sans-serif;color:#333">Página <span class="pageNumber"></span> de <span class="totalPages"></span></div>';
 
 export async function renderizarPdfEmissaoDof(navegador: Browser, entrada: SnapshotEmissaoDof): Promise<Buffer> {
-  const dados = snapshotEmissaoDofSchema.parse(entrada);
-  const html = renderizarEmissaoDof(dados);
+  return htmlParaPdf(navegador, renderizarEmissaoDof(snapshotEmissaoDofSchema.parse(entrada)));
+}
+
+export async function renderizarPdfEmissaoDtc(navegador: Browser, entrada: SnapshotEmissaoDtc): Promise<Buffer> {
+  return htmlParaPdf(navegador, renderizarEmissaoDtc(snapshotEmissaoDtcSchema.parse(entrada)));
+}
+
+export async function htmlParaPdf(navegador: Browser, html: string): Promise<Buffer> {
   const contexto = await navegador.newContext({ javaScriptEnabled: false, acceptDownloads: false });
   let pdf: Buffer;
   try {

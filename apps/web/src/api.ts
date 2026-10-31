@@ -1,4 +1,18 @@
 import {
+  documentoDtcSchema,
+  paginaDtcSchema,
+  previaDtcSchema,
+  resultadoTransicaoDtcSchema,
+  type AtualizarDtc,
+  type ConferirDtc,
+  type CriarDtc,
+  type DevolverDtc,
+  type DocumentoDtc,
+  type EmitirDtc,
+  type PaginaDtc,
+  type PreviaDtc,
+  type ResultadoTransicaoDtc,
+  type TipoDtc,
   historicoEmissoesSchema,
   resultadoCopiaEmitidoSchema,
   situacaoEmissaoSchema,
@@ -250,9 +264,37 @@ export const api = {
   async historico(tipo: GrupoHistorico, escopo: 'proprio' | 'todos'): Promise<HistoricoEmissoes> {
     return validar(historicoEmissoesSchema, await requisitar(`historico?${new URLSearchParams({ tipo, escopo }).toString()}`));
   },
-  async copiarEmitido(csrf: string, documentoId: string): Promise<ResultadoCopiaEmitido> {
+  async copiarEmitido(csrf: string, documentoId: string, tipo: 'DOF' | TipoDtc = 'DOF'): Promise<ResultadoCopiaEmitido> {
     return validar(resultadoCopiaEmitidoSchema, await requisitar(
-      `documentos/${documentoId}/copia`, 'POST', { confirmar: true }, csrf,
+      `${tipo === 'DOF' ? 'documentos' : 'dtc'}/${documentoId}/copia`, 'POST', { confirmar: true }, csrf,
+    ));
+  },
+  async listarDtc(estado: 'rascunho' | 'conferido', tipo?: TipoDtc): Promise<PaginaDtc> {
+    const consulta = new URLSearchParams({ estado });
+    if (tipo) consulta.set('tipo', tipo);
+    return validar(paginaDtcSchema, await requisitar(`dtc?${consulta.toString()}`));
+  },
+  async obterDtc(id: string): Promise<DocumentoDtc> {
+    return validar(documentoDtcSchema, await requisitar(`dtc/${id}`));
+  },
+  async criarDtc(csrf: string, dados: CriarDtc): Promise<DocumentoDtc> {
+    return validar(documentoDtcSchema, await requisitar('dtc', 'POST', dados, csrf));
+  },
+  async atualizarDtc(csrf: string, id: string, dados: AtualizarDtc): Promise<DocumentoDtc> {
+    return validar(documentoDtcSchema, await requisitar(`dtc/${id}`, 'PATCH', dados, csrf));
+  },
+  async previaDtc(id: string): Promise<PreviaDtc> {
+    return validar(previaDtcSchema, await requisitar(`dtc/${id}/previa`));
+  },
+  async conferirDtc(csrf: string, id: string, dados: ConferirDtc): Promise<ResultadoTransicaoDtc> {
+    return validar(resultadoTransicaoDtcSchema, await requisitar(`dtc/${id}/conferir`, 'POST', dados, csrf));
+  },
+  async devolverDtc(csrf: string, id: string, dados: DevolverDtc): Promise<ResultadoTransicaoDtc> {
+    return validar(resultadoTransicaoDtcSchema, await requisitar(`dtc/${id}/devolver`, 'POST', dados, csrf));
+  },
+  async emitirDtc(csrf: string, id: string, chave: string, dados: EmitirDtc): Promise<SituacaoEmissao> {
+    return validar(situacaoEmissaoSchema, await requisitar(
+      `dtc/${id}/emitir`, 'POST', dados, csrf, undefined, { 'Idempotency-Key': chave },
     ));
   },
   async cancelarEmitido(csrf: string, documentoId: string, dados: CancelarEmitido): Promise<SituacaoEmissao> {

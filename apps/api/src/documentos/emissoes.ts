@@ -2,16 +2,15 @@ import { BadRequestException, ConflictException, NotFoundException, ServiceUnava
 import {
   historicoEmissoesSchema,
   situacaoEmissaoSchema,
-  snapshotEmissaoDofSchema,
   type CancelarEmitido,
   type Configuracao,
   type ConsultaHistorico,
   type HistoricoEmissoes,
   type ItemHistorico,
   type SituacaoEmissao,
-  type SnapshotEmissaoDof,
 } from '@sisdoc/contratos';
 import type { Pool, PoolClient } from 'pg';
+import { z } from 'zod';
 import { transacao } from '../banco';
 import { dataEmSaoPaulo } from '../data';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
@@ -46,6 +45,9 @@ type LinhaSituacao = {
   matricula: string;
 };
 export type PdfEmissao = { nome: string; conteudo: Buffer };
+
+// O nome é o único campo do snapshot usado aqui; vale para DOF e DTC.
+const nomeSnapshotSchema = z.looseObject({ nome: z.string().min(1) });
 
 const tiposPorGrupo = {
   DOF: ['DOF'],
@@ -118,8 +120,8 @@ export class EmissoesService {
       || perfilPermiteAcao(sessao.usuario.papel, 'historico_terceiros');
   }
 
-  private snapshot(linha: Pick<LinhaSituacao, 'id'>, cifrado: Buffer): SnapshotEmissaoDof {
-    return snapshotEmissaoDofSchema.parse(JSON.parse(this.protetor.decifrar(cifrado, {
+  private snapshot(linha: Pick<LinhaSituacao, 'id'>, cifrado: Buffer): { nome: string } {
+    return nomeSnapshotSchema.parse(JSON.parse(this.protetor.decifrar(cifrado, {
       schema: 'documentos', tabela: 'emissao', registroId: linha.id, campo: 'snapshot_cifrado',
     }).toString('utf8')));
   }
@@ -221,7 +223,7 @@ export class EmissoesService {
           ...situacao,
           nome: ve ? linha.nome : null,
           matricula: ve ? linha.matricula : null,
-          podeCopiar: !minimizado && linha.tipo === 'DOF' && perfilPermiteAcao(papel, 'criar_rascunho')
+          podeCopiar: !minimizado && perfilPermiteAcao(papel, 'criar_rascunho')
             && (participa || papel === 'coordenador'),
           podeCancelar: linha.status === 'emitido' && perfilPermiteAcao(papel, 'cancelar_emitido'),
           podeBaixar: ve && situacao.pdf.disponivel,

@@ -3,6 +3,8 @@ import { analisarTextoDof, valoresVariaveisDof } from './variaveis-dof';
 
 export { analisarTextoDof, valoresVariaveisDof, verificarVariaveisDof } from './variaveis-dof';
 export { renderizarEmissaoDof } from './emissao-dof';
+export { CNPJ_SEMAD, MARCA_INSS_PROVISORIO, TEXTO_SEM_EMENDAS, renderizarDocumentoDtc, renderizarEmissaoDtc, renderizarPreviaDtc } from './emissao-dtc';
+export type { DadosDocumentoDtc } from './emissao-dtc';
 export type { ParteTextoDof } from './variaveis-dof';
 
 type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resultado' | 'blocos' | 'processo'> & {
