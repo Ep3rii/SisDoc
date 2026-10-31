@@ -1,0 +1,14 @@
+[
+  {
+    "codigo": "GT-01",
+    "dias": 1311,
+    "esperado": { "anos": 3, "meses": 7, "dias": 6 },
+    "texto": "1.311 dias, que correspondem a 03 anos, 07 meses e 06 dias."
+  },
+  {
+    "codigo": "GT-11",
+    "dias": 0,
+    "esperado": { "anos": 0, "meses": 0, "dias": 0 },
+    "texto": ""
+  }
+]

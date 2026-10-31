@@ -1,0 +1,177 @@
+[
+  {
+    "codigo": "GT-REF",
+    "tipo": "DOF",
+    "posse": "1986-06-17",
+    "dataReferencia": "2026-03-20",
+    "periodos": [
+      { "inicio": "1986-06-17", "fim": "2026-03-20", "anos": [{ "ano": 2000, "faltas": 1 }] }
+    ],
+    "esperado": {
+      "totais": { "diasBrutos": 14522, "contribuicaoMunicipio": 14521, "efetivoExercicio": 14521, "totalContribuicao": 14521 },
+      "textoContribuicao": "14.521 dias, que correspondem a 39 anos, 09 meses e 16 dias."
+    }
+  },
+  {
+    "codigo": "GT-02",
+    "tipo": "DOF",
+    "posse": "1980-01-01",
+    "dataReferencia": "2026-12-31",
+    "periodos": [{ "inicio": "1980-01-01", "fim": "2026-12-31", "anos": [] }],
+    "esperado": {
+      "totais": { "diasBrutos": 17167, "contribuicaoMunicipio": 17167, "efetivoExercicio": 17167 },
+      "quantidadeLinhas": 47,
+      "linhas": [{ "periodo": 1, "ano": 2026, "diasBrutos": 365 }]
+    }
+  },
+  {
+    "codigo": "GT-03",
+    "tipo": "DOF",
+    "posse": "2017-01-01",
+    "dataReferencia": "2021-12-31",
+    "periodos": [{
+      "inicio": "2017-01-01",
+      "fim": "2021-12-31",
+      "anos": [
+        { "ano": 2017, "ts": 365 },
+        { "ano": 2018, "ts": 365 },
+        { "ano": 2019, "ts": 100, "pf": 100 },
+        { "ano": 2020, "ts": 100, "pf": 81 },
+        { "ano": 2021, "pf": 1 }
+      ]
+    }],
+    "esperado": {
+      "totais": { "diasBrutos": 1826, "contribuicaoMunicipio": 1826, "efetivoExercicio": 1624 },
+      "avisos": ["limite_ts_excedido", "limite_pf_excedido"],
+      "linhas": [
+        { "periodo": 1, "ano": 2019, "excessoTs": 100, "excessoPf": 0, "efetivoExercicio": 265 },
+        { "periodo": 1, "ano": 2020, "excessoTs": 100, "excessoPf": 1, "efetivoExercicio": 265 },
+        { "periodo": 1, "ano": 2021, "excessoTs": 0, "excessoPf": 1, "efetivoExercicio": 364 }
+      ]
+    }
+  },
+  {
+    "codigo": "GT-04",
+    "tipo": "DOF",
+    "posse": "2019-12-31",
+    "dataReferencia": "2020-03-01",
+    "periodos": [{ "inicio": "2019-12-31", "fim": "2020-03-01", "anos": [] }],
+    "esperado": {
+      "totais": { "diasBrutos": 62, "contribuicaoMunicipio": 62, "efetivoExercicio": 62 },
+      "linhas": [
+        { "periodo": 1, "ano": 2019, "diasBrutos": 1 },
+        { "periodo": 1, "ano": 2020, "diasBrutos": 61 }
+      ]
+    }
+  },
+  {
+    "codigo": "GT-05",
+    "tipo": "DOF",
+    "posse": "2020-01-01",
+    "dataReferencia": "2020-01-02",
+    "periodos": [{ "inicio": "2019-12-01", "fim": "2020-01-02", "anos": [] }],
+    "esperado": {
+      "totais": { "diasBrutos": 2, "contribuicaoMunicipio": 2, "efetivoExercicio": 2 },
+      "avisos": ["inicio_ajustado_posse"],
+      "inicioEfetivo": "2020-01-01"
+    }
+  },
+  {
+    "codigo": "GT-06",
+    "tipo": "DOF",
+    "posse": "2020-01-01",
+    "dataReferencia": "2020-12-31",
+    "periodos": [{
+      "inicio": "2020-01-01",
+      "fim": "2020-12-31",
+      "anos": [{ "ano": 2020, "pb": 20, "pv": 30, "licencaPremio": 40 }]
+    }],
+    "esperado": {
+      "totais": {
+        "diasBrutos": 366, "contribuicaoMunicipio": 366, "efetivoExercicio": 366,
+        "pb": 20, "pv": 30, "licencaPremio": 40, "totalContribuicao": 456
+      },
+      "declaracao": [
+        "- Tempo de efetivo exercício: 366 dias, que correspondem a 01 ano e 01 dia.",
+        "- Tempo de contribuição ao município: 366 dias, que correspondem a 01 ano e 01 dia.",
+        "- Incorporação de PV-PB: 50 dias, que correspondem a 01 mês e 20 dias.",
+        "- Incorporação de LICENÇA-PRÊMIO: 40 dias, que correspondem a 01 mês e 10 dias.",
+        "- Tempo total de contribuição: 456 dias, que correspondem a 01 ano, 03 meses e 01 dia."
+      ]
+    }
+  },
+  {
+    "codigo": "GT-07",
+    "tipo": "DTC_IPAM",
+    "posse": "2016-01-01",
+    "dataReferencia": "2021-12-31",
+    "periodos": [
+      {
+        "inicio": "2016-01-01",
+        "fim": "2018-12-31",
+        "anos": [{ "ano": 2016, "ts": 366 }, { "ano": 2017, "ts": 365 }, { "ano": 2018, "ts": 1, "pf": 181 }]
+      },
+      {
+        "inicio": "2019-01-01",
+        "fim": "2020-12-31",
+        "anos": [{ "ano": 2019, "ts": 365 }, { "ano": 2020, "ts": 366 }]
+      },
+      { "inicio": "2021-01-01", "fim": "2021-12-31", "anos": [{ "ano": 2021, "ts": 180, "pf": 181 }] }
+    ],
+    "esperado": {
+      "totais": { "diasBrutos": 2192, "contribuicaoMunicipio": 2192, "efetivoExercicio": 2187, "totalContribuicao": 2192 },
+      "textoPeriodos": "01/01/2016 A 31/12/2018; 01/01/2019 A 31/12/2020; 01/01/2021 A 31/12/2021.",
+      "periodos": [
+        { "ordem": 1, "excessoTs": 2, "excessoPf": 1, "efetivoExercicio": 1093 },
+        { "ordem": 2, "excessoTs": 1, "excessoPf": 0, "efetivoExercicio": 730 },
+        { "ordem": 3, "excessoTs": 0, "excessoPf": 1, "efetivoExercicio": 364 }
+      ],
+      "linhas": [{ "periodo": 1, "ano": 2018, "excessoTs": 0, "excessoPf": 0, "efetivoExercicio": 365 }]
+    }
+  },
+  {
+    "codigo": "GT-09",
+    "tipo": "DOF",
+    "posse": "2020-12-31",
+    "dataReferencia": "2021-12-31",
+    "periodos": [{ "inicio": "2020-12-31", "fim": "2021-12-31", "anos": [] }],
+    "esperado": {
+      "totais": { "diasBrutos": 366, "contribuicaoMunicipio": 366, "efetivoExercicio": 366 },
+      "linhas": [{ "periodo": 1, "ano": 2021, "diasBrutos": 365 }]
+    }
+  },
+  {
+    "codigo": "GT-10-a",
+    "tipo": "DOF",
+    "posse": "2022-01-01",
+    "dataReferencia": "2022-12-31",
+    "periodos": [{ "inicio": "2022-01-01", "fim": "2022-12-31", "anos": [] }],
+    "esperado": { "ordemDeclaracao": ["efetivo", "municipio", "total"] }
+  },
+  {
+    "codigo": "GT-10-b",
+    "tipo": "DOF",
+    "posse": "2022-01-01",
+    "dataReferencia": "2022-12-31",
+    "periodos": [{ "inicio": "2022-01-01", "fim": "2022-12-31", "anos": [{ "ano": 2022, "pb": 10 }] }],
+    "esperado": { "ordemDeclaracao": ["efetivo", "municipio", "pb_pv", "total"] }
+  },
+  {
+    "codigo": "GT-10-c",
+    "tipo": "DOF",
+    "posse": "2022-01-01",
+    "dataReferencia": "2022-12-31",
+    "periodos": [{ "inicio": "2022-01-01", "fim": "2022-12-31", "anos": [{ "ano": 2022, "licencaPremio": 20 }] }],
+    "esperado": { "ordemDeclaracao": ["efetivo", "municipio", "licenca_premio", "total"] }
+  },
+  {
+    "codigo": "GT-10-d",
+    "tipo": "DOF",
+    "posse": "2022-01-01",
+    "dataReferencia": "2022-12-31",
+    "periodos": [{
+      "inicio": "2022-01-01", "fim": "2022-12-31", "anos": [{ "ano": 2022, "pb": 10, "licencaPremio": 20 }]
+    }],
+    "esperado": { "ordemDeclaracao": ["efetivo", "municipio", "pb_pv", "licenca_premio", "total"] }
+  }
+]

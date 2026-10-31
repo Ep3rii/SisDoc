@@ -1,0 +1,21 @@
+{
+  "codigo": "GT-08",
+  "matriculaInexistente": "000000-3",
+  "matriculaAtual": "000000-2",
+  "vinculos": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "pessoaId": "00000000-0000-4000-8000-000000000010",
+      "matricula": "000000-1",
+      "sistemaOrigem": "origem-sintetica",
+      "matriculaAnteriorId": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "pessoaId": "00000000-0000-4000-8000-000000000010",
+      "matricula": "000000-2",
+      "sistemaOrigem": "origem-sintetica",
+      "matriculaAnteriorId": "00000000-0000-4000-8000-000000000001"
+    }
+  ]
+}

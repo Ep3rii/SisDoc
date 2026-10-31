@@ -56,7 +56,7 @@ export const criarDocumentoSchema = z.strictObject({
   if (documento.tipo === 'DOF' && documento.periodos.length !== 1) {
     contexto.addIssue({ code: 'custom', path: ['periodos'], message: 'A DOF exige exatamente um período.' });
   }
-  const ordenados = [...documento.periodos].sort((a, b) => a.inicio.localeCompare(b.inicio));
+  const ordenados = [...documento.periodos].sort((a, b) => a.inicio < b.inicio ? -1 : a.inicio > b.inicio ? 1 : 0);
   for (let indice = 1; indice < ordenados.length; indice += 1) {
     if (ordenados[indice].inicio <= ordenados[indice - 1].fim) {
       contexto.addIssue({ code: 'custom', path: ['periodos'], message: 'Os períodos não podem se sobrepor.' });

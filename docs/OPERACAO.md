@@ -1,7 +1,8 @@
 # Operação — fundação ainda não autorizada
 
-Este documento descreve somente a fundação. **Não há login, cálculo, emissão,
-importação, backup ou serviço Windows implementados.** Não instalar ou usar
+Este documento descreve somente a fundação. O motor de referência foi
+testado, mas **não há login, fluxo de cálculo na interface, emissão,
+importação, backup ou serviço Windows implementados**. Não instalar ou usar
 operacionalmente até a conclusão das demais fatias e autorização formal.
 
 ## Pré-requisitos para uma futura instalação
