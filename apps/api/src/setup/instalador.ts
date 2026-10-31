@@ -11,6 +11,7 @@ import { Client } from 'pg';
 import { z } from 'zod';
 import { configuracaoSchema, type Configuracao } from '@sisdoc/contratos';
 import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
+import { aplicarAutenticacao } from '../migracoes/autenticacao';
 import { aplicarModelo } from '../migracoes/modelo';
 
 const execFile = promisify(execFileCallback);
@@ -415,6 +416,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await cliente.query(`GRANT USAGE ON SCHEMA seguranca TO ${papel}`);
     await cliente.query(`GRANT SELECT, INSERT, UPDATE ON seguranca.usuario TO ${papel}`);
     await aplicarModelo(cliente, opcoes.banco.usuario);
+    await aplicarAutenticacao(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

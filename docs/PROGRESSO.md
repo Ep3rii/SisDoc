@@ -8,7 +8,8 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 0 — fundação | gate técnico verificado | `npm run setup` e `npm start` em recursos descartáveis; HTTPS com CA e nome verificados; health e página inicial |
 | 1 — dados e contratos | gate técnico verificado | migração no banco vazio e em cópia sintética da fundação; contratos, restrições, privilégios e concorrência testados |
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
-| 3 a 9 — fluxos e operação | não iniciadas | — |
+| 3 — autenticação e perfis | parcial | migração e matriz de permissões testadas; login e controle de rotas ainda não implementados |
+| 4 a 9 — fluxos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
 citada no prompt. Node 24.20.0 e npm 11.19.0 foram encontrados; PostgreSQL e
@@ -35,6 +36,10 @@ passaram: 55 testes no total, incluindo os GT e propriedades com
 `fast-check`. `npm audit` não apontou vulnerabilidades. A busca de GT-08 é
 uma função pura com vínculos sintéticos, não uma consulta operacional.
 
+Na fatia 3, a migração 002 e a matriz de perfis/autoria passaram em recursos
+descartáveis; `npm run typecheck` e `npm test` passaram com 57 testes. Ainda
+não há sessão, CSRF, controle de acesso das rotas ou telas de usuários.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A fundação não
 possui autenticação, fluxo de cálculo na interface, emissão ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -43,4 +48,5 @@ sem aceite.
 Divergências e decisões estão em
 [001-regras-e-estado-inicial.md](decisoes/001-regras-e-estado-inicial.md) e
 [002-modelo-e-protecao.md](decisoes/002-modelo-e-protecao.md) e
-[003-motor-calculo.md](decisoes/003-motor-calculo.md).
+[003-motor-calculo.md](decisoes/003-motor-calculo.md) e
+[004-autenticacao.md](decisoes/004-autenticacao.md).

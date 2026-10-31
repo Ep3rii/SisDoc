@@ -1,4 +1,5 @@
 import type { Client } from 'pg';
+import { executarMigracao } from './executor';
 
 export const VERSAO_MODELO = '001-modelo';
 
@@ -546,28 +547,8 @@ CREATE TRIGGER staging_retencao BEFORE DELETE ON nucleo.staging_api
 `;
 
 export async function aplicarModelo(cliente: Client, usuarioAplicacao: string): Promise<boolean> {
-  if (!/^[A-Za-z_][A-Za-z0-9_]{0,62}$/.test(usuarioAplicacao)) {
-    throw new Error('Papel do aplicativo inválido para migração.');
-  }
-  await cliente.query('SAVEPOINT sisdoc_modelo_001');
-  try {
-    const bloqueio = await cliente.query<{ obtido: boolean }>(
-      'SELECT pg_try_advisory_xact_lock($1, $2) AS obtido',
-      [1936286820, 1],
-    );
-    if (!bloqueio.rows[0].obtido) throw new Error('Já existe outra migração em andamento neste banco.');
-    const resultado = await cliente.query<{ versao: string }>('SELECT versao FROM seguranca.migracao ORDER BY versao');
-    const versoes = new Set(resultado.rows.map((linha) => linha.versao));
-    if (!versoes.has('000-fundacao') || [...versoes].some((versao) => !['000-fundacao', VERSAO_MODELO].includes(versao))) {
-      throw new Error('Histórico de migrações desconhecido ou incompleto.');
-    }
-    if (versoes.has(VERSAO_MODELO)) {
-      await cliente.query('RELEASE SAVEPOINT sisdoc_modelo_001');
-      return false;
-    }
-
+  return executarMigracao(cliente, usuarioAplicacao, VERSAO_MODELO, async (papel) => {
     await cliente.query(sqlModelo);
-    const papel = `"${usuarioAplicacao}"`;
     await cliente.query('REVOKE ALL ON SCHEMA nucleo, documentos, seguranca, legado, extensoes FROM PUBLIC');
     await cliente.query('REVOKE ALL ON ALL TABLES IN SCHEMA nucleo, documentos, seguranca, legado FROM PUBLIC');
     await cliente.query('REVOKE ALL ON ALL SEQUENCES IN SCHEMA nucleo, documentos, seguranca, legado FROM PUBLIC');
@@ -576,16 +557,5 @@ export async function aplicarModelo(cliente: Client, usuarioAplicacao: string): 
     await cliente.query(`GRANT SELECT ON ALL TABLES IN SCHEMA nucleo, documentos, seguranca, legado TO ${papel}`);
     await cliente.query(`GRANT INSERT ON seguranca.auditoria TO ${papel}`);
     await cliente.query(`GRANT USAGE, SELECT ON SEQUENCE seguranca.auditoria_id_seq TO ${papel}`);
-    await cliente.query('INSERT INTO seguranca.migracao (versao) VALUES ($1)', [VERSAO_MODELO]);
-    await cliente.query('RELEASE SAVEPOINT sisdoc_modelo_001');
-    return true;
-  } catch (erro) {
-    try {
-      await cliente.query('ROLLBACK TO SAVEPOINT sisdoc_modelo_001');
-      await cliente.query('RELEASE SAVEPOINT sisdoc_modelo_001');
-    } catch (erroRollback) {
-      throw new AggregateError([erro, erroRollback], 'Não foi possível reverter a migração.');
-    }
-    throw erro;
-  }
+  });
 }

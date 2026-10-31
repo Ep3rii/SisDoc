@@ -17,6 +17,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { HealthController } from '../apps/api/dist/app.module.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
+import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js';
 import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
 import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
@@ -507,8 +508,25 @@ describe('fundação em recursos descartáveis', () => {
       ]);
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toMatchObject({ code: '25P01' });
       await expect(aplicarModelo(cliente, 'papel";DROP SCHEMA seguranca')).rejects.toThrow('Papel do aplicativo inválido');
+      const duplicado = randomUUID();
+      await cliente.query(
+        "INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel) VALUES ($1, 'teste', 'Outro sintético', 'hash-fictício', 'analista')",
+        [duplicado],
+      );
+      await cliente.query('BEGIN');
+      await expect(aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).rejects.toMatchObject({ code: '23505' });
+      await cliente.query('ROLLBACK');
+      expect((await cliente.query('SELECT id FROM seguranca.usuario ORDER BY matricula')).rows).toHaveLength(2);
+      expect((await cliente.query('SELECT versao FROM seguranca.migracao ORDER BY versao')).rows).toEqual([
+        { versao: '000-fundacao' }, { versao: '001-modelo' },
+      ]);
+      await cliente.query('DELETE FROM seguranca.usuario WHERE id = $1', [duplicado]);
+      await cliente.query('BEGIN');
+      expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
       await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarAutenticacao(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -546,14 +564,15 @@ describe('fundação em recursos descartáveis', () => {
       const privilegios = await cliente.query<{
         alterar_usuario: boolean; inserir_pessoa: boolean; inserir_emissao: boolean;
         inserir_auditoria: boolean; alterar_auditoria: boolean; apagar_auditoria: boolean;
-        publico_le_usuario: boolean; publico_usa_nucleo: boolean;
+        publico_le_usuario: boolean; publico_usa_nucleo: boolean; alterar_matricula: boolean;
       }>(`
-        SELECT has_table_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
+        SELECT has_any_column_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
                has_table_privilege(current_user, 'nucleo.pessoa', 'INSERT') AS inserir_pessoa,
                has_table_privilege(current_user, 'documentos.emissao', 'INSERT') AS inserir_emissao,
                has_table_privilege(current_user, 'seguranca.auditoria', 'INSERT') AS inserir_auditoria,
                has_table_privilege(current_user, 'seguranca.auditoria', 'UPDATE') AS alterar_auditoria,
                has_table_privilege(current_user, 'seguranca.auditoria', 'DELETE') AS apagar_auditoria,
+               has_column_privilege(current_user, 'seguranca.usuario', 'matricula', 'UPDATE') AS alterar_matricula,
                EXISTS (
                  SELECT 1 FROM aclexplode((SELECT relacl FROM pg_class WHERE oid = 'seguranca.usuario'::regclass))
                  WHERE grantee = 0 AND privilege_type = 'SELECT'
@@ -564,12 +583,15 @@ describe('fundação em recursos descartáveis', () => {
                ) AS publico_usa_nucleo
       `);
       expect(privilegios.rows[0]).toEqual({
-        alterar_usuario: false, inserir_pessoa: false, inserir_emissao: false, inserir_auditoria: true,
+        alterar_usuario: true, inserir_pessoa: false, inserir_emissao: false, inserir_auditoria: true,
         alterar_auditoria: false, apagar_auditoria: false, publico_le_usuario: false, publico_usa_nucleo: false,
+        alterar_matricula: false,
       });
       await cliente.query('BEGIN');
       await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");
-      await rejeitarSql(cliente, "UPDATE seguranca.usuario SET nome = 'Alteração indevida'", [], '42501');
+      await cliente.query("UPDATE seguranca.usuario SET nome = 'Nome sintético atualizado'");
+      await rejeitarSql(cliente, "UPDATE seguranca.usuario SET matricula = 'Alteração indevida'", [], '42501');
+      await rejeitarSql(cliente, 'DELETE FROM seguranca.usuario', [], '42501');
       await rejeitarSql(cliente, 'DELETE FROM seguranca.auditoria', [], '42501');
       await rejeitarSql(cliente, 'TRUNCATE seguranca.auditoria', [], '42501');
       await cliente.query('ROLLBACK');

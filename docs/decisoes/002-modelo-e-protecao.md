@@ -13,10 +13,12 @@ necessário implementar e verificar backup, restauração e procedimento de
 recuperação. O setup continua recusando bancos não vazios.
 
 `legado` existe, mas não contém tabelas: o mapeamento depende do esquema real
-ainda não fornecido. O papel da aplicação possui leitura das tabelas criadas e
-inserção na auditoria, sem escrita em usuários, documentos ou dados
-funcionais. Novas concessões devem acompanhar as funcionalidades e seus
-testes; não se presume autorização pela existência das tabelas.
+ainda não fornecido. Após a migração 001, o papel da aplicação tinha leitura
+das tabelas criadas e inserção na auditoria, sem outras escritas. A migração
+002 acrescenta concessões limitadas para usuários, sessões e controle de
+tentativas; documentos e dados funcionais continuam sem escrita. Novas
+concessões devem acompanhar as funcionalidades e seus testes; não se presume
+autorização pela existência das tabelas.
 
 ## Proteção de conteúdo
 
