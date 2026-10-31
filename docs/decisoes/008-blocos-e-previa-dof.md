@@ -15,7 +15,8 @@ revisão e bloqueio transacional do documento; leitura da revisão e dos blocos
 usa bloqueio compartilhado. A ordem é única ao final da transação, permitindo
 trocas. Blocos já salvos não podem ser apagados: podem ser desativados e
 permanecem no registro de ajustes. A conta da aplicação não pode modificar
-versões, apagar blocos ou alterar o estado do documento.
+versões ou apagar blocos. A transição de estado posteriormente acrescentada
+exige evento correspondente, conforme a [decisão 017](017-conferencia-provisoria-dof.md).
 
 Os limites técnicos são 200 blocos, 8.000 caracteres por bloco e 20.000 no
 total. Esses limites não representam validação de modelo oficial. O servidor
@@ -36,8 +37,8 @@ identidade e leitura da fonte estão na
 Conteúdo e valores são escapados como texto. São substituídas apenas as
 variáveis exibidas pela interface; nomes não disponíveis são destacados. O
 renderizador não fornece todos os campos e formatos previstos no prompt. A
-verificação preliminar detecta variáveis ausentes ou malformadas, mas a
-transição de conferência ainda não existe. A prévia tem indicação de ausência
+verificação preliminar detecta variáveis ausentes ou malformadas e a
+conferência provisória posterior bloqueia essas pendências. A prévia tem indicação de ausência
 de validade e não é template institucional, aprovação, conferência ou emissão.
 
 ## Evidência e limites
@@ -54,7 +55,6 @@ locais e não garantem desempenho sob carga ou em produção.
 Na execução completa, a abertura auditada de 45 anos por HTTPS descartável
 levou 7,5 ms, e a maior das cinco edições no limite de 200 blocos e 20.000
 caracteres até aparecer no iframe levou 84,7 ms. O navegador simulado não
-comprova integração à CA operacional. Conferência,
-numeração, snapshot, PDF, histórico, edição administrativa
+comprova integração à CA operacional. Numeração, snapshot, PDF, histórico, edição administrativa
 de modelos e reconhecimento de todas as variáveis continuam pendentes. Não
 existe autorização para emissão ou uso operacional.

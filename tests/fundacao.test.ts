@@ -17,12 +17,16 @@ import {
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
   paginaCoordenadoresDofSchema,
+  paginaConferidosDofSchema,
   paginaEncaminhamentosDofSchema,
   paginaUsuariosSchema,
   paginaRascunhosDofSchema,
   preconferenciaDofSchema,
+  previaConferidaDofSchema,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
+  resultadoConferenciaDofSchema,
+  resultadoDevolucaoConferidoDofSchema,
   resultadoDevolucaoDofSchema,
   respostaSessaoSchema,
   ultimaDevolucaoDofSchema,
@@ -41,6 +45,7 @@ import { aplicarAutenticacao } from '../apps/api/dist/migracoes/autenticacao.js'
 import { aplicarBlocosDof } from '../apps/api/dist/migracoes/blocos-dof.js';
 import { aplicarConfirmacaoInicioDof } from '../apps/api/dist/migracoes/confirmacao-inicio-dof.js';
 import { aplicarDevolucaoDof } from '../apps/api/dist/migracoes/devolucao-dof.js';
+import { aplicarConferenciaDof } from '../apps/api/dist/migracoes/conferencia-dof.js';
 import { aplicarEncaminhamentoDof } from '../apps/api/dist/migracoes/encaminhamento-dof.js';
 import { aplicarPreconferenciaDof, CHAVE_BLOQUEIO_FONTE_DOF } from '../apps/api/dist/migracoes/preconferencia-dof.js';
 import { aplicarRevisaoFonteDof } from '../apps/api/dist/migracoes/revisao-fonte-dof.js';
@@ -338,6 +343,23 @@ async function inserirPessoaEVinculo(cliente: Client): Promise<{ pessoa: string;
     [vinculo, pessoa, `M-${vinculo}`, randomUUID()],
   );
   return { pessoa, vinculo };
+}
+
+async function conferirSqlSintetico(cliente: Client, documentoId: string, usuarioId: string): Promise<string> {
+  const conferenciaId = randomUUID();
+  await cliente.query(`
+    INSERT INTO documentos.conferencia_dof
+      (id, documento_id, revisao_documento, revisao_pessoa, revisao_vinculo, conferido_por, avisos)
+    SELECT $1, d.id, d.revisao + 1, p.revisao_fonte, v.revisao_fonte, $3, ARRAY['regra_provisoria']::text[]
+    FROM documentos.documento d JOIN nucleo.pessoa p ON p.id = d.pessoa_id
+    JOIN nucleo.vinculo v ON v.id = d.vinculo_id WHERE d.id = $2
+  `, [conferenciaId, documentoId, usuarioId]);
+  await cliente.query(`
+    UPDATE documentos.documento SET status = 'conferido', conferido_por = $2,
+      conferido_em = (SELECT conferido_em FROM documentos.conferencia_dof WHERE id = $3),
+      atualizado_por = $2, revisao = revisao + 1 WHERE id = $1
+  `, [documentoId, usuarioId, conferenciaId]);
+  return conferenciaId;
 }
 
 describe('fundação em recursos descartáveis', () => {
@@ -705,6 +727,7 @@ describe('fundação em recursos descartáveis', () => {
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
       expect(await aplicarRevisaoFonteDof(cliente, 'sisdoc_aplicativo')).toBe(true);
+      expect(await aplicarConferenciaDof(cliente, 'sisdoc_aplicativo')).toBe(true);
       await cliente.query('COMMIT');
       await cliente.query('BEGIN');
       expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
@@ -718,6 +741,7 @@ describe('fundação em recursos descartáveis', () => {
       expect(await aplicarConfirmacaoInicioDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarDevolucaoDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       expect(await aplicarRevisaoFonteDof(cliente, 'sisdoc_aplicativo')).toBe(false);
+      expect(await aplicarConferenciaDof(cliente, 'sisdoc_aplicativo')).toBe(false);
       await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
       await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
       await cliente.query('ROLLBACK');
@@ -759,6 +783,9 @@ describe('fundação em recursos descartáveis', () => {
         alterar_rascunho: boolean; alterar_status: boolean; apagar_ajuste: boolean;
         alterar_bloco: boolean; apagar_bloco: boolean; alterar_versao_bloco: boolean;
         alterar_processo_cifrado: boolean; alterar_processo_texto: boolean;
+        alterar_pessoa: boolean; alterar_vinculo: boolean; inserir_conferencia: boolean;
+        alterar_conferencia: boolean; apagar_conferencia: boolean; truncar_conferencia: boolean;
+        alterar_devolucao_conferido: boolean; apagar_devolucao_conferido: boolean;
       }>(`
         SELECT has_any_column_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
                has_table_privilege(current_user, 'nucleo.pessoa', 'INSERT') AS inserir_pessoa,
@@ -775,6 +802,14 @@ describe('fundação em recursos descartáveis', () => {
                has_table_privilege(current_user, 'documentos.bloco_versao', 'UPDATE') AS alterar_versao_bloco,
                has_column_privilege(current_user, 'documentos.documento', 'processo_cifrado', 'UPDATE') AS alterar_processo_cifrado,
                has_column_privilege(current_user, 'documentos.documento', 'processo_numero', 'UPDATE') AS alterar_processo_texto,
+               has_any_column_privilege(current_user, 'nucleo.pessoa', 'UPDATE') AS alterar_pessoa,
+               has_any_column_privilege(current_user, 'nucleo.vinculo', 'UPDATE') AS alterar_vinculo,
+               has_column_privilege(current_user, 'documentos.conferencia_dof', 'revisao_pessoa', 'INSERT') AS inserir_conferencia,
+               has_any_column_privilege(current_user, 'documentos.conferencia_dof', 'UPDATE') AS alterar_conferencia,
+               has_table_privilege(current_user, 'documentos.conferencia_dof', 'DELETE') AS apagar_conferencia,
+               has_table_privilege(current_user, 'documentos.conferencia_dof', 'TRUNCATE') AS truncar_conferencia,
+               has_any_column_privilege(current_user, 'documentos.devolucao_conferido_dof', 'UPDATE') AS alterar_devolucao_conferido,
+               has_table_privilege(current_user, 'documentos.devolucao_conferido_dof', 'DELETE') AS apagar_devolucao_conferido,
                EXISTS (
                  SELECT 1 FROM aclexplode((SELECT relacl FROM pg_class WHERE oid = 'seguranca.usuario'::regclass))
                  WHERE grantee = 0 AND privilege_type = 'SELECT'
@@ -787,9 +822,12 @@ describe('fundação em recursos descartáveis', () => {
       expect(privilegios.rows[0]).toEqual({
         alterar_usuario: true, inserir_pessoa: false, inserir_emissao: false, inserir_auditoria: true,
         alterar_auditoria: false, apagar_auditoria: false, publico_le_usuario: false, publico_usa_nucleo: false,
-        alterar_matricula: false, alterar_rascunho: true, alterar_status: false, apagar_ajuste: false,
+        alterar_matricula: false, alterar_rascunho: true, alterar_status: true, apagar_ajuste: false,
         alterar_bloco: true, apagar_bloco: false, alterar_versao_bloco: false,
         alterar_processo_cifrado: true, alterar_processo_texto: false,
+        alterar_pessoa: false, alterar_vinculo: false, inserir_conferencia: true,
+        alterar_conferencia: false, apagar_conferencia: false, truncar_conferencia: false,
+        alterar_devolucao_conferido: false, apagar_devolucao_conferido: false,
       });
       await cliente.query('BEGIN');
       await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");
@@ -934,7 +972,11 @@ describe('fundação em recursos descartáveis', () => {
     try {
       const { pessoa, vinculo } = await inserirPessoaEVinculo(cliente);
       const outra = await inserirPessoaEVinculo(cliente);
-      const usuario = (await cliente.query<{ id: string }>('SELECT id FROM seguranca.usuario LIMIT 1')).rows[0].id;
+      const usuario = randomUUID();
+      await cliente.query(`
+        INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+        VALUES ($1, $2, 'Coordenador sintético', 'hash-sintetico', 'coordenador', false)
+      `, [usuario, `COORD-TESTE-${usuario}`]);
       const regra = randomUUID();
       const templateDof = randomUUID();
       const templateDtc = randomUUID();
@@ -1030,19 +1072,28 @@ describe('fundação em recursos descartáveis', () => {
         VALUES ($1, 'cargo', $2, $2, $3)
       `, [dof, conteudo, usuario]);
       await rejeitarSql(cliente, "UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [dof], '23514');
-      await cliente.query(`
-        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = now() WHERE id = $1
-      `, [dof, usuario]);
+      await rejeitarSql(cliente, `
+        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = now(),
+          atualizado_por = $2, revisao = revisao + 1 WHERE id = $1
+      `, [dof, usuario], '23514');
+      const primeiraConferencia = await conferirSqlSintetico(cliente, dof, usuario);
       await rejeitarSql(cliente, 'UPDATE documentos.documento SET confirmacao_inicio_cifrada = $2 WHERE id = $1',
         [dof, conteudo], '55000');
-      await rejeitarSql(cliente, "UPDATE documentos.documento SET status = 'rascunho' WHERE id = $1", [dof], '23514');
+      await rejeitarSql(cliente, `
+        UPDATE documentos.documento SET status = 'rascunho', conferido_por = NULL, conferido_em = NULL,
+          atualizado_por = $2, revisao = revisao + 1 WHERE id = $1
+      `, [dof, usuario], '23514');
       await cliente.query(`
-        UPDATE documentos.documento SET status = 'rascunho', conferido_por = NULL, conferido_em = NULL WHERE id = $1
-      `, [dof]);
-      await cliente.query('UPDATE documentos.documento SET entrada_cifrada = $2 WHERE id = $1', [dof, conteudo]);
+        INSERT INTO documentos.devolucao_conferido_dof
+          (id, documento_id, conferencia_id, devolvido_por, motivo_cifrado)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [randomUUID(), dof, primeiraConferencia, usuario, conteudo]);
       await cliente.query(`
-        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = now() WHERE id = $1
+        UPDATE documentos.documento SET status = 'rascunho', conferido_por = NULL, conferido_em = NULL,
+          atualizado_por = $2, revisao = revisao + 1 WHERE id = $1
       `, [dof, usuario]);
+      await cliente.query('UPDATE documentos.documento SET entrada_cifrada = $2 WHERE id = $1', [dof, conteudo]);
+      await conferirSqlSintetico(cliente, dof, usuario);
       await rejeitarSql(cliente, `
         UPDATE documentos.documento SET entrada_cifrada = $2 WHERE id = $1
       `, [dof, randomBytes(48)], '55000');
@@ -2653,10 +2704,10 @@ describe('fundação em recursos descartáveis', () => {
         }
         await cliente.query('BEGIN');
         try {
-          await cliente.query(`
-            UPDATE documentos.documento SET status = 'conferido', conferido_por = criado_por, conferido_em = now()
-            WHERE id = $1
-          `, [rascunhoBlocos.id]);
+          const autor = await cliente.query<{ criado_por: string }>(
+            'SELECT criado_por FROM documentos.documento WHERE id = $1', [rascunhoBlocos.id],
+          );
+          await conferirSqlSintetico(cliente, rascunhoBlocos.id, autor.rows[0].criado_por);
           await rejeitarSql(cliente, 'UPDATE documentos.documento SET processo_cifrado = $1 WHERE id = $2',
             [Buffer.from('alteração fictícia'), rascunhoBlocos.id], '55000');
         } finally {
@@ -2784,10 +2835,10 @@ describe('fundação em recursos descartáveis', () => {
         }
         const relatorioInicial = await verificar();
         expect(relatorioInicial).toMatchObject({
-          documentoId: rascunho.id, revisao: 3, status: 'nao_conferido', conferenciaDisponivel: false,
+          documentoId: rascunho.id, revisao: 3, status: 'nao_conferido', conferenciaDisponivel: true,
         });
         expect(relatorioInicial.bloqueios.map((item) => item.codigo)).toEqual(expect.arrayContaining([
-          'conferencia_indisponivel', 'aprovacao_modelo_nao_verificada', 'variaveis_ausentes', 'variaveis_malformadas',
+          'variaveis_ausentes', 'variaveis_malformadas', 'campos_referencia_ausentes',
         ]));
         for (const codigo of [
           'cpf_indisponivel', 'cpf_invalido', 'cpf_hash_inconsistente', 'matricula_inconsistente',
@@ -2796,7 +2847,7 @@ describe('fundação em recursos descartáveis', () => {
           'processo_ausente', 'mascaras_ausentes', 'processo_invalido',
         ]) expect(relatorioInicial.bloqueios.map((item) => item.codigo)).not.toContain(codigo);
         expect(relatorioInicial.avisos.map((item) => item.codigo)).toEqual(expect.arrayContaining([
-          'regra_provisoria', 'dados_sem_data', 'campos_referencia_ausentes',
+          'aprovacao_modelo_nao_verificada', 'regra_provisoria', 'dados_sem_data',
         ]));
 
         const semProcesso = await requisitarApi(portaHttps, caPem, {
@@ -3020,7 +3071,7 @@ describe('fundação em recursos descartáveis', () => {
           expect(maeValida.bloqueios.map((item) => item.codigo)).not.toContain('nome_mae_indisponivel');
           expect(maeValida.bloqueios.map((item) => item.codigo)).not.toContain('nome_mae_invalido');
           expect(JSON.stringify(maeValida)).not.toContain(nomeMaeFicticio);
-          expect(maeValida.avisos.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
+          expect(maeValida.bloqueios.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
             .not.toContain('nome da mãe');
           const casosMae = [
             { valor: Buffer.alloc(0), codigo: 'nome_mae_indisponivel' },
@@ -3035,14 +3086,14 @@ describe('fundação em recursos descartáveis', () => {
             await cliente.query('UPDATE nucleo.pessoa SET nome_mae_cifrado = $1 WHERE id = $2', [caso.valor, pessoaId]);
             const relatorio = await verificar();
             expect(relatorio.bloqueios.map((item) => item.codigo)).toContain(caso.codigo);
-            expect(relatorio.avisos.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
+            expect(relatorio.bloqueios.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
               .not.toContain('nome da mãe');
             expect(JSON.stringify(relatorio)).not.toContain(nomeMaeFicticio);
           }
         } finally {
           await cliente.query('UPDATE nucleo.pessoa SET nome_mae_cifrado = NULL WHERE id = $1', [pessoaId]);
         }
-        expect((await verificar()).avisos.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
+        expect((await verificar()).bloqueios.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
           .toContain('nome da mãe');
         await cliente.query("UPDATE nucleo.pessoa SET nascimento = '1990-01-01' WHERE id = $1", [pessoaId]);
         expect((await verificar()).bloqueios.map((item) => item.codigo)).toContain('nascimento_inconsistente');
@@ -3778,7 +3829,7 @@ describe('fundação em recursos descartáveis', () => {
         const vinculada = await verificar(previaInicial.provaFonte);
         expect(vinculada.status, vinculada.corpo).toBe(200);
         expect(preconferenciaDofSchema.parse(JSON.parse(vinculada.corpo))).toMatchObject({
-          fontePreviaValidada: true, status: 'nao_conferido', conferenciaDisponivel: false,
+          fontePreviaValidada: true, status: 'nao_conferido', conferenciaDisponivel: true,
         });
         expect(vinculada.corpo).not.toContain(previaInicial.provaFonte);
         expect(vinculada.corpo).not.toContain(cpf);
@@ -3879,6 +3930,358 @@ describe('fundação em recursos descartáveis', () => {
         expect(auditoria.rows.map((evento) => evento.acao)).toContain('preconferencia_fonte_alterada');
         expect(JSON.stringify(auditoria.rows)).not.toContain(cpf);
         expect(JSON.stringify(auditoria.rows)).not.toContain(previaInicial.provaFonte);
+        expect((await cliente.query('SELECT count(*) FROM documentos.emissao WHERE documento_id = $1', [rascunho.id])).rows[0].count).toBe('0');
+      } finally {
+        await encerrar();
+      }
+    } finally {
+      await cliente.end();
+    }
+  });
+
+  it('confere e devolve DOF com fonte e relatório revalidados atomicamente', async () => {
+    const config = await carregarConfiguracao(arquivoConfig);
+    const protetor = new ProtetorDados(config.chaves);
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    const pessoaId = randomUUID();
+    const vinculoId = randomUUID();
+    const cpf = cpfSintetico(900000004);
+    const senha = 'ConferenciaFicticia!12345';
+    const senhaHash = await gerarHashSenha(senha);
+    const usuarios = [
+      { chave: 'autor', papel: 'analista' },
+      { chave: 'destinatario', papel: 'coordenador' },
+      { chave: 'outro', papel: 'coordenador' },
+      { chave: 'secretario', papel: 'secretario_adjunto' },
+      { chave: 'administrador', papel: 'admin' },
+    ].map((usuario) => ({
+      ...usuario, id: randomUUID(), matricula: `CONFERENCIA-${usuario.chave.toUpperCase()}`,
+    }));
+    try {
+      await cliente.query(`
+        INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca, nascimento, nome_mae_cifrado)
+        VALUES ($1, $2, $3, 'Pessoa de conferência fictícia', 'pessoa de conferencia ficticia', '1960-05-04', $4)
+      `, [pessoaId, protetor.cifrar(Buffer.from(cpf, 'ascii'), {
+        schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'cpf_cifrado',
+      }), protetor.hashCpf(cpf), protetor.cifrar(Buffer.from('Filiação fictícia', 'utf8'), {
+        schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'nome_mae_cifrado',
+      })]);
+      await cliente.query(`
+        INSERT INTO nucleo.vinculo
+          (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem, admissao, cargo, referencia, regime_juridico, orgao_nome)
+        VALUES ($1, $2, 'CONFERENCIA-FICTICIA', 'CONFERENCIA-FICTICIA',
+          'fonte-conferencia-sintetica', $3, '1980-01-01', 'Cargo fictício', 'PNS-A', 'Regime fictício', 'Órgão fictício')
+      `, [vinculoId, pessoaId, randomUUID()]);
+      for (const usuario of usuarios) {
+        await cliente.query(`
+          INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+          VALUES ($1, $2, $3, $4, $5, false)
+        `, [usuario.id, usuario.matricula, `Operador sintético ${usuario.chave}`, senhaHash, usuario.papel]);
+      }
+      const encerrar = await iniciarServico(portaHttps, caPem, arquivoConfig);
+      try {
+        const sessoes = new Map<string, { cookie: string; csrf: string }>();
+        for (const usuario of usuarios) {
+          const login = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/auth/login', corpo: { matricula: usuario.matricula, senha },
+          });
+          expect(login.status, login.corpo).toBe(200);
+          const cookie = login.headers['set-cookie']?.[0].split(';')[0];
+          if (!cookie) throw new Error('Cookie sintético de conferência ausente.');
+          sessoes.set(usuario.chave, { cookie, csrf: respostaSessaoSchema.parse(JSON.parse(login.corpo)).csrf });
+        }
+        const sessao = (chave: string) => {
+          const resultado = sessoes.get(chave);
+          if (!resultado) throw new Error('Sessão sintética de conferência ausente.');
+          return resultado;
+        };
+        const autor = sessao('autor');
+        const destinatario = sessao('destinatario');
+        const destinatarioId = usuarios.find((usuario) => usuario.chave === 'destinatario')?.id;
+        if (!destinatarioId) throw new Error('Destinatário sintético ausente.');
+        const calculo = {
+          pessoaId, vinculoId, inicio: '1980-01-01', fim: '2024-12-31', confirmacaoDados: true,
+          anos: Array.from({ length: 45 }, (_, indice) => ({
+            ano: 1980 + indice, abrangencia: 'intervalo_declarado',
+            faltas: 0, ts: 0, pf: 0, ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
+          })),
+        };
+        const criado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos',
+          corpo: { calculo, admissaoEsperada: '1980-01-01', motivo: 'Cálculo sintético de 45 anos' }, ...autor,
+        });
+        expect(criado.status, criado.corpo).toBe(201);
+        const rascunho = rascunhoDofSchema.parse(JSON.parse(criado.corpo));
+        expect(rascunho.resultado.periodo.linhas).toHaveLength(45);
+        const rota = `/api/v1/documentos/${rascunho.id}`;
+        const abrir = async (usuario = autor) => {
+          const resposta = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: `${rota}/dados-previa`, cookie: usuario.cookie });
+          expect(resposta.status, resposta.corpo).toBe(200);
+          return dadosFontePreviaDofSchema.parse(JSON.parse(resposta.corpo));
+        };
+        const verificar = async (prova: string, usuario = autor) => {
+          const resposta = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `${rota}/preconferencia`, cookie: usuario.cookie, provaFonte: prova,
+          });
+          expect(resposta.status, resposta.corpo).toBe(200);
+          return preconferenciaDofSchema.parse(JSON.parse(resposta.corpo));
+        };
+        const pedirConferencia = (usuario: { cookie: string; csrf: string }, revisao: number, provaFonte: string, provaRelatorio: string) =>
+          requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/conferir`,
+            corpo: { revisao, provaFonte, provaRelatorio, confirmar: true }, ...usuario,
+          });
+        const previaSemProcesso = await abrir();
+        const bloqueada = await verificar(previaSemProcesso.provaFonte);
+        expect(bloqueada.bloqueios.map((item) => item.codigo)).toContain('processo_ausente');
+        if (!bloqueada.provaRelatorio) throw new Error('Prova sintética do relatório ausente.');
+        expect((await pedirConferencia(autor, 1, previaSemProcesso.provaFonte, bloqueada.provaRelatorio)).status).toBe(409);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/conferir`, corpo: { revisao: 1, confirmar: true }, ...autor,
+        })).status).toBe(400);
+
+        const processo = await requisitarApi(portaHttps, caPem, {
+          metodo: 'PATCH', rota: `${rota}/processo`,
+          corpo: { revisao: 1, processo: '1234/5678', motivo: 'Processo fictício' }, ...autor,
+        });
+        expect(processo.status, processo.corpo).toBe(200);
+        const comProcesso = rascunhoDofSchema.parse(JSON.parse(processo.corpo));
+        const camposFonte = [
+          { nome: 'data de nascimento', id: pessoaId, sql: 'UPDATE nucleo.pessoa SET nascimento = $2 WHERE id = $1',
+            ausente: null, completo: '1960-05-04' },
+          { nome: 'nome da mãe', id: pessoaId, sql: 'UPDATE nucleo.pessoa SET nome_mae_cifrado = $2 WHERE id = $1',
+            ausente: null, completo: protetor.cifrar(Buffer.from('Filiação fictícia', 'utf8'), {
+              schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'nome_mae_cifrado',
+            }) },
+          { nome: 'regime jurídico', id: vinculoId, sql: 'UPDATE nucleo.vinculo SET regime_juridico = $2 WHERE id = $1',
+            ausente: ' ', completo: 'Regime fictício' },
+          { nome: 'cargo', id: vinculoId, sql: 'UPDATE nucleo.vinculo SET cargo = $2 WHERE id = $1',
+            ausente: null, completo: 'Cargo fictício' },
+          { nome: 'referência/padrão', id: vinculoId, sql: 'UPDATE nucleo.vinculo SET referencia = $2 WHERE id = $1',
+            ausente: '', completo: 'PNS-A' },
+          { nome: 'órgão de origem', id: vinculoId, sql: 'UPDATE nucleo.vinculo SET orgao_nome = $2 WHERE id = $1',
+            ausente: null, completo: 'Órgão fictício' },
+        ];
+        for (const campo of camposFonte) {
+          await cliente.query(campo.sql, [campo.id, campo.ausente]);
+          const previaIncompleta = await abrir();
+          const incompleta = await verificar(previaIncompleta.provaFonte);
+          expect(incompleta.bloqueios.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
+            .toContain(campo.nome);
+          if (!incompleta.provaRelatorio) throw new Error('Prova sintética do relatório incompleto ausente.');
+          expect((await pedirConferencia(autor, comProcesso.revisao,
+            previaIncompleta.provaFonte, incompleta.provaRelatorio)).status).toBe(409);
+          await cliente.query(campo.sql, [campo.id, campo.completo]);
+        }
+        const previaAntesEnvio = await abrir();
+        const relatorioAntesEnvio = await verificar(previaAntesEnvio.provaFonte);
+        if (!relatorioAntesEnvio.provaRelatorio) throw new Error('Prova sintética do relatório ausente.');
+        expect((await pedirConferencia(destinatario, comProcesso.revisao,
+          previaAntesEnvio.provaFonte, relatorioAntesEnvio.provaRelatorio)).status).toBe(404);
+        const encaminhado = await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/encaminhar`,
+          corpo: { revisao: comProcesso.revisao, destinatarioId }, ...autor,
+        });
+        expect(encaminhado.status, encaminhado.corpo).toBe(201);
+        const revisao = rascunhoDofSchema.parse(JSON.parse(encaminhado.corpo)).revisao;
+        let previa = await abrir(destinatario);
+        let relatorio = await verificar(previa.provaFonte, destinatario);
+        expect(relatorio.bloqueios).toEqual([]);
+        expect(relatorio.avisos.map((item) => item.codigo)).toEqual(expect.arrayContaining([
+          'aprovacao_modelo_nao_verificada', 'regra_provisoria',
+        ]));
+        if (!relatorio.provaRelatorio) throw new Error('Prova sintética do relatório ausente.');
+        const relatorioAutor = await verificar(previa.provaFonte, autor);
+        if (!relatorioAutor.provaRelatorio) throw new Error('Prova sintética do autor ausente.');
+        expect(relatorioAutor.provaRelatorio).not.toBe(relatorio.provaRelatorio);
+        expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, relatorioAutor.provaRelatorio)).status).toBe(409);
+        expect((await pedirConferencia(destinatario, revisao - 1, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(409);
+        expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, 'a'.repeat(64))).status).toBe(409);
+        expect((await pedirConferencia(sessao('outro'), revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(404);
+        for (const chave of ['secretario', 'administrador']) {
+          expect((await pedirConferencia(sessao(chave), revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(403);
+        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: `${rota}/conferir`,
+          corpo: { revisao, provaFonte: previa.provaFonte, provaRelatorio: relatorio.provaRelatorio, confirmar: true },
+          cookie: destinatario.cookie,
+        })).status).toBe(403);
+
+        const outraFonte = await inserirPessoaEVinculo(cliente);
+        await cliente.query(`
+          UPDATE nucleo.vinculo SET matricula = 'CONFERENCIA-FICTICIA', matricula_norm = 'CONFERENCIA-FICTICIA'
+          WHERE id = $1
+        `, [outraFonte.vinculo]);
+        expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(409);
+        const ambigua = await verificar(previa.provaFonte, destinatario);
+        expect(ambigua.bloqueios.map((item) => item.codigo)).toContain('matricula_ambigua');
+        if (!ambigua.provaRelatorio) throw new Error('Prova sintética de relatório ambíguo ausente.');
+        expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, ambigua.provaRelatorio)).status).toBe(409);
+        await cliente.query('UPDATE nucleo.vinculo SET removido_na_fonte_em = now() WHERE id = $1', [outraFonte.vinculo]);
+
+        const bloqueador = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await bloqueador.connect();
+        let confirmado = false;
+        try {
+          await bloqueador.query('BEGIN');
+          await bloqueador.query('UPDATE nucleo.vinculo SET cargo = cargo WHERE id = $1', [vinculoId]);
+          const ocupada = await pedirConferencia(destinatario, revisao, previa.provaFonte, relatorio.provaRelatorio);
+          expect(ocupada.status, ocupada.corpo).toBe(409);
+          expect(ocupada.corpo).toContain('sendo atualizada');
+          await bloqueador.query('COMMIT');
+          confirmado = true;
+        } finally {
+          if (!confirmado) await bloqueador.query('ROLLBACK');
+          await bloqueador.end();
+        }
+        expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(409);
+        previa = await abrir(destinatario);
+        relatorio = await verificar(previa.provaFonte, destinatario);
+        const relatorioAutorAtual = await verificar(previa.provaFonte, autor);
+        if (!relatorio.provaRelatorio || !relatorioAutorAtual.provaRelatorio) throw new Error('Provas sintéticas ausentes.');
+        const fonteAoConferir = await cliente.query<{ pessoa: string; vinculo: string }>(`
+          SELECT p.revisao_fonte::text AS pessoa, v.revisao_fonte::text AS vinculo
+          FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id WHERE p.id = $1 AND v.id = $2
+        `, [pessoaId, vinculoId]);
+        const concorrentes = await Promise.all([
+          pedirConferencia(autor, revisao, previa.provaFonte, relatorioAutorAtual.provaRelatorio),
+          pedirConferencia(destinatario, revisao, previa.provaFonte, relatorio.provaRelatorio),
+        ]);
+        expect(concorrentes.map((item) => item.status).sort()).toEqual([201, 404]);
+        const sucesso = concorrentes.find((item) => item.status === 201);
+        if (!sucesso) throw new Error('Nenhuma conferência sintética foi registrada.');
+        const conferido = resultadoConferenciaDofSchema.parse(JSON.parse(sucesso.corpo));
+        expect(conferido).toMatchObject({ documentoId: rascunho.id, revisao: revisao + 1, status: 'conferido' });
+        const eventos = await cliente.query<{
+          id: string; avisos: string[]; revisao_pessoa: string; revisao_vinculo: string;
+        }>('SELECT id, avisos, revisao_pessoa, revisao_vinculo FROM documentos.conferencia_dof WHERE documento_id = $1', [rascunho.id]);
+        expect(eventos.rows).toHaveLength(1);
+        expect(eventos.rows[0].avisos).toEqual(expect.arrayContaining(['aprovacao_modelo_nao_verificada', 'regra_provisoria']));
+        expect(eventos.rows[0].revisao_pessoa).toBe(fonteAoConferir.rows[0].pessoa);
+        expect(eventos.rows[0].revisao_vinculo).toBe(fonteAoConferir.rows[0].vinculo);
+        expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(404);
+        await expect(cliente.query('UPDATE documentos.conferencia_dof SET avisos = $1 WHERE id = $2',
+          [[], eventos.rows[0].id])).rejects.toMatchObject({ code: '55000' });
+        await expect(cliente.query('DELETE FROM documentos.conferencia_dof WHERE id = $1',
+          [eventos.rows[0].id])).rejects.toMatchObject({ code: '55000' });
+        await expect(cliente.query('UPDATE documentos.documento SET entrada_cifrada = $2 WHERE id = $1',
+          [rascunho.id, randomBytes(48)])).rejects.toMatchObject({ code: '55000' });
+
+        const lista = async (usuario: { cookie: string }) => {
+          const resposta = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: '/api/v1/documentos/conferidos', cookie: usuario.cookie,
+          });
+          expect(resposta.status, resposta.corpo).toBe(200);
+          return paginaConferidosDofSchema.parse(JSON.parse(resposta.corpo)).itens;
+        };
+        expect((await lista(autor)).some((item) => item.id === rascunho.id)).toBe(true);
+        expect((await lista(destinatario)).some((item) => item.id === rascunho.id)).toBe(true);
+        expect((await lista(sessao('outro'))).some((item) => item.id === rascunho.id)).toBe(false);
+        for (const chave of ['secretario', 'administrador']) {
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: '/api/v1/documentos/conferidos', cookie: sessao(chave).cookie,
+          })).status).toBe(403);
+        }
+        const rotaDadosPrevia = `${rota}/dados-previa-conferida`;
+        const dadosAntesDaAlteracao = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaDadosPrevia, cookie: destinatario.cookie,
+        });
+        expect(dadosAntesDaAlteracao.status, dadosAntesDaAlteracao.corpo).toBe(200);
+        expect(previaConferidaDofSchema.parse(JSON.parse(dadosAntesDaAlteracao.corpo)).fonteSelecionadaAlterada).toBe(false);
+        await cliente.query("UPDATE nucleo.pessoa SET nome = 'Pessoa atualizada fictícia' WHERE id = $1", [pessoaId]);
+        expect((await lista(destinatario)).find((item) => item.id === rascunho.id)?.fonteSelecionadaAlterada).toBe(true);
+        const previaConferida = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rota}/previa-conferida`, cookie: destinatario.cookie,
+        });
+        expect(previaConferida.status, previaConferida.corpo).toBe(200);
+        expect(previaConferida.headers['content-security-policy']).toContain('sandbox');
+        expect(previaConferida.headers['cache-control']).toContain('no-store');
+        expect(previaConferida.corpo).not.toContain(previa.provaFonte);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rota}/previa-conferida`, cookie: sessao('outro').cookie,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: rotaDadosPrevia })).status).toBe(401);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaDadosPrevia, cookie: sessao('outro').cookie,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaDadosPrevia, cookie: sessao('administrador').cookie,
+        })).status).toBe(403);
+        const dadosPrevia = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaDadosPrevia, cookie: destinatario.cookie,
+        });
+        expect(dadosPrevia.status, dadosPrevia.corpo).toBe(200);
+        expect(dadosPrevia.headers['cache-control']).toContain('no-store');
+        const dadosAtuais = previaConferidaDofSchema.parse(JSON.parse(dadosPrevia.corpo));
+        expect(dadosAtuais).toMatchObject({
+          documentoId: rascunho.id, revisao: conferido.revisao, status: 'conferido',
+          nome: 'Pessoa atualizada fictícia', fonte: { nome: 'Pessoa atualizada fictícia' }, fonteSelecionadaAlterada: true,
+        });
+        expect(dadosAtuais.resultado.periodo.linhas).toHaveLength(45);
+        expect(previaConferidaDofSchema.safeParse({
+          ...dadosAtuais, fonte: { ...dadosAtuais.fonte, documentoId: randomUUID() },
+        }).success).toBe(false);
+        expect(previaConferidaDofSchema.safeParse({
+          ...dadosAtuais, fonte: { ...dadosAtuais.fonte, revisao: dadosAtuais.revisao + 1 },
+        }).success).toBe(false);
+
+        const motivo = 'Ajustar dado fictício <img src=x>';
+        const devolver = (usuario: { cookie: string; csrf: string }, revisaoPedido: number, texto = motivo) =>
+          requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: `${rota}/devolver-conferido`,
+            corpo: { revisao: revisaoPedido, motivo: texto }, ...usuario,
+          });
+        expect((await devolver(autor, conferido.revisao)).status).toBe(403);
+        expect((await devolver(sessao('outro'), conferido.revisao)).status).toBe(404);
+        expect((await devolver(destinatario, conferido.revisao, ' ')).status).toBe(400);
+        expect((await devolver(destinatario, conferido.revisao - 1)).status).toBe(409);
+        const devolvido = await devolver(destinatario, conferido.revisao);
+        expect(devolvido.status, devolvido.corpo).toBe(201);
+        expect(resultadoDevolucaoConferidoDofSchema.parse(JSON.parse(devolvido.corpo))).toMatchObject({
+          documentoId: rascunho.id, revisao: conferido.revisao + 1, status: 'rascunho',
+        });
+        expect((await devolver(destinatario, conferido.revisao)).status).toBe(404);
+        expect((await pedirConferencia(autor, revisao, previa.provaFonte, relatorioAutorAtual.provaRelatorio)).status).toBe(409);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaDadosPrevia, cookie: autor.cookie,
+        })).status).toBe(404);
+        const ultima = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rota}/ultima-devolucao`, cookie: autor.cookie,
+        });
+        expect(ultima.status, ultima.corpo).toBe(200);
+        expect(ultimaDevolucaoDofSchema.parse(JSON.parse(ultima.corpo)).devolucao?.motivo).toBe(motivo);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rota}/ultima-devolucao`, cookie: destinatario.cookie,
+        })).status).toBe(404);
+        const retorno = await cliente.query<{ id: string; motivo_cifrado: Buffer }>(`
+          SELECT id, motivo_cifrado FROM documentos.devolucao_conferido_dof WHERE documento_id = $1
+        `, [rascunho.id]);
+        expect(retorno.rows).toHaveLength(1);
+        expect(retorno.rows[0].motivo_cifrado.includes(Buffer.from(motivo))).toBe(false);
+        expect(JSON.parse(protetor.decifrar(retorno.rows[0].motivo_cifrado, {
+          schema: 'documentos', tabela: 'devolucao_conferido_dof', registroId: retorno.rows[0].id, campo: 'motivo_cifrado',
+        }).toString('utf8'))).toBe(motivo);
+        await expect(cliente.query('DELETE FROM documentos.devolucao_conferido_dof WHERE id = $1',
+          [retorno.rows[0].id])).rejects.toMatchObject({ code: '55000' });
+        await expect(cliente.query('UPDATE documentos.devolucao_conferido_dof SET motivo_cifrado = $2 WHERE id = $1',
+          [retorno.rows[0].id, randomBytes(48)])).rejects.toMatchObject({ code: '55000' });
+        await expect(cliente.query('TRUNCATE documentos.devolucao_conferido_dof')).rejects.toMatchObject({ code: '55000' });
+        const auditoria = await cliente.query<{ acao: string; detalhes: unknown }>(`
+          SELECT acao, detalhes FROM seguranca.auditoria WHERE entidade_id = $1
+        `, [rascunho.id]);
+        expect(auditoria.rows.map((evento) => evento.acao)).toEqual(expect.arrayContaining([
+          'dof_conferida', 'dof_conferida_devolvida', 'conferencia_dof_relatorio_alterado',
+          'conferencia_dof_fonte_alterada', 'conferencia_dof_fonte_ocupada', 'conferencia_dof_com_pendencias',
+        ]));
+        const detalhes = JSON.stringify(auditoria.rows);
+        for (const dado of [cpf, motivo, previa.provaFonte, relatorio.provaRelatorio]) expect(detalhes).not.toContain(dado);
         expect((await cliente.query('SELECT count(*) FROM documentos.emissao WHERE documento_id = $1', [rascunho.id])).rows[0].count).toBe('0');
       } finally {
         await encerrar();

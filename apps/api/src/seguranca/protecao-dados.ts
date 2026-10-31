@@ -94,4 +94,10 @@ export class ProtetorDados {
     return createHmac('sha256', this.chaveHmac).update('sisdoc/dof/revisao-fonte/v1\0', 'utf8')
       .update(JSON.stringify(revisoes), 'utf8').digest();
   }
+
+  assinarRelatorioDof(hashSessao: Buffer, conteudo: Buffer): Buffer {
+    if (hashSessao.length !== 32) throw new Error('Identificador de sessão inválido para o relatório.');
+    return createHmac('sha256', this.chaveHmac).update('sisdoc/dof/relatorio/v1\0', 'utf8')
+      .update(hashSessao).update(conteudo).digest();
+  }
 }

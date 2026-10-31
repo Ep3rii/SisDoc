@@ -5,8 +5,8 @@
 A consulta de pendências não é uma conferência. Apenas o autor ou o
 coordenador destinatário do encaminhamento pode executá-la; o destinatário
 continua sem acesso de edição. A resposta identifica revisão, instante,
-bloqueios e avisos e informa explicitamente que a conferência não está
-disponível. A consulta é auditada sem registrar CPF ou conteúdo dos blocos.
+bloqueios e avisos; uma transição separada registra a conferência provisória,
+conforme a [decisão 017](017-conferencia-provisoria-dof.md). A consulta é auditada sem registrar CPF ou conteúdo dos blocos.
 A interface descarta o resultado quando existem alterações locais ou quando
 a revisão muda e rejeita uma resposta recebida para outra revisão.
 
@@ -16,13 +16,14 @@ remoção, admissão, nascimento posterior à admissão, período persistido,
 versão de regra, recálculo, processo e máscaras atuais. Início anterior à
 admissão permanece bloqueado sem a confirmação específica descrita na
 [decisão 012](012-confirmacao-inicio-dof.md). O parser usado pela prévia também detecta variáveis sem
-valor e expressões malformadas em blocos ativos. Campos presentes na
-referência, mas ainda sem obrigatoriedade institucional definida, geram aviso.
+valor e expressões malformadas em blocos ativos. Campos de referência
+selecionados e ausentes bloqueiam a conferência provisória por cautela, sem
+declarar sua obrigatoriedade institucional.
 As variáveis de identidade e vínculo usam a mesma fonte e o mesmo resolvedor da
 [prévia](014-dados-fonte-previa-dof.md); referência sem hífen gera aviso.
 Para o nome da mãe são verificadas a integridade da cifra e a validade técnica
-do texto, sem comprovar que ele corresponde à pessoa; a ausência continua
-como aviso. O contrato e os limites estão na
+do texto, sem comprovar que ele corresponde à pessoa; a ausência é um bloqueio
+conservador. O contrato e os limites estão na
 [decisão 013](013-identidade-fonte-dof.md). O vínculo sem data, antigo ou com
 data futura gera aviso. A consulta não verifica todas as datas de origem da
 pessoa nem confronta automaticamente afastamentos e incorporações.

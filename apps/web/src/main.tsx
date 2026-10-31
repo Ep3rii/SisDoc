@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import type { RespostaSessao } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { Auditoria } from './auditoria';
+import { ConferidosDof } from './conferidos-dof';
 import { RascunhosDof } from './rascunhos-dof';
 import { Servidores } from './servidores';
 import { nomesPerfis, Usuarios } from './usuarios';
@@ -79,7 +80,7 @@ function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados'>('busca');
+  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
   const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
   const pendencias = useRef(false);
@@ -178,7 +179,7 @@ function App() {
       <div className="conteudo">
         <p className="etiqueta">Sistema em construção — não autorizado para uso operacional</p>
         <h1>DOF e DTC</h1>
-        <p>O cálculo e a prévia da DOF são provisórios e não têm validade oficial. Conferência e emissão ainda não estão disponíveis.</p>
+        <p>O cálculo, a prévia e a conferência da DOF são provisórios e não têm validade oficial. A emissão ainda não está disponível.</p>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
@@ -192,6 +193,7 @@ function App() {
             <nav className="acoes" aria-label="Navegação">
               {funcional && <button type="button" className="secundario" onClick={() => navegar('busca')}>Buscar servidores</button>}
               {podeSalvar && <button type="button" className="secundario" onClick={() => navegar('rascunhos')}>Meus rascunhos</button>}
+              {podeSalvar && <button type="button" className="secundario" onClick={() => navegar('conferidos')}>DOFs conferidas</button>}
               {sessao.usuario.papel === 'coordenador' && (
                 <button type="button" className="secundario" onClick={() => navegar('encaminhados')}>Encaminhados a mim</button>
               )}
@@ -204,6 +206,9 @@ function App() {
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
+            {podeSalvar && tela === 'conferidos' && <ConferidosDof key={chaveTela} csrf={sessao.csrf}
+              podeDevolver={sessao.usuario.papel === 'coordenador'} onErro={tratarErro} onLimpar={limparMensagens}
+              onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {sessao.usuario.papel === 'coordenador' && tela === 'encaminhados' && (
               <RascunhosDof key={chaveTela} csrf={sessao.csrf} recebidos
                 onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />

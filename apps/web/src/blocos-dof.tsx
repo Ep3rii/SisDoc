@@ -16,6 +16,7 @@ type Props = {
   rascunho: RascunhoDof;
   csrf: string;
   bloqueado: boolean;
+  previaBloqueada?: boolean;
   somenteLeitura?: boolean;
   onAtualizar: (rascunho: RascunhoDof) => void;
   onPendente: (valor: boolean) => void;
@@ -25,7 +26,7 @@ type Props = {
 };
 
 export function BlocosDof({
-  rascunho, csrf, bloqueado, somenteLeitura = false, onAtualizar, onPendente, onPrevia, onErro, onLimpar,
+  rascunho, csrf, bloqueado, previaBloqueada = false, somenteLeitura = false, onAtualizar, onPendente, onPrevia, onErro, onLimpar,
 }: Props) {
   const [blocos, setBlocos] = useState(rascunho.blocos);
   const [tipo, setTipo] = useState<CodigoBlocoDof>('contratacao');
@@ -172,7 +173,8 @@ export function BlocosDof({
           <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Os dados da fonte são consultados ao abrir; feche e reabra para atualizá-los. Não possui validade oficial.</p>
           {fonte && fonte.documentoId === rascunho.id && fonte.revisao === rascunho.revisao ? (
             <>
-              <button type="button" className="secundario" onClick={() => { setFonte(null); onPrevia(null); }}>
+              <button type="button" className="secundario" disabled={previaBloqueada}
+                onClick={() => { setFonte(null); onPrevia(null); }}>
                 Fechar prévia
               </button>
               <iframe
@@ -181,7 +183,7 @@ export function BlocosDof({
                 srcDoc={renderizarPreviaDof({ ...rascunho, blocos, fonte })}
               />
             </>
-          ) : <button type="button" className="secundario" disabled={ocupado} onClick={() => void abrirPrevia()}>Abrir prévia</button>}
+          ) : <button type="button" className="secundario" disabled={ocupado || previaBloqueada} onClick={() => void abrirPrevia()}>Abrir prévia</button>}
         </div>
       </div>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}

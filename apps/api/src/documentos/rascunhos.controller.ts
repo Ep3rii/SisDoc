@@ -2,8 +2,8 @@ import type { ServerResponse } from 'node:http';
 import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
 import {
   atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema,
-  confirmarInicioDofSchema, devolverRascunhoDofSchema, encaminharRascunhoDofSchema, paginaUuidQuerySchema,
-  provaFonteDofSchema, recolherRascunhoDofSchema,
+  conferirDofSchema, confirmarInicioDofSchema, devolverConferidoDofSchema, devolverRascunhoDofSchema,
+  encaminharRascunhoDofSchema, paginaUuidQuerySchema, previaConferidaDofSchema, provaFonteDofSchema, recolherRascunhoDofSchema,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { z } from 'zod';
@@ -14,6 +14,14 @@ function idDocumento(valor: string): string {
   const resultado = z.uuid().safeParse(valor);
   if (!resultado.success) throw new BadRequestException('Identificador de rascunho inválido.');
   return resultado.data;
+}
+
+function responderPrevia(resposta: ServerResponse, html: string, revisao: number): void {
+  resposta.setHeader('Content-Type', 'text/html; charset=utf-8');
+  resposta.setHeader('Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox");
+  resposta.setHeader('X-Sisdoc-Revisao', String(revisao));
+  resposta.end(html);
 }
 
 @Controller('documentos')
@@ -44,6 +52,14 @@ export class RascunhosController {
     return this.rascunhos.listarEncaminhados(exigirSessao(req), ipRequisicao(req), dados.data.limite, dados.data.cursor);
   }
 
+  @ExigirAcao('conferir')
+  @Get('conferidos')
+  listarConferidos(@Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = paginaUuidQuerySchema.safeParse(consulta);
+    if (!dados.success) throw new BadRequestException('Paginação inválida; o limite máximo é 50.');
+    return this.rascunhos.listarConferidos(exigirSessao(req), ipRequisicao(req), dados.data.limite, dados.data.cursor);
+  }
+
   @ExigirAcao('criar_rascunho')
   @Get(':id')
   obter(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
@@ -59,12 +75,30 @@ export class RascunhosController {
   @ExigirAcao('criar_rascunho')
   @Get(':id/previa')
   async previa(@Param('id') id: string, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
-    const { rascunho, fonte } = await this.rascunhos.obterParaPrevia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
-    resposta.setHeader('Content-Type', 'text/html; charset=utf-8');
-    resposta.setHeader('Content-Security-Policy',
-      "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox");
-    resposta.setHeader('X-Sisdoc-Revisao', String(rascunho.revisao));
-    resposta.end(renderizarPreviaDof({ ...rascunho, fonte }));
+    const { conteudo, fonte } = await this.rascunhos.obterParaPrevia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
+    responderPrevia(resposta, renderizarPreviaDof({ ...conteudo, fonte }), conteudo.revisao);
+  }
+
+  @ExigirAcao('conferir')
+  @Get(':id/previa-conferida')
+  async previaConferida(@Param('id') id: string, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
+    const { conteudo, fonte } = await this.rascunhos.obterParaPrevia(
+      exigirSessao(req), ipRequisicao(req), idDocumento(id), 'conferido',
+    );
+    responderPrevia(resposta, renderizarPreviaDof({ ...conteudo, fonte }), conteudo.revisao);
+  }
+
+  @ExigirAcao('conferir')
+  @Get(':id/dados-previa-conferida')
+  async dadosPreviaConferida(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
+    const { conteudo, fonte, fonteSelecionadaAlterada } = await this.rascunhos.obterParaPrevia(
+      exigirSessao(req), ipRequisicao(req), idDocumento(id), 'conferido',
+    );
+    return previaConferidaDofSchema.parse({
+      documentoId: conteudo.id, revisao: conteudo.revisao, status: 'conferido',
+      nome: conteudo.nome, matricula: conteudo.matricula, resultado: conteudo.resultado,
+      blocos: conteudo.blocos, processo: conteudo.processo, fonte, fonteSelecionadaAlterada,
+    });
   }
 
   @ExigirAcao('criar_rascunho')
@@ -82,6 +116,22 @@ export class RascunhosController {
     const prova = provaFonteDofSchema.optional().safeParse(cabecalho);
     if (!prova.success) throw new BadRequestException('Identificador da prévia inválido. Feche e reabra a prévia.');
     return this.rascunhos.verificarPreconferencia(exigirSessao(req), ipRequisicao(req), idDocumento(id), prova.data);
+  }
+
+  @ExigirAcao('conferir')
+  @Post(':id/conferir')
+  conferir(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = conferirDofSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira a revisão, a prévia, as pendências e a confirmação.');
+    return this.rascunhos.conferir(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
+  }
+
+  @ExigirAcao('receber_encaminhamento')
+  @Post(':id/devolver-conferido')
+  devolverConferido(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = devolverConferidoDofSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira a revisão e informe o motivo da devolução.');
+    return this.rascunhos.devolverConferido(exigirSessao(req), ipRequisicao(req), idDocumento(id), dados.data);
   }
 
   @ExigirAcao('criar_rascunho')

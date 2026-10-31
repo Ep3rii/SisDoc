@@ -26,7 +26,8 @@ isolado por `sandbox` e a prévia não representa layout oficial. A fonte é um
 retrato pontual: alterações após a abertura não são atualizadas automaticamente.
 A comparação das revisões da prévia com a verificação preliminar é descrita na
 [decisão 016](016-revisao-fonte-previa-dof.md). Ela não comprova revisão humana
-nem substitui a revalidação atômica necessária para futura conferência.
+nem substitui a revalidação atômica da
+[conferência provisória](017-conferencia-provisoria-dof.md).
 
 ## Evidência e limites
 
@@ -37,5 +38,5 @@ contêm CPF ou filiação em texto. Testes de
 Chromium com API sintética cobrem HTML escapado, ausência de
 scripts e imagens injetadas, rejeição de resposta obsoleta e prévia interativa.
 Os dados da fonte não são automaticamente confrontados com os lançamentos de
-afastamentos ou incorporações. Não há conferência, PDF ou aprovação de
-modelo; a emissão operacional permanece bloqueada.
+afastamentos ou incorporações. Não há PDF ou aprovação de modelo; a
+conferência é provisória e a emissão operacional permanece bloqueada.

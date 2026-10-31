@@ -37,6 +37,7 @@ simulada são exercitados fechamento da prévia e respostas atrasadas.
 A comparação vincula somente as revisões da pessoa e do vínculo selecionados e
 a revisão do documento. Não cobre outras tabelas da fonte nem comprova que
 alguém revisou a prévia. Ela não reserva os dados depois da consulta e não
-registra conferência, aprovação ou emissão. Uma futura transição de conferência
-deverá revalidar a fonte, os demais dados aplicáveis e o relatório na mesma
-transação. As regras e o modelo continuam provisórios.
+registra conferência, aprovação ou emissão. A
+[conferência provisória](017-conferencia-provisoria-dof.md) revalida a fonte e
+o relatório na mesma transação; não cobre todas as tabelas ou aprovações
+aplicáveis. As regras e o modelo continuam provisórios.

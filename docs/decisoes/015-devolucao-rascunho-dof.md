@@ -6,8 +6,8 @@ O coordenador destinatário de um encaminhamento ativo pode devolver o
 rascunho ao autor com motivo obrigatório. O documento permanece em
 `rascunho`: esta operação não representa conferência, aprovação ou emissão.
 A devolução fecha o encaminhamento, incrementa a revisão e libera a edição
-para o autor. Não implementa ainda a transição de `conferido` para
-`rascunho` prevista para uma etapa posterior.
+para o autor. A transição posterior de `conferido` para `rascunho` é distinta,
+conforme a [decisão 017](017-conferencia-provisoria-dof.md).
 
 O motivo é cifrado com o contexto do registro de encaminhamento. A ação e a
 leitura da última devolução são auditadas sem incluir o motivo nos detalhes.
@@ -34,8 +34,8 @@ Falhas de comunicação exigem consulta ao estado antes de repetir a ação.
 ## Limites
 
 A interface mostra apenas a última devolução ao autor, identificada por data e
-coordenador. Histórico completo, conferência real, devolução de documento
-conferido, emissão e PDF ainda não estão implementados. Testes usam banco e
+coordenador. Histórico completo, conferência institucional, emissão e PDF
+ainda não estão implementados. Testes usam banco e
 HTTPS descartáveis ou navegador com API simulada; isso não autoriza operação.
 Eles cobrem papéis, CSRF, retorno ao autor, conteúdo cifrado e corrompido,
 auditoria, imutabilidade, revisão obsoleta e recolhimento concorrente.

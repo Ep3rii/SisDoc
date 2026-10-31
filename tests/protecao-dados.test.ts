@@ -82,4 +82,18 @@ describe('proteção de dados pessoais', () => {
     expect(() => protetor.assinarRevisaoFonteDof({ ...revisoes, pessoaRevisao: '01' })).toThrow();
     expect(() => protetor.assinarRevisaoFonteDof({ ...revisoes, documentoRevisao: 0 })).toThrow();
   });
+
+  it('vincula o relatório à sessão, ao conteúdo e à chave sem expô-los na assinatura', () => {
+    const protetor = new ProtetorDados(chavesFicticias());
+    const sessao = randomBytes(32);
+    const relatorio = Buffer.from('relatório sintético com avisos', 'utf8');
+    const assinatura = protetor.assinarRelatorioDof(sessao, relatorio);
+    expect(assinatura).toHaveLength(32);
+    expect(assinatura).toEqual(protetor.assinarRelatorioDof(sessao, relatorio));
+    expect(assinatura).not.toEqual(protetor.assinarRelatorioDof(randomBytes(32), relatorio));
+    expect(assinatura).not.toEqual(protetor.assinarRelatorioDof(sessao, Buffer.from('relatório alterado', 'utf8')));
+    expect(assinatura).not.toEqual(new ProtetorDados(chavesFicticias()).assinarRelatorioDof(sessao, relatorio));
+    expect(assinatura.includes(relatorio)).toBe(false);
+    expect(() => protetor.assinarRelatorioDof(Buffer.alloc(31), relatorio)).toThrow('sessão inválido');
+  });
 });

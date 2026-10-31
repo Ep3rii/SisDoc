@@ -9,6 +9,8 @@ import {
   processoCorrespondeMascara,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
+  resultadoConferenciaDofSchema,
+  resultadoDevolucaoConferidoDofSchema,
   resultadoDevolucaoDofSchema,
   solicitarCalculoDofSchema,
   ultimaDevolucaoDofSchema,
@@ -18,18 +20,23 @@ import {
   type BlocoRascunhoDof,
   type CodigoBlocoDof,
   type Configuracao,
+  type ConferirDof,
   type ConfirmarInicioDof,
   type CriarRascunhoDof,
   type DadosFontePreviaDof,
   type DevolverRascunhoDof,
+  type DevolverConferidoDof,
   type EncaminharRascunhoDof,
   type PaginaCoordenadoresDof,
   type PaginaEncaminhamentosDof,
+  type PaginaConferidosDof,
   type PaginaRascunhosDof,
   type PreconferenciaDof,
   type RascunhoDof,
   type RecolherRascunhoDof,
   type ResultadoDevolucaoDof,
+  type ResultadoConferenciaDof,
+  type ResultadoDevolucaoConferidoDof,
   type SolicitarCalculoDof,
   type UltimaDevolucaoDof,
 } from '@sisdoc/contratos';
@@ -79,6 +86,11 @@ type LinhaEncaminhamento = {
   encaminhado_em: Date;
 };
 type RevisoesFonte = { pessoa_revisao: string; vinculo_revisao: string };
+type DadosPrevia = {
+  conteudo: Omit<RascunhoDof, 'status'>;
+  fonte: DadosFontePreviaDof;
+  fonteSelecionadaAlterada: boolean | null;
+};
 const confirmacaoInicioProtegidaSchema = z.strictObject({
   inicio: dataFuncionalSchema,
   admissao: dataFuncionalSchema,
@@ -153,6 +165,22 @@ export class RascunhosService {
       vinculoId: linha.vinculo_id,
       vinculoRevisao: revisoes.vinculo_revisao,
     });
+  }
+
+  private async consultarRevisoesFonte(cliente: PoolClient, linha: LinhaRascunho): Promise<RevisoesFonte> {
+    const consulta = await cliente.query<RevisoesFonte>(`
+      SELECT p.revisao_fonte::text AS pessoa_revisao, v.revisao_fonte::text AS vinculo_revisao
+      FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
+      WHERE p.id = $1 AND v.id = $2
+    `, [linha.pessoa_id, linha.vinculo_id]);
+    if (!consulta.rows[0]) throw new Error('Pessoa ou vínculo da verificação deixou de existir.');
+    return consulta.rows[0];
+  }
+
+  private fonteCorresponde(linha: LinhaRascunho, revisoes: RevisoesFonte, prova: string): boolean {
+    const recebida = Buffer.from(prova, 'hex');
+    const esperada = this.assinarFonte(linha, revisoes);
+    return recebida.length === esperada.length && timingSafeEqual(recebida, esperada);
   }
 
   private async blocos(cliente: PoolClient, documentoId: string): Promise<BlocoRascunhoDof[]> {
@@ -249,6 +277,7 @@ export class RascunhosService {
     autorId: string,
     bloquear?: 'leitura' | 'alteracao',
     permitirEncaminhado = false,
+    estado: 'rascunho' | 'conferido' = 'rascunho',
   ): Promise<LinhaRascunho | undefined> {
     if (permitirEncaminhado && !bloquear) {
       throw new Error('Acesso a encaminhamento requer bloqueio do rascunho.');
@@ -263,9 +292,9 @@ export class RascunhosService {
       JOIN nucleo.pessoa p ON p.id = d.pessoa_id
       JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
       JOIN documentos.regra_versao r ON r.id = d.regra_versao_id
-      WHERE d.id = $1 AND (d.criado_por = $2 OR $6::boolean) AND d.tipo = 'DOF' AND d.status = 'rascunho'
+      WHERE d.id = $1 AND (d.criado_por = $2 OR $6::boolean) AND d.tipo = 'DOF' AND d.status = $7
       ${bloquear === 'alteracao' ? 'FOR UPDATE OF d' : bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
-    `, [id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA), permitirEncaminhado]);
+    `, [id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA), permitirEncaminhado, estado]);
     const linha = consulta.rows[0];
     if (!linha || linha.criado_por === autorId) return linha;
     // Revalida após bloquear o documento, para não aceitar um encaminhamento recolhido durante a espera.
@@ -375,6 +404,47 @@ export class RascunhosService {
     });
   }
 
+  async listarConferidos(
+    sessao: SessaoAutenticada, ip: string, limite: number, cursor?: string,
+  ): Promise<PaginaConferidosDof> {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('conferir'));
+      const consulta = await cliente.query<Pick<LinhaRascunho,
+        'id' | 'pessoa_id' | 'vinculo_id' | 'nome' | 'matricula' | 'revisao' | 'atualizado_em'> & {
+        autor_nome: string; conferido_por_nome: string; conferido_em: Date; fonte_selecionada_alterada: boolean;
+      }>(`
+        SELECT d.id, d.pessoa_id, d.vinculo_id, p.nome, v.matricula, d.revisao, d.atualizado_em,
+          autor.nome AS autor_nome, conferente.nome AS conferido_por_nome, c.conferido_em,
+          (c.revisao_pessoa <> p.revisao_fonte OR c.revisao_vinculo <> v.revisao_fonte) AS fonte_selecionada_alterada
+        FROM documentos.documento d
+        JOIN nucleo.pessoa p ON p.id = d.pessoa_id
+        JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
+        JOIN documentos.conferencia_dof c ON c.documento_id = d.id AND c.revisao_documento = d.revisao
+        JOIN seguranca.usuario autor ON autor.id = d.criado_por
+        JOIN seguranca.usuario conferente ON conferente.id = c.conferido_por
+        WHERE d.tipo = 'DOF' AND d.status = 'conferido'
+          AND (d.criado_por = $1 OR EXISTS (
+            SELECT 1 FROM documentos.encaminhamento_dof e
+            JOIN seguranca.usuario u ON u.id = e.destinatario_id
+            WHERE e.documento_id = d.id AND e.destinatario_id = $1 AND e.recolhido_em IS NULL
+              AND u.ativo AND u.papel = 'coordenador'
+          ))
+          AND ($2::uuid IS NULL OR d.id > $2::uuid)
+        ORDER BY d.id LIMIT $3
+      `, [sessao.usuario.id, cursor ?? null, limite + 1]);
+      await auditarConsultaFuncional(cliente, sessao, 'conferidos_dof_listados', 'documento', null, null, ip);
+      return {
+        itens: consulta.rows.slice(0, limite).map((linha) => ({
+          id: linha.id, pessoaId: linha.pessoa_id, vinculoId: linha.vinculo_id, nome: linha.nome,
+          matricula: linha.matricula, revisao: linha.revisao, atualizadoEm: linha.atualizado_em.toISOString(),
+          autorNome: linha.autor_nome, conferidoPorNome: linha.conferido_por_nome,
+          conferidoEm: linha.conferido_em.toISOString(), fonteSelecionadaAlterada: linha.fonte_selecionada_alterada,
+        })),
+        proximoCursor: consulta.rows.length > limite ? consulta.rows[limite - 1].id : null,
+      };
+    });
+  }
+
   private async obterAuditado(
     sessao: SessaoAutenticada, ip: string, id: string,
   ): Promise<RascunhoDof> {
@@ -402,20 +472,29 @@ export class RascunhosService {
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
       }
       const consulta = await cliente.query<{
-        id: string; coordenador_nome: string; recolhido_em: Date; motivo_cifrado: Buffer;
+        id: string; tipo: 'conferido' | 'encaminhamento'; coordenador_nome: string; recolhido_em: Date; motivo_cifrado: Buffer;
       }>(`
-        SELECT e.id, u.nome AS coordenador_nome, e.recolhido_em, e.motivo_cifrado
-        FROM documentos.encaminhamento_dof e
-        JOIN seguranca.usuario u ON u.id = e.destinatario_id
-        WHERE e.documento_id = $1 AND e.recolhido_por = e.destinatario_id
-          AND e.recolhido_em IS NOT NULL
-        ORDER BY e.recolhido_em DESC, e.id DESC LIMIT 1
+        SELECT id, tipo, coordenador_nome, recolhido_em, motivo_cifrado FROM (
+          SELECT v.id, 'conferido' AS tipo, u.nome AS coordenador_nome,
+            v.devolvido_em AS recolhido_em, v.motivo_cifrado, 1 AS prioridade
+          FROM documentos.devolucao_conferido_dof v
+          JOIN seguranca.usuario u ON u.id = v.devolvido_por WHERE v.documento_id = $1
+          UNION ALL
+          SELECT e.id, 'encaminhamento' AS tipo, u.nome AS coordenador_nome,
+            e.recolhido_em, e.motivo_cifrado, 0 AS prioridade
+          FROM documentos.encaminhamento_dof e
+          JOIN seguranca.usuario u ON u.id = e.destinatario_id
+          WHERE e.documento_id = $1 AND e.recolhido_por = e.destinatario_id AND e.recolhido_em IS NOT NULL
+        ) devolucoes ORDER BY recolhido_em DESC, prioridade DESC, id DESC LIMIT 1
       `, [id]);
       const devolucao = consulta.rows[0];
       let motivo: unknown = null;
       if (devolucao) {
         try {
-          motivo = this.ler('encaminhamento_dof', devolucao.id, 'motivo_cifrado', devolucao.motivo_cifrado);
+          motivo = this.ler(
+            devolucao.tipo === 'conferido' ? 'devolucao_conferido_dof' : 'encaminhamento_dof',
+            devolucao.id, 'motivo_cifrado', devolucao.motivo_cifrado,
+          );
         } catch (erro) {
           if (!(erro instanceof SyntaxError)
               && (!(erro instanceof Error) || erro.message !== 'Dado protegido inválido ou corrompido.')) throw erro;
@@ -443,12 +522,12 @@ export class RascunhosService {
   }
 
   async obterParaPrevia(
-    sessao: SessaoAutenticada, ip: string, id: string,
-  ): Promise<{ rascunho: RascunhoDof; fonte: DadosFontePreviaDof }> {
-    const tentativa = await transacao<Tentativa<{ rascunho: RascunhoDof; fonte: DadosFontePreviaDof }>>(
+    sessao: SessaoAutenticada, ip: string, id: string, estado: 'rascunho' | 'conferido' = 'rascunho',
+  ): Promise<DadosPrevia> {
+    const tentativa = await transacao<Tentativa<DadosPrevia>>(
       this.banco, async (cliente) => {
         await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
-        const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
+        const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true, estado);
         if (!linha) {
           await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
           return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -457,22 +536,27 @@ export class RascunhosService {
           await auditarConsultaFuncional(cliente, sessao, 'previa_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
           return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e abra a prévia novamente.' } };
         }
-        const atual = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
+        const atual = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true, estado);
         if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a abertura da prévia.');
         const consulta = await cliente.query<RevisoesFonte & {
           cpf_cifrado: Buffer; cpf_hash: Buffer; nascimento: string | null; nome_mae_cifrado: Buffer | null;
           regime_juridico: string | null; cargo: string | null; referencia: string | null; orgao_nome: string | null;
-          removido: boolean; consultado_em: Date;
+          removido: boolean; consultado_em: Date; fonte_selecionada_alterada: boolean | null;
         }>(`
           SELECT p.cpf_cifrado, p.cpf_hash, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
             p.nome_mae_cifrado, v.regime_juridico, v.cargo, v.referencia, v.orgao_nome,
             p.revisao_fonte::text AS pessoa_revisao, v.revisao_fonte::text AS vinculo_revisao,
-            v.removido_na_fonte_em IS NOT NULL AS removido, clock_timestamp() AS consultado_em
+            v.removido_na_fonte_em IS NOT NULL AS removido, clock_timestamp() AS consultado_em,
+            (c.revisao_pessoa <> p.revisao_fonte OR c.revisao_vinculo <> v.revisao_fonte) AS fonte_selecionada_alterada
           FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
+          LEFT JOIN documentos.conferencia_dof c ON c.documento_id = $3 AND c.revisao_documento = $4
           WHERE p.id = $1 AND v.id = $2
-        `, [atual.pessoa_id, atual.vinculo_id]);
+        `, [atual.pessoa_id, atual.vinculo_id, atual.id, atual.revisao]);
         const origem = consulta.rows[0];
         if (!origem) throw new Error('Pessoa ou vínculo da prévia deixou de existir.');
+        if (estado === 'conferido' && origem.fonte_selecionada_alterada === null) {
+          throw new Error('DOF conferida sem registro correspondente.');
+        }
         const cpf = lerCpfDof(this.protetor, atual.pessoa_id, origem.cpf_cifrado, origem.cpf_hash);
         const nomeMae = lerNomeMaeDof(this.protetor, atual.pessoa_id, origem.nome_mae_cifrado);
         if ('erro' in cpf || 'erro' in nomeMae) {
@@ -508,9 +592,12 @@ export class RascunhosService {
           await auditarConsultaFuncional(cliente, sessao, 'previa_fonte_invalida', 'documento', id, atual.pessoa_id, ip);
           return { falha: { tipo: 'conflito', mensagem: 'Os dados da fonte são inválidos. Solicite sua verificação antes de abrir a prévia.' } };
         }
-        const rascunho = await this.apresentar(cliente, atual);
-        await auditarConsultaFuncional(cliente, sessao, 'previa_dof_aberta', 'documento', id, atual.pessoa_id, ip);
-        return { valor: { rascunho, fonte: fonte.data } };
+        const { status: _status, ...conteudo } = await this.apresentar(cliente, atual);
+        await auditarConsultaFuncional(
+          cliente, sessao, estado === 'conferido' ? 'previa_conferido_dof_aberta' : 'previa_dof_aberta',
+          'documento', id, atual.pessoa_id, ip,
+        );
+        return { valor: { conteudo, fonte: fonte.data, fonteSelecionadaAlterada: origem.fonte_selecionada_alterada } };
       },
     );
     return concluir(tentativa);
@@ -533,16 +620,8 @@ export class RascunhosService {
       const atual = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
       if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a pré-conferência.');
       if (provaFonte !== undefined) {
-        const consulta = await cliente.query<RevisoesFonte>(`
-          SELECT p.revisao_fonte::text AS pessoa_revisao, v.revisao_fonte::text AS vinculo_revisao
-          FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
-          WHERE p.id = $1 AND v.id = $2
-        `, [atual.pessoa_id, atual.vinculo_id]);
-        const revisoes = consulta.rows[0];
-        if (!revisoes) throw new Error('Pessoa ou vínculo da pré-conferência deixou de existir.');
-        const recebida = Buffer.from(provaFonte, 'hex');
-        const esperada = this.assinarFonte(atual, revisoes);
-        if (recebida.length !== esperada.length || !timingSafeEqual(recebida, esperada)) {
+        const revisoes = await this.consultarRevisoesFonte(cliente, atual);
+        if (!this.fonteCorresponde(atual, revisoes, provaFonte)) {
           await auditarConsultaFuncional(cliente, sessao, 'preconferencia_fonte_alterada', 'documento', id, atual.pessoa_id, ip);
           return {
             falha: {
@@ -554,10 +633,134 @@ export class RascunhosService {
       }
       const rascunho = await this.apresentar(cliente, atual);
       const resultado = await verificarPreconferenciaDof(
-        cliente, sessao, ip, rascunho, atual.regra_atual, this.protetor, provaFonte !== undefined,
+        cliente, sessao, ip, rascunho, atual.regra_atual, this.protetor, provaFonte,
       );
       await auditarConsultaFuncional(cliente, sessao, 'preconferencia_verificada', 'documento', id, atual.pessoa_id, ip);
       return { valor: resultado };
+    });
+    return concluir(tentativa);
+  }
+
+  async conferir(
+    sessao: SessaoAutenticada, ip: string, id: string, dados: ConferirDof,
+  ): Promise<ResultadoConferenciaDof> {
+    const tentativa = await transacao<Tentativa<ResultadoConferenciaDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('conferir'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao', true);
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'conferencia_dof_nao_encontrada', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado para conferência.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'conferencia_dof_revisao_invalida', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A revisão do rascunho mudou ou atingiu o limite. Reabra-o e verifique novamente.' } };
+      }
+      if (!await tentarBloqueioFonte(cliente)) {
+        await auditarConsultaFuncional(cliente, sessao, 'conferencia_dof_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e verifique novamente.' } };
+      }
+      const atual = await this.linha(cliente, id, sessao.usuario.id, 'alteracao', true);
+      if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a conferência.');
+      const revisoes = await this.consultarRevisoesFonte(cliente, atual);
+      if (!this.fonteCorresponde(atual, revisoes, dados.provaFonte)) {
+        await auditarConsultaFuncional(cliente, sessao, 'conferencia_dof_fonte_alterada', 'documento', id, atual.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A fonte mudou desde a prévia. Feche e reabra a prévia antes de conferir.' } };
+      }
+      const rascunho = await this.apresentar(cliente, atual);
+      const relatorio = await verificarPreconferenciaDof(
+        cliente, sessao, ip, rascunho, atual.regra_atual, this.protetor, dados.provaFonte,
+      );
+      if (!relatorio.provaRelatorio) throw new Error('Relatório vinculado à prévia não possui prova.');
+      const recebida = Buffer.from(dados.provaRelatorio, 'hex');
+      const esperada = Buffer.from(relatorio.provaRelatorio, 'hex');
+      if (recebida.length !== esperada.length || !timingSafeEqual(recebida, esperada)) {
+        await auditarConsultaFuncional(cliente, sessao, 'conferencia_dof_relatorio_alterado', 'documento', id, atual.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'As pendências ou os avisos mudaram. Verifique-os novamente antes de conferir.' } };
+      }
+      if (relatorio.bloqueios.length > 0) {
+        await auditarConsultaFuncional(cliente, sessao, 'conferencia_dof_com_pendencias', 'documento', id, atual.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'Há pendências que impedem a conferência. Consulte o relatório e corrija-as.' } };
+      }
+      const conferenciaId = randomUUID();
+      await cliente.query(`
+        INSERT INTO documentos.conferencia_dof
+          (id, documento_id, revisao_documento, revisao_pessoa, revisao_vinculo, conferido_por, avisos)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `, [
+        conferenciaId, id, atual.revisao + 1, revisoes.pessoa_revisao, revisoes.vinculo_revisao,
+        sessao.usuario.id, relatorio.avisos.map((aviso) => aviso.codigo),
+      ]);
+      const atualizado = await cliente.query<{ revisao: number; conferido_em: Date }>(`
+        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2,
+          conferido_em = (SELECT conferido_em FROM documentos.conferencia_dof WHERE id = $3),
+          atualizado_por = $2, atualizado_em = now(), revisao = revisao + 1
+        WHERE id = $1 AND status = 'rascunho' AND revisao = $4
+        RETURNING revisao, conferido_em
+      `, [id, sessao.usuario.id, conferenciaId, atual.revisao]);
+      if (!atualizado.rows[0]) throw new Error('A transição para conferido não pôde ser registrada.');
+      await auditarConsultaFuncional(cliente, sessao, 'dof_conferida', 'documento', id, atual.pessoa_id, ip);
+      return {
+        valor: resultadoConferenciaDofSchema.parse({
+          documentoId: id, revisao: atualizado.rows[0].revisao, status: 'conferido',
+          conferidoEm: atualizado.rows[0].conferido_em.toISOString(),
+        }),
+      };
+    });
+    return concluir(tentativa);
+  }
+
+  async devolverConferido(
+    sessao: SessaoAutenticada, ip: string, id: string, dados: DevolverConferidoDof,
+  ): Promise<ResultadoDevolucaoConferidoDof> {
+    const tentativa = await transacao<Tentativa<ResultadoDevolucaoConferidoDof>>(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('receber_encaminhamento'));
+      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao', true, 'conferido');
+      if (!linha) {
+        await auditarConsultaFuncional(cliente, sessao, 'conferido_dof_nao_encontrado', 'documento', id, null, ip);
+        return { falha: { tipo: 'nao_encontrado', mensagem: 'DOF conferida não encontrada.' } };
+      }
+      if (linha.revisao !== dados.revisao || linha.revisao === 2147483647) {
+        await auditarConsultaFuncional(cliente, sessao, 'devolucao_conferido_dof_revisao_invalida', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A revisão da DOF mudou ou atingiu o limite. Reabra a lista antes de devolver.' } };
+      }
+      const conferencia = await cliente.query<{ id: string }>(`
+        SELECT id FROM documentos.conferencia_dof WHERE documento_id = $1 AND revisao_documento = $2
+      `, [id, linha.revisao]);
+      if (!conferencia.rows[0]) throw new Error('DOF conferida sem registro correspondente.');
+      const devolucaoId = randomUUID();
+      await cliente.query(`
+        INSERT INTO documentos.devolucao_conferido_dof
+          (id, documento_id, conferencia_id, devolvido_por, motivo_cifrado)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [
+        devolucaoId, id, conferencia.rows[0].id, sessao.usuario.id,
+        this.cifrar('devolucao_conferido_dof', devolucaoId, 'motivo_cifrado', dados.motivo),
+      ]);
+      const atualizado = await cliente.query<{ revisao: number; devolvido_em: Date }>(`
+        UPDATE documentos.documento SET status = 'rascunho', conferido_por = NULL, conferido_em = NULL,
+          atualizado_por = $2, atualizado_em = now(), revisao = revisao + 1
+        WHERE id = $1 AND status = 'conferido' AND revisao = $3
+        RETURNING revisao, (SELECT devolvido_em FROM documentos.devolucao_conferido_dof WHERE id = $4) AS devolvido_em
+      `, [id, sessao.usuario.id, linha.revisao, devolucaoId]);
+      if (!atualizado.rows[0]) throw new Error('A devolução da DOF conferida não pôde ser registrada.');
+      const encaminhamento = await this.encaminhamento(cliente, id);
+      if (encaminhamento) {
+        await cliente.query(`
+          UPDATE documentos.encaminhamento_dof SET recolhido_por = $2,
+            recolhido_em = (SELECT devolvido_em FROM documentos.devolucao_conferido_dof WHERE id = $3),
+            motivo_cifrado = $4 WHERE id = $1 AND recolhido_em IS NULL
+        `, [
+          encaminhamento.id, sessao.usuario.id, devolucaoId,
+          this.cifrar('encaminhamento_dof', encaminhamento.id, 'motivo_cifrado', dados.motivo),
+        ]);
+      }
+      await auditarConsultaFuncional(cliente, sessao, 'dof_conferida_devolvida', 'documento', id, linha.pessoa_id, ip);
+      return {
+        valor: resultadoDevolucaoConferidoDofSchema.parse({
+          documentoId: id, revisao: atualizado.rows[0].revisao, status: 'rascunho',
+          devolvidoEm: atualizado.rows[0].devolvido_em.toISOString(),
+        }),
+      };
     });
     return concluir(tentativa);
   }

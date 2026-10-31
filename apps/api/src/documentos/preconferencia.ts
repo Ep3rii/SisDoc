@@ -39,7 +39,7 @@ export async function verificarPreconferenciaDof(
   rascunho: RascunhoDof,
   regraAtual: boolean,
   protetor: ProtetorDados,
-  fontePreviaValidada: boolean,
+  provaFonte?: string,
 ): Promise<PreconferenciaDof> {
   const consulta = await cliente.query<LinhaFonte>(`
     SELECT p.cpf_cifrado, p.cpf_hash, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
@@ -53,11 +53,9 @@ export async function verificarPreconferenciaDof(
   `, [rascunho.pessoaId, rascunho.vinculoId]);
   const fonte = consulta.rows[0];
   if (!fonte) throw new Error('Pessoa ou vínculo do rascunho deixou de existir.');
-  const bloqueios: PreconferenciaDof['bloqueios'] = [
-    { codigo: 'conferencia_indisponivel', mensagem: 'A transição para conferido ainda não foi implementada.' },
-    { codigo: 'aprovacao_modelo_nao_verificada', mensagem: 'Não há verificação implementada de aprovação do modelo e dos campos obrigatórios.' },
-  ];
+  const bloqueios: PreconferenciaDof['bloqueios'] = [];
   const avisos: PreconferenciaDof['avisos'] = [
+    { codigo: 'aprovacao_modelo_nao_verificada', mensagem: 'O modelo e os campos obrigatórios não foram aprovados. A conferência não autoriza emissão.' },
     { codigo: 'regra_provisoria', mensagem: 'A regra de cálculo é provisória e depende de aprovação para emissão.' },
   ];
 
@@ -127,9 +125,9 @@ export async function verificarPreconferenciaDof(
   ] as const;
   const ausentes = camposReferencia.filter(([valor]) => !valor).map(([, nome]) => nome);
   if (ausentes.length) {
-    avisos.push({
+    bloqueios.push({
       codigo: 'campos_referencia_ausentes',
-      mensagem: `Dados presentes na referência, mas não informados na fonte: ${ausentes.join(', ')}. A obrigatoriedade depende do modelo aprovado.`,
+      mensagem: `Para a conferência provisória, informe na fonte os campos de referência ausentes: ${ausentes.join(', ')}. A obrigatoriedade institucional depende do modelo aprovado.`,
     });
   }
   if (!fonte.sincronizado_em) {
@@ -207,13 +205,22 @@ export async function verificarPreconferenciaDof(
     });
   }
 
+  const provaRelatorio = provaFonte === undefined ? null : protetor.assinarRelatorioDof(
+    sessao.hash,
+    Buffer.from(JSON.stringify([
+      rascunho.id.toLowerCase(), rascunho.revisao, provaFonte,
+      bloqueios.map(({ codigo, mensagem }) => [codigo, mensagem]),
+      avisos.map(({ codigo, mensagem }) => [codigo, mensagem]),
+    ]), 'utf8'),
+  ).toString('hex');
   return preconferenciaDofSchema.parse({
     documentoId: rascunho.id,
     revisao: rascunho.revisao,
     verificadoEm: fonte.verificado_em.toISOString(),
     status: 'nao_conferido',
-    conferenciaDisponivel: false,
-    fontePreviaValidada,
+    conferenciaDisponivel: true,
+    fontePreviaValidada: provaFonte !== undefined,
+    provaRelatorio,
     bloqueios,
     avisos,
   });

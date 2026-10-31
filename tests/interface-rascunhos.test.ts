@@ -4,7 +4,9 @@ import {
   atualizarRascunhoDofSchema,
   atualizarBlocosDofSchema,
   atualizarProcessoDofSchema,
+  conferirDofSchema,
   confirmarInicioDofSchema,
+  devolverConferidoDofSchema,
   devolverRascunhoDofSchema,
   encaminharRascunhoDofSchema,
   processoCorrespondeMascara,
@@ -37,9 +39,12 @@ type Simulacao = {
   admissao: string | null;
   rascunho: RascunhoDof | null;
   autorId: string | null;
+  conferido: { conferidoEm: string; conferidoPorNome: string; revisaoFonte: number } | null;
   conflito: boolean;
   falhaRede: boolean;
   falhaListagem: boolean;
+  falhaPreviaConferida: boolean;
+  revisaoPreviaInvalida: boolean;
   extras: number;
   erros: string[];
   escritas: number;
@@ -107,8 +112,9 @@ async function responder(rota: Route, status: number, corpo: unknown) {
 
 async function simularApi(pagina: Page): Promise<Simulacao> {
   const estado: Simulacao = {
-    papel: 'analista', admissao: '1980-01-01', rascunho: null, autorId: null,
-    conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [],
+    papel: 'analista', admissao: '1980-01-01', rascunho: null, autorId: null, conferido: null,
+    conflito: false, falhaRede: false, falhaListagem: false, falhaPreviaConferida: false, revisaoPreviaInvalida: false,
+    extras: 0, erros: [], escritas: 0, anosConfirmados: [],
     previas: 0, revisaoFonte: 1,
     adiarPrevia: false, liberarPrevia: null, adiarPreconferencia: false, liberarPreconferencia: null,
     devolucao: null,
@@ -116,6 +122,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
     adiarConsultaDevolucao: false, liberarConsultaDevolucao: null,
   };
   const usuarioAtual = () => estado.papel === 'coordenador' ? coordenadorId : usuarioId;
+  const provaRelatorio = () => 'b'.repeat(63) + (estado.papel === 'coordenador' ? 'c' : 'd');
   await pagina.route('**/api/v1/**', async (rota) => {
     try {
       const requisicao = rota.request();
@@ -172,9 +179,19 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === '/api/v1/documentos/encaminhados' && metodo === 'GET') {
         if (estado.papel !== 'coordenador') return responder(rota, 403, { detail: 'Perfil sem permissão.' });
         const encaminhamento = estado.rascunho?.encaminhamento;
-        const itens = estado.rascunho && encaminhamento?.destinatarioId === coordenadorId
+        const itens = estado.rascunho && !estado.conferido && encaminhamento?.destinatarioId === coordenadorId
           ? [{ ...resumo(estado.rascunho), autorNome: 'Analista Ficticio', encaminhadoEm: encaminhamento.encaminhadoEm }]
           : [];
+        return responder(rota, 200, { itens, proximoCursor: null });
+      }
+      if (caminho === '/api/v1/documentos/conferidos' && metodo === 'GET') {
+        const itens = estado.rascunho && estado.conferido
+          && (estado.autorId === usuarioAtual() || estado.rascunho.encaminhamento?.destinatarioId === usuarioAtual())
+          ? [{
+            ...resumo(estado.rascunho), autorNome: 'Analista Ficticio',
+            conferidoPorNome: estado.conferido.conferidoPorNome, conferidoEm: estado.conferido.conferidoEm,
+            fonteSelecionadaAlterada: estado.conferido.revisaoFonte !== estado.revisaoFonte,
+          }] : [];
         return responder(rota, 200, { itens, proximoCursor: null });
       }
       if (caminho === '/api/v1/documentos' && metodo === 'GET') {
@@ -184,7 +201,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           pessoaId, vinculoId, nome: `Pessoa fictícia ${indice + 1}`, matricula,
           revisao: 1, atualizadoEm: '2026-01-01T12:00:00.000Z',
         }));
-        const itens = [...(estado.rascunho && estado.autorId === usuarioAtual() ? [resumo(estado.rascunho)] : []), ...extras]
+        const itens = [...(estado.rascunho && !estado.conferido && estado.autorId === usuarioAtual() ? [resumo(estado.rascunho)] : []), ...extras]
           .sort((a, b) => a.id.localeCompare(b.id));
         const cursor = endereco.searchParams.get('cursor');
         const seguintes = itens.filter((item) => !cursor || item.id > cursor);
@@ -210,7 +227,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
         estado.escritas += 1;
         return responder(rota, 201, estado.rascunho);
       }
-      if (caminho === `/api/v1/documentos/${documentoId}` && metodo === 'GET' && estado.rascunho) {
+      if (caminho === `/api/v1/documentos/${documentoId}` && metodo === 'GET' && estado.rascunho && !estado.conferido) {
         if (estado.autorId !== usuarioAtual() && estado.rascunho.encaminhamento?.destinatarioId !== usuarioAtual()) {
           return responder(rota, 404, { detail: 'Rascunho não encontrado.' });
         }
@@ -234,6 +251,17 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
         }
         return responder(rota, 200, fonte);
       }
+      if (caminho === `/api/v1/documentos/${documentoId}/dados-previa-conferida`
+          && metodo === 'GET' && estado.conferido && estado.rascunho) {
+        if (estado.falhaPreviaConferida) return responder(rota, 503, { detail: 'Falha sintética de prévia.' });
+        const revisao = estado.rascunho.revisao + (estado.revisaoPreviaInvalida ? 1 : 0);
+        const fonte = fonteSintetica({ ...estado.rascunho, revisao }, estado.admissao, estado.revisaoFonte);
+        return responder(rota, 200, {
+          documentoId, revisao, status: 'conferido', nome, matricula,
+          resultado: estado.rascunho.resultado, blocos: estado.rascunho.blocos, processo: estado.rascunho.processo,
+          fonte, fonteSelecionadaAlterada: estado.conferido.revisaoFonte !== estado.revisaoFonte,
+        });
+      }
       if (caminho === `/api/v1/documentos/${documentoId}/preconferencia` && metodo === 'GET' && estado.rascunho) {
         const provaFonte = requisicao.headers()['x-sisdoc-fonte-dof'];
         const fonte = fonteSintetica(estado.rascunho, estado.admissao, estado.revisaoFonte);
@@ -245,10 +273,9 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
         });
         const resposta = {
           documentoId, revisao: estado.rascunho.revisao, verificadoEm: new Date().toISOString(),
-          status: 'nao_conferido', conferenciaDisponivel: false, fontePreviaValidada: provaFonte !== undefined,
+          status: 'nao_conferido', conferenciaDisponivel: true, fontePreviaValidada: provaFonte !== undefined,
+          provaRelatorio: provaFonte === undefined ? null : provaRelatorio(),
           bloqueios: [
-            { codigo: 'conferencia_indisponivel', mensagem: 'A transição para conferido ainda não foi implementada.' },
-            { codigo: 'aprovacao_modelo_nao_verificada', mensagem: 'A aprovação do modelo ainda não foi verificada.' },
             ...(!estado.rascunho.processo ? [{ codigo: 'processo_ausente', mensagem: 'Informe o número do processo.' }] : []),
             ...(variaveis.indisponiveis.length ? [{ codigo: 'variaveis_ausentes', mensagem: 'Há variáveis indisponíveis.' }] : []),
             ...(variaveis.malformadas ? [{ codigo: 'variaveis_malformadas', mensagem: 'Há expressões malformadas.' }] : []),
@@ -256,12 +283,44 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
               && !estado.rascunho.inicioAjustadoConfirmado
               ? [{ codigo: 'inicio_ajustado_sem_confirmacao', mensagem: 'Confirme o ajuste do início.' }] : []),
           ],
-          avisos: [{ codigo: 'regra_provisoria', mensagem: 'A regra é provisória.' }],
+          avisos: [
+            { codigo: 'aprovacao_modelo_nao_verificada', mensagem: 'A aprovação do modelo ainda não foi verificada.' },
+            { codigo: 'regra_provisoria', mensagem: 'A regra é provisória.' },
+          ],
         };
         if (estado.adiarPreconferencia) {
           await new Promise<void>((resolve) => { estado.liberarPreconferencia = resolve; });
         }
         return responder(rota, 200, resposta);
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/conferir` && metodo === 'POST' && estado.rascunho && !estado.conferido) {
+        if (estado.falhaRede) return rota.abort('failed');
+        const dados = conferirDofSchema.parse(requisicao.postDataJSON());
+        const fonte = fonteSintetica(estado.rascunho, estado.admissao, estado.revisaoFonte);
+        if (dados.revisao !== estado.rascunho.revisao || dados.provaFonte !== fonte.provaFonte
+            || dados.provaRelatorio !== provaRelatorio() || !estado.rascunho.processo) {
+          return responder(rota, 409, { detail: 'A fonte ou as pendências mudaram. Reabra e verifique novamente.' });
+        }
+        const conferidoEm = new Date().toISOString();
+        estado.rascunho = { ...estado.rascunho, revisao: estado.rascunho.revisao + 1, atualizadoEm: conferidoEm };
+        estado.conferido = { conferidoEm, conferidoPorNome: 'Operador Ficticio', revisaoFonte: estado.revisaoFonte };
+        estado.escritas += 1;
+        return responder(rota, 201, { documentoId, revisao: estado.rascunho.revisao, status: 'conferido', conferidoEm });
+      }
+      if (caminho === `/api/v1/documentos/${documentoId}/devolver-conferido`
+          && metodo === 'POST' && estado.rascunho && estado.conferido) {
+        if (estado.falhaRede) return rota.abort('failed');
+        if (estado.papel !== 'coordenador') return responder(rota, 403, { detail: 'Perfil sem permissão.' });
+        const dados = devolverConferidoDofSchema.parse(requisicao.postDataJSON());
+        if (dados.revisao !== estado.rascunho.revisao) return responder(rota, 409, { detail: 'A revisão mudou.' });
+        const devolvidoEm = new Date().toISOString();
+        estado.devolucao = { coordenadorNome: 'Operador Ficticio', devolvidoEm, motivo: dados.motivo };
+        estado.rascunho = {
+          ...estado.rascunho, revisao: estado.rascunho.revisao + 1, atualizadoEm: devolvidoEm, encaminhamento: null,
+        };
+        estado.conferido = null;
+        estado.escritas += 1;
+        return responder(rota, 201, { documentoId, revisao: estado.rascunho.revisao, status: 'rascunho', devolvidoEm });
       }
       if (caminho === `/api/v1/documentos/${documentoId}/confirmar-inicio` && metodo === 'POST' && estado.rascunho) {
         if (estado.falhaRede) return rota.abort('failed');
@@ -874,7 +933,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
-    expect(await pagina.getByText('A transição para conferido ainda não foi implementada.').count()).toBe(1);
+    expect(await pagina.getByText('A aprovação do modelo ainda não foi verificada.').count()).toBe(1);
 
     estado.papel = 'coordenador';
     await pagina.reload();
@@ -958,7 +1017,7 @@ describe('interface de rascunhos com API sintética', () => {
     const armazenamentos = await pagina.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
     expect(armazenamentos).not.toContain(motivo);
     expect(await pagina.getByLabel('Faltas em 1980').isEnabled()).toBe(true);
-    expect(await pagina.getByRole('button', { name: 'Conferir', exact: true }).count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).count()).toBe(0);
     estado.adiarConsultaDevolucao = true;
     await pagina.getByLabel('Número do processo').fill('1234/5678');
     await pagina.getByLabel('Motivo da alteração do processo').fill('Ajuste fictício após devolução');
@@ -972,6 +1031,89 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText(motivo, { exact: true }).waitFor();
   });
 
+  it('confere a prévia revisada e devolve a DOF conferida ao autor', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Dados inteiramente fictícios');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByLabel('Número do processo').fill('1234/5678');
+    await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByText('Processo salvo na revisão 2.', { exact: false }).waitFor();
+    await pagina.getByRole('button', { name: 'Escolher coordenador' }).click();
+    await pagina.getByLabel('Coordenador destinatário').selectOption(coordenadorId);
+    await pagina.getByRole('button', { name: 'Encaminhar rascunho' }).click();
+    await pagina.getByText('Rascunho encaminhado na revisão 3.', { exact: false }).waitFor();
+
+    estado.papel = 'coordenador';
+    await pagina.reload();
+    await pagina.getByRole('button', { name: 'Encaminhados a mim' }).click();
+    await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByText('Nenhum bloqueio técnico identificado nesta consulta.').waitFor();
+    expect(await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).isDisabled()).toBe(true);
+    await pagina.getByRole('checkbox', { name: /Revisei a prévia/ }).check();
+    estado.falhaRede = true;
+    await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).click();
+    await pagina.getByRole('alert').getByText('Não foi possível confirmar a conferência.', { exact: false }).waitFor();
+    expect(estado.conferido).toBeNull();
+    estado.falhaRede = false;
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByRole('checkbox', { name: /Revisei a prévia/ }).check();
+    estado.revisaoFonte += 1;
+    await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).click();
+    await pagina.getByRole('alert').getByText(/A fonte ou as pendências mudaram/).waitFor();
+    expect(estado.conferido).toBeNull();
+    await pagina.getByRole('button', { name: 'Fechar prévia' }).click();
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
+    await pagina.getByRole('checkbox', { name: /Revisei a prévia/ }).check();
+    await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).click();
+    await pagina.getByText('DOF conferida provisoriamente.', { exact: false }).waitFor();
+    expect(estado.conferido).not.toBeNull();
+    expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
+
+    await pagina.getByRole('button', { name: 'DOFs conferidas', exact: true }).click();
+    await pagina.getByText('Sem alteração detectada na pessoa e no vínculo', { exact: true }).waitFor();
+    estado.revisaoFonte += 1;
+    estado.falhaPreviaConferida = true;
+    await pagina.getByRole('button', { name: /Abrir DOF de Pessoa Ficticia/ }).click();
+    await pagina.getByRole('alert').getByText('Falha sintética de prévia.').waitFor();
+    estado.falhaPreviaConferida = false;
+    estado.revisaoPreviaInvalida = true;
+    await pagina.getByRole('button', { name: 'Tentar carregar prévia novamente' }).click();
+    await pagina.getByRole('alert').getByText('A DOF conferida mudou.', { exact: false }).waitFor();
+    estado.revisaoPreviaInvalida = false;
+    await pagina.getByRole('button', { name: 'Tentar carregar prévia novamente' }).click();
+    const quadroConferido = pagina.frameLocator('iframe[title="Prévia atual da DOF conferida"]');
+    await quadroConferido.getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    await pagina.getByText('A pessoa ou o vínculo mudou após a conferência.', { exact: false }).waitFor();
+    await quadroConferido.getByText(/Mãe fictícia <img src=x>/).waitFor();
+    expect(await quadroConferido.locator('img[src="x"]').count()).toBe(0);
+    expect(await pagina.locator('iframe[title="Prévia atual da DOF conferida"]').getAttribute('sandbox')).toBe('');
+    expect(await quadroConferido.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content'))
+      .toContain("default-src 'none'");
+    await pagina.getByLabel('Motivo da devolução ao autor').fill('Correção sintética <img src=x>');
+    estado.falhaRede = true;
+    await pagina.getByRole('button', { name: 'Devolver DOF para ajustes' }).click();
+    await pagina.getByRole('alert').getByText('Não foi possível confirmar a devolução.', { exact: false }).waitFor();
+    expect(estado.conferido).not.toBeNull();
+    estado.falhaRede = false;
+    await pagina.getByRole('button', { name: 'Devolver DOF para ajustes' }).click();
+    await pagina.getByText('DOF devolvida ao autor como rascunho.', { exact: false }).waitFor();
+    expect(estado.conferido).toBeNull();
+    expect(estado.rascunho).toMatchObject({ status: 'rascunho', revisao: 5, encaminhamento: null });
+    expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
+    estado.papel = 'analista';
+    await pagina.reload();
+    await abrirRascunho(pagina);
+    await pagina.getByText('Correção sintética <img src=x>', { exact: true }).waitFor();
+    expect(await pagina.locator('img[src="x"]').count()).toBe(0);
+  });
+
   it('mostra bloqueios preliminares e invalida o resultado diante de edições locais', async () => {
     await pagina.goto(endereco);
     await iniciarCalculo(pagina);
@@ -982,7 +1124,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Rascunho não conferido — revisão 1,', { exact: false }).waitFor();
     await pagina.getByText('Informe o número do processo.').waitFor();
     expect(await pagina.getByText('A aprovação do modelo ainda não foi verificada.').count()).toBe(1);
-    expect(await pagina.getByRole('button', { name: 'Conferir', exact: true }).count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).count()).toBe(0);
 
     await pagina.getByLabel('Número do processo').fill('1234/5678');
     expect(await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).isDisabled()).toBe(true);

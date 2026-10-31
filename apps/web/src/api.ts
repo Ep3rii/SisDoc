@@ -3,14 +3,18 @@ import {
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
   paginaCoordenadoresDofSchema,
+  paginaConferidosDofSchema,
   paginaEncaminhamentosDofSchema,
   paginaRascunhosDofSchema,
   paginaUsuariosSchema,
   dadosFontePreviaDofSchema,
   preconferenciaDofSchema,
+  previaConferidaDofSchema,
   detalheServidorSchema,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
+  resultadoConferenciaDofSchema,
+  resultadoDevolucaoConferidoDofSchema,
   resultadoDevolucaoDofSchema,
   respostaSessaoSchema,
   ultimaDevolucaoDofSchema,
@@ -22,21 +26,27 @@ import {
   type CriarRascunhoDof,
   type CriarUsuario,
   type ConfirmarInicioDof,
+  type ConferirDof,
   type DadosFontePreviaDof,
   type DevolverRascunhoDof,
+  type DevolverConferidoDof,
   type DetalheServidor,
   type PaginaAuditoria,
   type PaginaBuscaServidores,
   type PaginaEventosServidor,
   type EncaminharRascunhoDof,
   type PaginaCoordenadoresDof,
+  type PaginaConferidosDof,
   type PaginaEncaminhamentosDof,
   type PaginaRascunhosDof,
   type PaginaUsuarios,
   type PreconferenciaDof,
+  type PreviaConferidaDof,
   type RascunhoDof,
   type RecolherRascunhoDof,
   type ResultadoDevolucaoDof,
+  type ResultadoConferenciaDof,
+  type ResultadoDevolucaoConferidoDof,
   type RespostaSessao,
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
@@ -164,6 +174,9 @@ export const api = {
   async listarEncaminhadosDof(cursor?: string): Promise<PaginaEncaminhamentosDof> {
     return validar(paginaEncaminhamentosDofSchema, await requisitar(`documentos/encaminhados?${parametros(cursor)}`));
   },
+  async listarConferidosDof(cursor?: string): Promise<PaginaConferidosDof> {
+    return validar(paginaConferidosDofSchema, await requisitar(`documentos/conferidos?${parametros(cursor)}`));
+  },
   async obterRascunhoDof(id: string): Promise<RascunhoDof> {
     return validar(rascunhoDofSchema, await requisitar(`documentos/${id}`));
   },
@@ -199,7 +212,20 @@ export const api = {
       `documentos/${id}/preconferencia`, 'GET', undefined, undefined, provaFonte,
     ));
   },
+  async conferirDof(csrf: string, id: string, dados: ConferirDof): Promise<ResultadoConferenciaDof> {
+    return validar(resultadoConferenciaDofSchema, await requisitar(`documentos/${id}/conferir`, 'POST', dados, csrf));
+  },
+  async devolverConferidoDof(
+    csrf: string, id: string, dados: DevolverConferidoDof,
+  ): Promise<ResultadoDevolucaoConferidoDof> {
+    return validar(
+      resultadoDevolucaoConferidoDofSchema, await requisitar(`documentos/${id}/devolver-conferido`, 'POST', dados, csrf),
+    );
+  },
   async obterPreviaDof(id: string): Promise<DadosFontePreviaDof> {
     return validar(dadosFontePreviaDofSchema, await requisitar(`documentos/${id}/dados-previa`));
+  },
+  async obterPreviaConferidaDof(id: string): Promise<PreviaConferidaDof> {
+    return validar(previaConferidaDofSchema, await requisitar(`documentos/${id}/dados-previa-conferida`));
   },
 };

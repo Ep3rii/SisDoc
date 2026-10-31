@@ -2,8 +2,8 @@
 
 O login, a administração e a consulta de servidores existem para verificação
 em recursos descartáveis. Há cálculo, rascunho, blocos e prévia provisórios de
-DOF pela interface, mas **não há conferência, emissão, importação, backup ou
-serviço Windows implementados**. A prévia não é um modelo oficial. Não instalar
+DOF e conferência provisória pela interface, mas **não há emissão, importação,
+backup ou serviço Windows implementados**. A prévia não é um modelo oficial. Não instalar
 ou usar operacionalmente até a
 conclusão das demais fatias, revisão e autorização formal.
 
@@ -67,12 +67,12 @@ npm run usuario -- criar
 ```
 
 Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 011, mas a criação ou troca de senha retorna erro até que a
+possuir a migração 012, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `011-revisao-fonte-dof` ao banco novo. Uma instalação anterior sem essa
+O setup aplica até `012-conferencia-dof` ao banco novo. Uma instalação anterior sem essa
 migração não inicia com esta versão. Não existe procedimento aprovado de
 atualização: não aplique a migração manualmente em banco existente.
 
@@ -185,8 +185,8 @@ coordenador ativo e selecione **Encaminhar rascunho**. O destinatário pode
 consultar o cálculo, os blocos, o processo e a prévia em **Encaminhados a mim**.
 Ele também pode selecionar **Devolver rascunho** e informar o motivo para o
 autor. A devolução encerra o acesso do destinatário e não registra conferência.
-O documento permanece rascunho; conferência e emissão ainda não estão
-disponíveis. Nenhum outro perfil ganha acesso ao rascunho por esse envio.
+O documento permanece rascunho. Nenhum outro perfil ganha acesso ao rascunho
+por esse envio; a emissão ainda não está disponível.
 
 Enquanto o encaminhamento estiver ativo, as edições ficam bloqueadas também
 para o autor. Para corrigir ou trocar o destinatário, informe um motivo e use
@@ -216,16 +216,18 @@ pessoa e do vínculo com as usadas ao abri-la. Divergência retorna conflito:
 feche e reabra a prévia e execute a verificação novamente. Sem prévia aberta,
 a consulta continua disponível, mas informa que não foi vinculada a ela.
 Essa comparação não comprova revisão humana, não cobre outras tabelas da fonte
-e não assegura que os dados permaneçam iguais após a consulta. Uma futura
-conferência precisará revalidar tudo na mesma transação.
+e não assegura que os dados permaneçam iguais após a consulta. A conferência
+provisória revalida a fonte e o relatório na mesma transação.
 
 A verificação identifica, entre outras pendências, CPF protegido inválido ou
 inconsistente, matrícula divergente ou duplicada entre vínculos ativos,
 vínculo removido, admissão alterada, divergência de período/cálculo, processo
 fora das máscaras atuais e variáveis indisponíveis ou malformadas em blocos
-ativos. Dados do vínculo sem data de sincronização, com mais de 24 horas ou
-com data futura geram avisos. Outros campos da referência ainda dependem de
-definição institucional. Se o nome da mãe estiver presente, a verificação
+ativos. Como medida conservadora, nascimento, nome da mãe, regime, cargo,
+referência/padrão e órgão ausentes também bloqueiam a conferência provisória;
+a obrigatoriedade institucional de cada campo ainda depende de aprovação.
+Dados do vínculo sem data de sincronização, com mais de 24 horas ou com data
+futura geram avisos. Se o nome da mãe estiver presente, a verificação
 testa a cifra e a validade técnica do texto; não comprova sua correspondência
 com a pessoa. Os registros de afastamento e incorporação não são
 automaticamente confrontados com os lançamentos.
@@ -237,6 +239,26 @@ O mesmo protocolo protege a criação e a edição do cálculo, mas não outras
 tabelas de fonte. Esse mecanismo provisório, sua ordenação e seu impacto em
 importações futuras devem ser reavaliados antes de implementar sincronização
 ou operação concorrente.
+
+## Conferência provisória e devolução
+
+No rascunho próprio ou encaminhado ao coordenador destinatário, abra a prévia
+salva e execute a verificação de pendências. Resolva os bloqueios, leia os
+avisos e confirme que revisou a prévia, os dados e os lançamentos antes de
+selecionar **Conferir DOF provisória**. A operação registra a revisão e os
+avisos, mas não aprova regras, modelo ou campos e não autoriza emissão.
+Se o rascunho, a fonte ou os avisos mudarem, feche e reabra a prévia e refaça
+a verificação. Se a comunicação falhar, consulte **DOFs conferidas** antes de
+repetir, pois a conferência pode ter sido registrada.
+
+Em **DOFs conferidas**, o autor ou coordenador destinatário pode consultar
+seus documentos. A lista e a abertura da prévia indicam mudanças detectadas na
+pessoa e no vínculo em cada consulta; elas não monitoram todas as fontes. A prévia usa a fonte atual e não preserva
+um snapshot do conteúdo conferido. Se não puder ser carregada, a tela informa
+o erro e oferece nova tentativa. O coordenador autor ou destinatário pode
+informar um motivo e devolver o documento para ajustes; a conferência anterior
+é preservada e eventual encaminhamento é encerrado. Se a comunicação falhar,
+consulte os rascunhos antes de repetir a devolução.
 
 ## Verificação de software
 

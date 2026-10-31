@@ -91,7 +91,8 @@ export function CalculoDof({
   const [processoPendente, setProcessoPendente] = useState(false);
   const [encaminhamentoPendente, setEncaminhamentoPendente] = useState(false);
   const [operacaoEncaminhamento, setOperacaoEncaminhamento] = useState(false);
-  const pendencias = useRef({ calculo: false, blocos: false, processo: false, encaminhamento: false });
+  const [operacaoConferencia, setOperacaoConferencia] = useState(false);
+  const pendencias = useRef({ calculo: false, blocos: false, processo: false, encaminhamento: false, conferencia: false });
   const ativa = useRef(true);
   useEffect(() => {
     ativa.current = true;
@@ -101,25 +102,36 @@ export function CalculoDof({
   function marcarCalculo(valor: boolean) {
     pendencias.current.calculo = valor;
     setCalculoPendente(valor);
-    onPendente(valor || pendencias.current.blocos || pendencias.current.processo || pendencias.current.encaminhamento);
+    onPendente(valor || pendencias.current.blocos || pendencias.current.processo
+      || pendencias.current.encaminhamento || pendencias.current.conferencia);
   }
 
   function marcarBlocos(valor: boolean) {
     pendencias.current.blocos = valor;
     setBlocosPendentes(valor);
-    onPendente(valor || pendencias.current.calculo || pendencias.current.processo || pendencias.current.encaminhamento);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.processo
+      || pendencias.current.encaminhamento || pendencias.current.conferencia);
   }
 
   function marcarProcesso(valor: boolean) {
     pendencias.current.processo = valor;
     setProcessoPendente(valor);
-    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos || pendencias.current.encaminhamento);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos
+      || pendencias.current.encaminhamento || pendencias.current.conferencia);
   }
 
   function marcarEncaminhamento(valor: boolean) {
     pendencias.current.encaminhamento = valor;
     setEncaminhamentoPendente(valor);
-    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos || pendencias.current.processo);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos
+      || pendencias.current.processo || pendencias.current.conferencia);
+  }
+
+  function marcarConferencia(valor: boolean) {
+    pendencias.current.conferencia = valor;
+    setOperacaoConferencia(valor);
+    onPendente(valor || pendencias.current.calculo || pendencias.current.blocos
+      || pendencias.current.processo || pendencias.current.encaminhamento);
   }
 
   function invalidar() {
@@ -310,7 +322,7 @@ export function CalculoDof({
       <p>As ocorrências da fonte não são carregadas automaticamente. Confira os registros e informe os dias de cada intervalo; campos vazios serão tratados como zero somente após sua confirmação.</p>
       <form onSubmit={calcular}>
         <fieldset disabled={ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
-          || operacaoEncaminhamento || edicaoIndisponivel || !admissaoAtual}>
+          || operacaoEncaminhamento || operacaoConferencia || edicaoIndisponivel || !admissaoAtual}>
           <div className="grade">
             <label>Início do período<input type="date" value={inicio} required onChange={(evento) => { setInicio(evento.target.value); setTabela(null); invalidar(); }} /></label>
             <label>Fim do período<input type="date" value={fim} required onChange={(evento) => { setFim(evento.target.value); setTabela(null); invalidar(); }} /></label>
@@ -380,7 +392,7 @@ export function CalculoDof({
       {podeSalvar && resultado && pedidoCalculado && (
         <form className="separado" onSubmit={salvar}>
           <fieldset disabled={ocupado || blocosPendentes || processoPendente || encaminhamentoPendente
-            || operacaoEncaminhamento || edicaoIndisponivel}>
+            || operacaoEncaminhamento || operacaoConferencia || edicaoIndisponivel}>
             {anosExcluidos.length > 0 && (
               <>
                 <p className="aviso erro">
@@ -404,44 +416,51 @@ export function CalculoDof({
       {rascunho && (podeSalvar || somenteLeitura) && (
         <ConfirmacaoInicioDof rascunho={rascunho} csrf={csrf}
           bloqueado={calculoPendente || blocosPendentes || processoPendente || encaminhamentoPendente
-            || operacaoEncaminhamento || ocupado}
+            || operacaoEncaminhamento || operacaoConferencia || ocupado}
           somenteLeitura={edicaoIndisponivel}
           onAtualizar={setRascunho} onOcupado={setOcupado} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && (podeSalvar || somenteLeitura) && (
         <ProcessoDof rascunho={rascunho} csrf={csrf}
-          bloqueado={calculoPendente || blocosPendentes || encaminhamentoPendente || operacaoEncaminhamento || ocupado}
+          bloqueado={calculoPendente || blocosPendentes || encaminhamentoPendente
+            || operacaoEncaminhamento || operacaoConferencia || ocupado}
           somenteLeitura={edicaoIndisponivel}
           onAtualizar={setRascunho} onPendente={marcarProcesso} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && (podeSalvar || somenteLeitura) && (
         <BlocosDof rascunho={rascunho} csrf={csrf}
-          bloqueado={calculoPendente || processoPendente || encaminhamentoPendente || operacaoEncaminhamento || ocupado}
+          bloqueado={calculoPendente || processoPendente || encaminhamentoPendente
+            || operacaoEncaminhamento || operacaoConferencia || ocupado}
+          previaBloqueada={operacaoConferencia}
           somenteLeitura={edicaoIndisponivel}
           onAtualizar={setRascunho} onPendente={marcarBlocos} onPrevia={setProvaPrevia} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && (podeSalvar || somenteLeitura) && (
-        <VerificacaoConferenciaDof rascunho={rascunho}
+        <VerificacaoConferenciaDof rascunho={rascunho} csrf={csrf}
           provaFonte={provaPrevia?.documentoId === rascunho.id && provaPrevia.revisao === rascunho.revisao
             ? provaPrevia.provaFonte : undefined}
           bloqueado={calculoPendente || blocosPendentes || processoPendente || encaminhamentoPendente
             || operacaoEncaminhamento || ocupado}
-          onErro={onErro} onLimpar={onLimpar} />
+          onOcupado={marcarConferencia}
+          onConferido={() => {
+            marcarConferencia(false);
+            onFechar('DOF conferida provisoriamente. Consulte-a em DOFs conferidas; a emissão permanece indisponível.');
+          }} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && podeSalvar && !somenteLeitura && (
         <EncaminhamentoDof rascunho={rascunho} csrf={csrf}
-          bloqueado={calculoPendente || blocosPendentes || processoPendente || ocupado}
+          bloqueado={calculoPendente || blocosPendentes || processoPendente || operacaoConferencia || ocupado}
           onAtualizar={setRascunho} onPendente={marcarEncaminhamento} onOcupado={setOperacaoEncaminhamento}
           onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && somenteLeitura && rascunho.encaminhamento && (
         <DevolverRascunhoDof rascunho={rascunho} csrf={csrf}
-          bloqueado={ocupado} onPendente={marcarEncaminhamento} onOcupado={setOperacaoEncaminhamento}
+          bloqueado={ocupado || operacaoConferencia} onPendente={marcarEncaminhamento} onOcupado={setOperacaoEncaminhamento}
           onDevolvido={() => onFechar('Rascunho devolvido para ajustes. Ele continua não conferido.')}
           onErro={onErro} onLimpar={onLimpar} />
       )}
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
-      <div className="acoes"><button type="button" className="secundario" disabled={ocupado || operacaoEncaminhamento} onClick={() => {
+      <div className="acoes"><button type="button" className="secundario" disabled={ocupado || operacaoEncaminhamento || operacaoConferencia} onClick={() => {
         if (confirmarSaida()) { onPendente(false); onFechar(); }
       }}>
         {somenteLeitura ? 'Voltar aos encaminhados' : rascunhoInicial ? 'Voltar aos meus rascunhos' : 'Fechar cálculo'}

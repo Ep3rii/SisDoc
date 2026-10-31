@@ -15,11 +15,12 @@ AES-256-GCM, não JSON. A importação e a sincronização futuras precisam segu
 esse contrato e verificar a compatibilidade das origens. O CPF continua
 validado e comparado ao HMAC pelo mesmo componente de leitura da identidade.
 
-O campo ausente continua como aviso, pois sua obrigatoriedade depende do
-modelo institucional aprovado. Um campo presente e íntegro não comprova que
+O campo ausente bloqueia a conferência provisória por cautela; sua
+obrigatoriedade institucional depende do modelo aprovado. Um campo presente e íntegro não comprova que
 o nome corresponde à pessoa; é necessária conferência humana. A exibição
 posterior na prévia está descrita na [decisão 014](014-dados-fonte-previa-dof.md).
-Não há conferência ou emissão habilitadas.
+A conferência é provisória, conforme a [decisão 017](017-conferencia-provisoria-dof.md);
+a emissão não está habilitada.
 
 ## Evidência e limites
 

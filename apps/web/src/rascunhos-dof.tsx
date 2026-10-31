@@ -70,7 +70,7 @@ export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPend
     <section aria-labelledby="rascunhos-titulo">
       <h2 id="rascunhos-titulo">{recebidos ? 'Rascunhos encaminhados a mim' : 'Meus rascunhos de DOF'}</h2>
       <p>{recebidos
-        ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta e devolução. A conferência ainda não está disponível.'
+        ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta, conferência provisória e devolução.'
         : 'Somente rascunhos de sua autoria são exibidos. Você pode encaminhá-los a um coordenador para análise.'}</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {falhou ? (

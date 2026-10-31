@@ -10,7 +10,7 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia provisória, encaminhamento e verificação preliminar; conferência, emissão e PDF ainda não implementados |
+| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia, encaminhamento e conferência provisórios; emissão, snapshot, PDF e histórico ainda não implementados |
 | 6 a 9 — demais documentos e operação | não iniciadas | — |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
@@ -114,8 +114,8 @@ Na continuação da fatia 5, foram adicionados blocos manuais, versões técnica
 vazias e prévia não oficial. Os blocos são cifrados, ordenáveis e desativáveis;
 alterações exigem motivo e usam a revisão do rascunho. A abertura da prévia é
 auditada; o conteúdo é escapado e exibido em iframe isolado. Variáveis não
-disponíveis são destacadas, mas a conferência que deverá bloqueá-las ainda não
-existe. A migração `005-blocos-dof` é aplicada apenas em banco novo.
+disponíveis são destacadas; naquela entrega ainda não havia conferência. A
+migração `005-blocos-dof` é aplicada apenas em banco novo.
 
 `npm run typecheck`, `npm test` (78 testes em nove arquivos) e `npm audit`
 passaram; a auditoria de dependências não apontou vulnerabilidades. Na
@@ -211,8 +211,9 @@ importação ou sincronização.
 
 A pré-conferência agora verifica a integridade da cifra do nome da mãe e a
 validade técnica do texto, sem afirmar que corresponde à pessoa.
-Campo ausente continua como aviso, e cifra corrompida ou texto inválido geram
-bloqueio. O texto protegido usa UTF-8 diretamente no envelope cifrado; a
+Naquela etapa, campo ausente gerava aviso, e cifra corrompida ou texto inválido
+geravam bloqueio. A conferência provisória posterior passou a bloquear também
+a ausência. O texto protegido usa UTF-8 diretamente no envelope cifrado; a
 importação futura deve observar esse contrato. `npm run typecheck` e os
 23 testes direcionados passaram em recursos sintéticos descartáveis;
 `npm test` passou com 91 testes em 14 arquivos e `npm audit` não apontou
@@ -229,14 +230,14 @@ automaticamente quando a fonte muda. O mesmo resolvedor verifica as variáveis
 na pré-conferência. A suíte completa passou (93 testes em 14 arquivos),
 incluindo autorização, integridade, escape de HTML, resposta obsoleta e
 concorrência. `npm run typecheck` passou e `npm audit` não apontou
-vulnerabilidades. Não houve conferência, aprovação de modelo ou emissão.
+vulnerabilidades. Naquela etapa não havia conferência, aprovação de modelo ou emissão.
 
 O coordenador destinatário pode devolver o rascunho não conferido com motivo
 cifrado, visível apenas ao autor. A operação encerra o encaminhamento, cria
 nova revisão e não altera o status para conferido. A leitura do motivo e a
 devolução são auditadas sem o texto nos detalhes; conflitos, identidade do
 destinatário e concorrência com recolhimento são tratados explicitamente.
-Essa operação não substitui a futura devolução de documento conferido. A
+Essa operação não substitui a devolução posterior de documento conferido. A
 migração `010-devolucao-dof` só é aplicada em banco novo; não há procedimento
 aprovado para atualização de instalação existente. `npm run typecheck` e a
 suíte completa passaram (95 testes em 14 arquivos); `npm audit` não apontou
@@ -258,8 +259,24 @@ vulnerabilidades. Nesta execução, a prévia HTTPS de 45 anos levou 11,5 ms; a
 atualização no limite dos blocos chegou a 86,6 ms, ou 158,6 ms com
 delimitadores malformados.
 
+Analista ou coordenador pode conferir provisoriamente um rascunho próprio, e
+o coordenador destinatário pode conferir o encaminhado. A confirmação exige
+prévia vinculada, revisão humana expressa e revalidação transacional da fonte,
+do relatório e dos bloqueios. Seis campos da referência ausentes bloqueiam a
+conferência como medida conservadora, sem presumir aprovação institucional. O
+coordenador autor ou destinatário pode devolver o conferido com motivo cifrado;
+o evento anterior permanece imutável. A lista e a prévia usam a fonte atual,
+não um snapshot. A migração `012-conferencia-dof` só é aplicada em banco novo.
+Foram verificados 46 testes direcionados com PostgreSQL/HTTPS descartáveis e
+navegador com API simulada. `npm run typecheck` e `npm test` passaram, com
+102 testes em 14 arquivos; `npm audit` não apontou vulnerabilidades. Na suíte
+completa, a abertura HTTPS da prévia de 45 anos levou 13,2 ms e a atualização
+local no limite dos blocos chegou a 87,9 ms, ou 163,1 ms com delimitadores
+malformados. O bundle principal continua acima de 500 kB. A implementação e
+seus limites estão na [decisão 017](decisoes/017-conferencia-provisoria-dof.md).
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
-possui conferência, emissão, importação ou instalação como
+possui emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
 conta de serviço, proxy, backup e suporte do sistema operacional permanecem
 sem aceite.
@@ -279,4 +296,5 @@ Divergências e decisões estão em
 [013-identidade-fonte-dof.md](decisoes/013-identidade-fonte-dof.md) e
 [014-dados-fonte-previa-dof.md](decisoes/014-dados-fonte-previa-dof.md) e
 [015-devolucao-rascunho-dof.md](decisoes/015-devolucao-rascunho-dof.md) e
-[016-revisao-fonte-previa-dof.md](decisoes/016-revisao-fonte-previa-dof.md).
+[016-revisao-fonte-previa-dof.md](decisoes/016-revisao-fonte-previa-dof.md) e
+[017-conferencia-provisoria-dof.md](decisoes/017-conferencia-provisoria-dof.md).

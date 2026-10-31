@@ -62,6 +62,29 @@ export const recolherRascunhoDofSchema = z.strictObject({
 
 export const devolverRascunhoDofSchema = recolherRascunhoDofSchema;
 
+export const conferirDofSchema = z.strictObject({
+  revisao: revisaoSchema,
+  provaFonte: provaFonteDofSchema,
+  provaRelatorio: provaFonteDofSchema,
+  confirmar: z.literal(true),
+});
+
+export const devolverConferidoDofSchema = recolherRascunhoDofSchema;
+
+export const resultadoConferenciaDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  status: z.literal('conferido'),
+  conferidoEm: z.iso.datetime(),
+});
+
+export const resultadoDevolucaoConferidoDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  status: z.literal('rascunho'),
+  devolvidoEm: z.iso.datetime(),
+});
+
 export const resultadoDevolucaoDofSchema = z.strictObject({
   documentoId: z.uuid(),
   revisao: revisaoSchema,
@@ -123,6 +146,16 @@ export const paginaEncaminhamentosDofSchema = z.strictObject({
   proximoCursor: z.uuid().nullable(),
 });
 
+export const paginaConferidosDofSchema = z.strictObject({
+  itens: z.array(resumoRascunhoDofSchema.extend({
+    autorNome: z.string(),
+    conferidoPorNome: z.string(),
+    conferidoEm: z.iso.datetime(),
+    fonteSelecionadaAlterada: z.boolean(),
+  })),
+  proximoCursor: z.uuid().nullable(),
+});
+
 export const dadosFontePreviaDofSchema = z.strictObject({
   documentoId: z.uuid(),
   revisao: revisaoSchema,
@@ -143,9 +176,25 @@ export const dadosFontePreviaDofSchema = z.strictObject({
   removidoNaFonte: z.boolean(),
 });
 
+export const previaConferidaDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  status: z.literal('conferido'),
+  nome: z.string(),
+  matricula: z.string(),
+  resultado: resultadoCalculoDofSchema,
+  blocos: blocosDofSchema,
+  processo: numeroProcessoSchema.nullable(),
+  fonte: dadosFontePreviaDofSchema,
+  fonteSelecionadaAlterada: z.boolean(),
+}).superRefine((dados, contexto) => {
+  if (dados.documentoId !== dados.fonte.documentoId || dados.revisao !== dados.fonte.revisao
+      || dados.nome !== dados.fonte.nome || dados.matricula !== dados.fonte.matricula) {
+    contexto.addIssue({ code: 'custom', message: 'A prévia conferida e os dados da fonte são inconsistentes.' });
+  }
+});
+
 const codigoPendenciaConferenciaDofSchema = z.enum([
-  'conferencia_indisponivel',
-  'aprovacao_modelo_nao_verificada',
   'cpf_indisponivel',
   'cpf_invalido',
   'cpf_hash_inconsistente',
@@ -167,14 +216,15 @@ const codigoPendenciaConferenciaDofSchema = z.enum([
   'variaveis_ausentes',
   'variaveis_malformadas',
   'inicio_ajustado_sem_confirmacao',
+  'campos_referencia_ausentes',
 ]);
 
 const codigoAvisoConferenciaDofSchema = z.enum([
+  'aprovacao_modelo_nao_verificada',
   'regra_provisoria',
   'dados_sem_data',
   'dados_antigos',
   'data_fonte_futura',
-  'campos_referencia_ausentes',
   'nivel_referencia',
 ]);
 
@@ -183,13 +233,14 @@ export const preconferenciaDofSchema = z.strictObject({
   revisao: revisaoSchema,
   verificadoEm: z.iso.datetime(),
   status: z.literal('nao_conferido'),
-  conferenciaDisponivel: z.literal(false),
+  conferenciaDisponivel: z.literal(true),
   fontePreviaValidada: z.boolean(),
-  bloqueios: z.array(z.strictObject({ codigo: codigoPendenciaConferenciaDofSchema, mensagem: z.string().min(1) })).min(1),
+  provaRelatorio: provaFonteDofSchema.nullable(),
+  bloqueios: z.array(z.strictObject({ codigo: codigoPendenciaConferenciaDofSchema, mensagem: z.string().min(1) })),
   avisos: z.array(z.strictObject({ codigo: codigoAvisoConferenciaDofSchema, mensagem: z.string().min(1) })),
 }).superRefine((dados, contexto) => {
-  if (!dados.bloqueios.some((item) => item.codigo === 'conferencia_indisponivel')) {
-    contexto.addIssue({ code: 'custom', message: 'A indisponibilidade da conferência deve ser informada.' });
+  if (dados.fontePreviaValidada !== (dados.provaRelatorio !== null)) {
+    contexto.addIssue({ code: 'custom', message: 'A prova do relatório exige uma prévia validada.' });
   }
   for (const itens of [dados.bloqueios, dados.avisos]) {
     if (new Set(itens.map((item) => item.codigo)).size !== itens.length) {
@@ -233,13 +284,19 @@ export type AtualizarRascunhoDof = z.infer<typeof atualizarRascunhoDofSchema>;
 export type EncaminharRascunhoDof = z.infer<typeof encaminharRascunhoDofSchema>;
 export type RecolherRascunhoDof = z.infer<typeof recolherRascunhoDofSchema>;
 export type DevolverRascunhoDof = z.infer<typeof devolverRascunhoDofSchema>;
+export type DevolverConferidoDof = z.infer<typeof devolverConferidoDofSchema>;
 export type ResultadoDevolucaoDof = z.infer<typeof resultadoDevolucaoDofSchema>;
+export type ResultadoConferenciaDof = z.infer<typeof resultadoConferenciaDofSchema>;
+export type ResultadoDevolucaoConferidoDof = z.infer<typeof resultadoDevolucaoConferidoDofSchema>;
 export type UltimaDevolucaoDof = z.infer<typeof ultimaDevolucaoDofSchema>;
 export type ConfirmarInicioDof = z.infer<typeof confirmarInicioDofSchema>;
+export type ConferirDof = z.infer<typeof conferirDofSchema>;
 export type PaginaCoordenadoresDof = z.infer<typeof paginaCoordenadoresDofSchema>;
 export type PaginaEncaminhamentosDof = z.infer<typeof paginaEncaminhamentosDofSchema>;
+export type PaginaConferidosDof = z.infer<typeof paginaConferidosDofSchema>;
 export type PaginaRascunhosDof = z.infer<typeof paginaRascunhosDofSchema>;
 export type DadosFontePreviaDof = z.infer<typeof dadosFontePreviaDofSchema>;
+export type PreviaConferidaDof = z.infer<typeof previaConferidaDofSchema>;
 export type ProvaFontePreviaDof = Pick<DadosFontePreviaDof, 'documentoId' | 'revisao' | 'provaFonte'>;
 export type PreconferenciaDof = z.infer<typeof preconferenciaDofSchema>;
 export type RascunhoDof = z.infer<typeof rascunhoDofSchema>;
