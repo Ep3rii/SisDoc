@@ -7,7 +7,7 @@ backup ou serviço Windows implementados**. A prévia não é um modelo oficial.
 ou usar operacionalmente até a
 conclusão das demais fatias, revisão e autorização formal.
 O renderizador experimental de PDF é usado apenas por testes sintéticos: não
-há botão de download, arquivo persistido, numeração ou emissão.
+há botão de download, arquivo operacional persistido, numeração ou emissão.
 
 ## Pré-requisitos para uma futura instalação
 

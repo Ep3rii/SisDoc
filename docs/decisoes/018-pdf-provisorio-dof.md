@@ -6,8 +6,9 @@ Sem modelo e regras aprovados, a aplicação continua sem emissão ou download d
 PDF. Foi preparado um renderizador **experimental**, chamado apenas pelos
 testes, que recebe uma cópia validada da prévia conferida e produz um PDF em
 memória explicitamente marcado como provisório e sem validade oficial.
-Não existe rota, botão, gravação em disco, reserva de número ou job para esse
-renderizador.
+Não existe rota, botão, gravação operacional, reserva de número ou job para
+esse renderizador. Os testes de armazenamento descritos na
+[decisão 019](019-armazenamento-pdf.md) usam somente diretórios temporários.
 
 A cópia inclui os dados exibidos e a revisão do documento, mas não inclui a
 prova HMAC da fonte. A captura valida a identidade e separa os objetos da

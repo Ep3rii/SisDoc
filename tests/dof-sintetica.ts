@@ -1,5 +1,9 @@
+import { randomUUID } from 'node:crypto';
 import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
-import { resultadoCalculoDofSchema, type ResultadoCalculoDof } from '@sisdoc/contratos';
+import {
+  previaConferidaDofSchema, resultadoCalculoDofSchema, type PreviaConferidaDof, type ResultadoCalculoDof,
+} from '@sisdoc/contratos';
+import { cpfSintetico } from './dados-sinteticos.js';
 
 export function resultadoDofSintetico(): ResultadoCalculoDof {
   const calculo = calcular({
@@ -24,5 +28,28 @@ export function resultadoDofSintetico(): ResultadoCalculoDof {
     totais: calculo.totais,
     declaracao: linhasDeclaracaoDof(calculo.totais, calculo.regras),
     avisos: calculo.avisos,
+  });
+}
+
+export function previaDofSintetica(): PreviaConferidaDof {
+  const documentoId = randomUUID();
+  return previaConferidaDofSchema.parse({
+    documentoId, revisao: 2, status: 'conferido',
+    nome: 'Pessoa fictícia <img src=x>', matricula: 'FICTICIA-1',
+    resultado: resultadoDofSintetico(),
+    blocos: [
+      { id: randomUUID(), codigo: 'contratacao', ativo: true, texto: 'Linha fictícia para {{nome}}.\nOutra linha.' },
+      { id: randomUUID(), codigo: 'complementares', ativo: false, texto: 'BLOCO-INATIVO-FICTICIO' },
+    ],
+    processo: 'FICTICIO-1',
+    fonte: {
+      documentoId, revisao: 2, provaFonte: 'a'.repeat(64), consultadoEm: '2026-01-01T12:00:00.000Z',
+      nome: 'Pessoa fictícia <img src=x>', matricula: 'FICTICIA-1', cpf: cpfSintetico(),
+      nascimento: '1950-05-04', nomeMae: 'Mãe fictícia <script>fictício</script>',
+      regimeJuridico: 'ESTATUTARIO', cargo: 'Cargo fictício', nivel: 'A',
+      avisoNivel: null, referencia: 'A-1', orgao: 'Órgão fictício',
+      admissao: '1980-01-01', removidoNaFonte: false,
+    },
+    fonteSelecionadaAlterada: false,
   });
 }

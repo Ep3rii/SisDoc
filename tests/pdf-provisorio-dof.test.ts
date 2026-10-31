@@ -1,44 +1,23 @@
 import { randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 import {
   capturarDadosPdfProvisorioDof,
   dadosPdfProvisorioDofSchema,
-  previaConferidaDofSchema,
   type DadosPdfProvisorioDof,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { chromium, type Browser } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ArmazenamentoPdf } from '../apps/api/dist/documentos/armazenamento-pdf.js';
 import { renderizarPdfProvisorioDof } from '../apps/api/dist/documentos/pdf-provisorio-dof.js';
-import { cpfSintetico } from './dados-sinteticos.js';
-import { resultadoDofSintetico } from './dof-sintetica.js';
+import { previaDofSintetica as previaSintetica } from './dof-sintetica.js';
 
 type ItemTexto = { texto: string; x: number; y: number; largura: number; altura: number };
 type PaginaPdf = { largura: number; altura: number; itens: ItemTexto[]; texto: string };
-
-function previaSintetica() {
-  const documentoId = randomUUID();
-  return previaConferidaDofSchema.parse({
-    documentoId, revisao: 2, status: 'conferido',
-    nome: 'Pessoa fictícia <img src=x>', matricula: 'FICTICIA-1',
-    resultado: resultadoDofSintetico(),
-    blocos: [
-      { id: randomUUID(), codigo: 'contratacao', ativo: true, texto: 'Linha fictícia para {{nome}}.\nOutra linha.' },
-      { id: randomUUID(), codigo: 'complementares', ativo: false, texto: 'BLOCO-INATIVO-FICTICIO' },
-    ],
-    processo: 'FICTICIO-1',
-    fonte: {
-      documentoId, revisao: 2, provaFonte: 'a'.repeat(64), consultadoEm: '2026-01-01T12:00:00.000Z',
-      nome: 'Pessoa fictícia <img src=x>', matricula: 'FICTICIA-1', cpf: cpfSintetico(),
-      nascimento: '1950-05-04', nomeMae: 'Mãe fictícia <script>fictício</script>',
-      regimeJuridico: 'ESTATUTARIO', cargo: 'Cargo fictício', nivel: 'A',
-      avisoNivel: null, referencia: 'A-1', orgao: 'Órgão fictício',
-      admissao: '1980-01-01', removidoNaFonte: false,
-    },
-    fonteSelecionadaAlterada: false,
-  });
-}
 
 async function lerPaginas(pdf: Buffer): Promise<PaginaPdf[]> {
   const tarefa = getDocument({ data: new Uint8Array(pdf), useSystemFonts: true, verbosity: 0 });
@@ -246,21 +225,30 @@ describe('PDF provisório de DOF sem emissão', () => {
     }
   });
 
-  it('mede 20 renderizações aquecidas de 45 anos sem incluir fila ou gravação', async () => {
+  it('mede 20 renderizações aquecidas de 45 anos com gravação, sem fila', async () => {
     const dados = capturarDadosPdfProvisorioDof(previaSintetica());
     await renderizarPdfProvisorioDof(navegador, dados);
-    const duracoes: number[] = [];
-    for (let indice = 0; indice < 20; indice += 1) {
-      const inicio = performance.now();
-      const pdf = await renderizarPdfProvisorioDof(navegador, dados);
-      duracoes.push(performance.now() - inicio);
-      expect(pdf.subarray(0, 5).toString('ascii')).toBe('%PDF-');
+    const diretorio = await mkdtemp(path.join(os.tmpdir(), 'sisdoc-pdf-medicao-'));
+    try {
+      const armazenamento = new ArmazenamentoPdf(diretorio);
+      const duracoes: number[] = [];
+      for (let indice = 0; indice < 20; indice += 1) {
+        const inicio = performance.now();
+        const pdf = await renderizarPdfProvisorioDof(navegador, dados);
+        const resultado = await armazenamento.gravar(randomUUID(), pdf);
+        duracoes.push(performance.now() - inicio);
+        expect(resultado.reutilizado).toBe(false);
+      }
+      const ordenadas = [...duracoes].sort((a, b) => a - b);
+      const mediana = (ordenadas[9] + ordenadas[10]) / 2;
+      const p95 = ordenadas[18];
+      const maximo = ordenadas[19];
+      console.info(`PDF provisório aquecido, com gravação e sem fila: mediana ${mediana.toFixed(1)} ms; p95 ${p95.toFixed(1)} ms; máximo ${maximo.toFixed(1)} ms.`);
+      expect(maximo).toBeLessThan(5000);
+    } finally {
+      if (path.basename(diretorio).startsWith('sisdoc-pdf-medicao-')) {
+        await rm(diretorio, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      }
     }
-    const ordenadas = [...duracoes].sort((a, b) => a - b);
-    const mediana = (ordenadas[9] + ordenadas[10]) / 2;
-    const p95 = ordenadas[18];
-    const maximo = ordenadas[19];
-    console.info(`PDF provisório aquecido, sem fila/gravação: mediana ${mediana.toFixed(1)} ms; p95 ${p95.toFixed(1)} ms; máximo ${maximo.toFixed(1)} ms.`);
-    expect(maximo).toBeLessThan(5000);
   });
 });

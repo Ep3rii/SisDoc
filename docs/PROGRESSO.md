@@ -293,6 +293,17 @@ sufixos de colisão explícitos, sem gravar arquivos. A busca e reserva
 atômica de nomes e a recuperação de colisões continuam não implementadas. A
 suíte completa posterior passou com 118 testes em 16 arquivos.
 
+Um componente experimental grava PDFs sintéticos em diretórios temporários,
+por UUID, sem sobrescrever e com conferência de SHA-256. Testes verificam
+concorrência, alterações no arquivo, escrita parcial e falhas de publicação e
+limpeza. A medição direcionada de 20 renderizações aquecidas com gravação e
+verificação local teve mediana de 302,6 ms, p95 de 317,2 ms e máximo de
+317,7 ms; não inclui fila ou transação. Não há worker, gravação operacional
+ou recuperação integrada. A ACL, os limites de persistência e as pendências
+estão na [decisão 019](decisoes/019-armazenamento-pdf.md). A suíte completa
+passou com 129 testes em 17 arquivos; nela, as 20 renderizações com gravação
+tiveram mediana de 299,9 ms, p95 de 316,5 ms e máximo de 327,9 ms.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -316,4 +327,5 @@ Divergências e decisões estão em
 [015-devolucao-rascunho-dof.md](decisoes/015-devolucao-rascunho-dof.md) e
 [016-revisao-fonte-previa-dof.md](decisoes/016-revisao-fonte-previa-dof.md) e
 [017-conferencia-provisoria-dof.md](decisoes/017-conferencia-provisoria-dof.md) e
-[018-pdf-provisorio-dof.md](decisoes/018-pdf-provisorio-dof.md).
+[018-pdf-provisorio-dof.md](decisoes/018-pdf-provisorio-dof.md) e
+[019-armazenamento-pdf.md](decisoes/019-armazenamento-pdf.md).
