@@ -1,23 +1,17 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
-  dataFuncionalSchema,
   resultadoCalculoDofSchema,
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
 import type { Pool, PoolClient } from 'pg';
 import { transacao } from '../banco';
+import { dataEmSaoPaulo } from '../data';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
-
-function dataAtual(): string {
-  return dataFuncionalSchema.parse(new Intl.DateTimeFormat('sv-SE', {
-    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
-  }).format(new Date()));
-}
 
 export async function calcularDofNaTransacao(
   cliente: PoolClient,
@@ -41,7 +35,7 @@ export async function calcularDofNaTransacao(
   const calculo = calcular({
     tipo: 'DOF',
     posse: vinculo.admissao,
-    dataReferencia: dataAtual(),
+    dataReferencia: dataEmSaoPaulo(new Date()),
     periodos: [{
       inicio: dados.inicio,
       fim: dados.fim,

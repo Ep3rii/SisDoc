@@ -288,6 +288,10 @@ institucional continuam pendentes; detalhes na
 110 testes em 15 arquivos, e `npm audit` não apontou vulnerabilidades. Na
 execução completa, as 20 renderizações aquecidas em memória tiveram mediana
 de 290,6 ms, p95 de 301,8 ms e máximo de 304,7 ms.
+Um formatador separado prepara nomes seguros para os quatro tipos e aceita
+sufixos de colisão explícitos, sem gravar arquivos. A busca e reserva
+atômica de nomes e a recuperação de colisões continuam não implementadas. A
+suíte completa posterior passou com 118 testes em 16 arquivos.
 
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui emissão, importação ou instalação como

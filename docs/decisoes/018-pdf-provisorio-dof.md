@@ -32,6 +32,16 @@ instalações ainda precisam ser resolvidas antes de um PDF oficial. O leitor
 PDF.js 6.4.299 é dependência apenas de desenvolvimento, para inspeção dos PDFs
 sintéticos.
 
+Um formatador independente prepara nomes para os quatro tipos previstos,
+usando a data do instante informado em `America/Sao_Paulo`. Ele remove
+acentos, caracteres especiais e dígitos da parte do nome, inclui o tipo e a
+data e respeita o limite provisório de 80 caracteres, extensão e sufixo
+incluídos. Entradas sem letras utilizáveis são rejeitadas. O índice de colisão
+é explícito: 1 não acrescenta sufixo, enquanto 2, 3 e seguintes acrescentam
+`_2`, `_3` etc. O formatador não consulta nem grava arquivos e não reserva
+nomes; a detecção e a reserva atômica de colisões permanecem pendentes.
+Também não aceita CPF, matrícula ou caminho como campos de entrada.
+
 ## Evidência e limites
 
 Com dados inteiramente fictícios, os testes leem o PDF gerado e verificam
@@ -41,6 +51,10 @@ da tabela. Também verificam os 200 blocos e 20.000 caracteres permitidos,
 texto longo, conteúdo escapado, ausência de requisições, isolamento entre
 renderizações simultâneas e falhas de abertura/encerramento. A inspeção de
 texto e geometria não substitui revisão visual ou aprovação do modelo.
+Os testes do nome cobrem os quatro tipos, passagem de ano no fuso previsto,
+caracteres hostis, identificadores numéricos, colisões informadas e o limite
+completo, inclusive com nomes longos. Eles não demonstram detecção ou
+recuperação de colisões no disco.
 
 Em uma execução direcionada com Chromium aquecido, 20 renderizações do caso
 de 45 anos em memória tiveram mediana de 278,0 ms, p95 de 291,9 ms e máximo de
