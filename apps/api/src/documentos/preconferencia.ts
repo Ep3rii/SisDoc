@@ -1,7 +1,5 @@
-import { timingSafeEqual } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import {
-  cpfSchema,
   normalizarMatricula,
   preconferenciaDofSchema,
   processoCorrespondeMascara,
@@ -13,12 +11,13 @@ import type { PoolClient } from 'pg';
 import { calcularDofNaTransacao } from '../calculos/calculos';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import type { ProtetorDados } from '../seguranca/protecao-dados';
+import { lerCpfDof, lerNomeMaeDof } from './identidade-fonte-dof';
 
 type LinhaFonte = {
   cpf_cifrado: Buffer;
   cpf_hash: Buffer;
   nascimento: string | null;
-  mae_informada: boolean;
+  nome_mae_cifrado: Buffer | null;
   matricula_norm: string;
   regime_juridico: string | null;
   cargo: string | null;
@@ -42,7 +41,7 @@ export async function verificarPreconferenciaDof(
 ): Promise<PreconferenciaDof> {
   const consulta = await cliente.query<LinhaFonte>(`
     SELECT p.cpf_cifrado, p.cpf_hash, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
-      (p.nome_mae_cifrado IS NOT NULL AND octet_length(p.nome_mae_cifrado) > 0) AS mae_informada,
+      p.nome_mae_cifrado,
       v.matricula_norm, v.regime_juridico, v.cargo, v.referencia, v.orgao_nome,
       to_char(v.admissao, 'YYYY-MM-DD') AS admissao, v.removido_na_fonte_em IS NOT NULL AS removido,
       v.sincronizado_em, v.sincronizado_em < now() - interval '24 hours' AS desatualizado,
@@ -60,31 +59,23 @@ export async function verificarPreconferenciaDof(
     { codigo: 'regra_provisoria', mensagem: 'A regra de cálculo é provisória e depende de aprovação para emissão.' },
   ];
 
-  let cpfProtegido: Buffer | undefined;
-  try {
-    cpfProtegido = protetor.decifrar(fonte.cpf_cifrado, {
-      schema: 'nucleo', tabela: 'pessoa', registroId: rascunho.pessoaId, campo: 'cpf_cifrado',
-    });
-  } catch (erro) {
-    if (!(erro instanceof Error) || erro.message !== 'Dado protegido inválido ou corrompido.') throw erro;
-    bloqueios.push({
-      codigo: 'cpf_indisponivel',
-      mensagem: 'O CPF protegido não pôde ser lido. Solicite a verificação de integridade e das chaves ao administrador.',
-    });
+  const cpf = lerCpfDof(protetor, rascunho.pessoaId, fonte.cpf_cifrado, fonte.cpf_hash);
+  if ('erro' in cpf) {
+    const mensagens = {
+      cpf_indisponivel: 'O CPF protegido não pôde ser lido. Solicite a verificação de integridade e das chaves ao administrador.',
+      cpf_invalido: 'O CPF do vínculo é inválido. Solicite a correção na fonte.',
+      cpf_hash_inconsistente: 'O CPF não corresponde ao identificador protegido. Solicite a verificação da fonte e das chaves.',
+    } as const;
+    bloqueios.push({ codigo: cpf.erro, mensagem: mensagens[cpf.erro] });
   }
-  if (cpfProtegido) {
-    const cpf = cpfSchema.safeParse(cpfProtegido.toString('utf8'));
-    if (!cpf.success) {
-      bloqueios.push({ codigo: 'cpf_invalido', mensagem: 'O CPF do vínculo é inválido. Solicite a correção na fonte.' });
-    } else {
-      const hash = protetor.hashCpf(cpf.data);
-      if (fonte.cpf_hash.length !== hash.length || !timingSafeEqual(fonte.cpf_hash, hash)) {
-        bloqueios.push({
-          codigo: 'cpf_hash_inconsistente',
-          mensagem: 'O CPF não corresponde ao identificador protegido. Solicite a verificação da fonte e das chaves.',
-        });
-      }
-    }
+  const nomeMae = lerNomeMaeDof(protetor, rascunho.pessoaId, fonte.nome_mae_cifrado);
+  if ('erro' in nomeMae) {
+    bloqueios.push({
+      codigo: nomeMae.erro,
+      mensagem: nomeMae.erro === 'nome_mae_indisponivel'
+        ? 'O nome da mãe protegido não pôde ser lido. Solicite a verificação de integridade e das chaves ao administrador.'
+        : 'O nome da mãe protegido está vazio ou contém texto inválido. Solicite a correção na fonte.',
+    });
   }
 
   if (!rascunho.matricula.trim() || normalizarMatricula(rascunho.matricula) !== fonte.matricula_norm) {
@@ -122,7 +113,7 @@ export async function verificarPreconferenciaDof(
   }
   const camposReferencia = [
     [fonte.nascimento, 'data de nascimento'],
-    [fonte.mae_informada, 'nome da mãe'],
+    ['erro' in nomeMae || nomeMae.valor !== null, 'nome da mãe'],
     [fonte.regime_juridico?.trim(), 'regime jurídico'],
     [fonte.cargo?.trim(), 'cargo'],
     [fonte.referencia?.trim(), 'referência/padrão'],

@@ -205,9 +205,10 @@ vínculo removido, admissão alterada, divergência de período/cálculo, proces
 fora das máscaras atuais e variáveis indisponíveis ou malformadas em blocos
 ativos. Dados do vínculo sem data de sincronização, com mais de 24 horas ou
 com data futura geram avisos. Outros campos da referência ainda dependem de
-definição institucional; a presença de nome da mãe não valida seu conteúdo.
-Os registros de afastamento e incorporação não são automaticamente
-confrontados com os lançamentos.
+definição institucional. Se o nome da mãe estiver presente, a verificação
+testa a cifra e a validade técnica do texto; não comprova sua correspondência
+com a pessoa nem o mostra na prévia atual. Os registros de afastamento e
+incorporação não são automaticamente confrontados com os lançamentos.
 
 Se a fonte estiver sendo atualizada durante a consulta, a operação retorna
 conflito; aguarde e tente novamente. Enquanto a consulta está em andamento,

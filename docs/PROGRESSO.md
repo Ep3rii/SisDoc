@@ -156,9 +156,9 @@ Foi adicionada uma verificação preliminar auditada para rascunhos próprios e
 encaminhados ao coordenador destinatário. Ela compara identidade, matrícula,
 admissão, período e recálculo, processo e variáveis de blocos ativos; informa
 pendências e avisos, sem transição de estado. Falta a definição dos campos
-obrigatórios e da aprovação institucional do modelo. Presença de nome da mãe
-não significa validação do conteúdo; afastamentos e incorporações da fonte
-ainda não são automaticamente confrontados com os lançamentos.
+obrigatórios e da aprovação institucional do modelo. A verificação posterior
+da filiação é descrita abaixo; afastamentos e incorporações da fonte ainda não
+são automaticamente confrontados com os lançamentos.
 
 A migração `008-preconferencia-dof` protege a leitura da fonte durante a
 consulta com um bloqueio advisory compartilhado; escritas em pessoa e vínculo
@@ -209,6 +209,18 @@ delimitadores malformados. O bloqueio é global, não cobre outras tabelas de
 fonte e precisa ter desempenho, falhas e ordenação reavaliados antes de
 importação ou sincronização.
 
+A pré-conferência agora verifica a integridade da cifra do nome da mãe e a
+validade técnica do texto, sem exibi-lo ou afirmar que corresponde à pessoa.
+Campo ausente continua como aviso, e cifra corrompida ou texto inválido geram
+bloqueio. O texto protegido usa UTF-8 diretamente no envelope cifrado; a
+importação futura deve observar esse contrato. `npm run typecheck` e os
+23 testes direcionados passaram em recursos sintéticos descartáveis;
+`npm test` passou com 91 testes em 14 arquivos e `npm audit` não apontou
+vulnerabilidades. Nesta execução, a prévia HTTPS de 45 anos levou 7,9 ms; a
+atualização no limite de blocos chegou a 84,8 ms, ou 156,3 ms com milhares de
+delimitadores malformados. A prévia atual ainda não exibe o campo; não houve
+conferência nem aprovação.
+
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
 serviço; não está pronta para uso operacional. Requisitos de certificado,
@@ -226,4 +238,5 @@ Divergências e decisões estão em
 [009-processo-dof.md](decisoes/009-processo-dof.md) e
 [010-encaminhamento-dof.md](decisoes/010-encaminhamento-dof.md) e
 [011-preconferencia-dof.md](decisoes/011-preconferencia-dof.md) e
-[012-confirmacao-inicio-dof.md](decisoes/012-confirmacao-inicio-dof.md).
+[012-confirmacao-inicio-dof.md](decisoes/012-confirmacao-inicio-dof.md) e
+[013-identidade-fonte-dof.md](decisoes/013-identidade-fonte-dof.md).

@@ -109,6 +109,8 @@ const codigoPendenciaConferenciaDofSchema = z.enum([
   'cpf_indisponivel',
   'cpf_invalido',
   'cpf_hash_inconsistente',
+  'nome_mae_indisponivel',
+  'nome_mae_invalido',
   'matricula_inconsistente',
   'matricula_ambigua',
   'vinculo_removido',

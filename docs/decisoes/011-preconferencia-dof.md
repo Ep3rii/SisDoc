@@ -18,8 +18,10 @@ admissão permanece bloqueado sem a confirmação específica descrita na
 [decisão 012](012-confirmacao-inicio-dof.md). O parser usado pela prévia também detecta variáveis sem
 valor e expressões malformadas em blocos ativos. Campos presentes na
 referência, mas ainda sem obrigatoriedade institucional definida, geram aviso.
-Para o nome da mãe é verificada somente a presença do campo cifrado; seu
-conteúdo e integridade não são validados. O vínculo sem data, antigo ou com
+Para o nome da mãe são verificadas a integridade da cifra e a validade técnica
+do texto, sem comprovar que ele corresponde à pessoa; a ausência continua
+como aviso. O contrato e os limites estão na
+[decisão 013](013-identidade-fonte-dof.md). O vínculo sem data, antigo ou com
 data futura gera aviso. A consulta não verifica todas as datas de origem da
 pessoa nem confronta automaticamente afastamentos e incorporações.
 

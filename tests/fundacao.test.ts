@@ -2910,6 +2910,43 @@ describe('fundação em recursos descartáveis', () => {
             protetor.hashCpf(cpf), cifraCpf, pessoaId,
           ]);
         }
+        const nomeMaeFicticio = 'Filiação sintética protegida';
+        const contextoMae = {
+          schema: 'nucleo' as const, tabela: 'pessoa', registroId: pessoaId, campo: 'nome_mae_cifrado',
+        };
+        const cifrarMae = (valor: Buffer) => protetor.cifrar(valor, contextoMae);
+        try {
+          await cliente.query('UPDATE nucleo.pessoa SET nome_mae_cifrado = $1 WHERE id = $2', [
+            cifrarMae(Buffer.from(nomeMaeFicticio, 'utf8')), pessoaId,
+          ]);
+          const maeValida = await verificar();
+          expect(maeValida.bloqueios.map((item) => item.codigo)).not.toContain('nome_mae_indisponivel');
+          expect(maeValida.bloqueios.map((item) => item.codigo)).not.toContain('nome_mae_invalido');
+          expect(JSON.stringify(maeValida)).not.toContain(nomeMaeFicticio);
+          expect(maeValida.avisos.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
+            .not.toContain('nome da mãe');
+          const casosMae = [
+            { valor: Buffer.alloc(0), codigo: 'nome_mae_indisponivel' },
+            { valor: protetor.cifrar(Buffer.from(nomeMaeFicticio), { ...contextoMae, registroId: randomUUID() }),
+              codigo: 'nome_mae_indisponivel' },
+            { valor: cifrarMae(Buffer.from([0xc3, 0x28])), codigo: 'nome_mae_invalido' },
+            { valor: cifrarMae(Buffer.from('   ')), codigo: 'nome_mae_invalido' },
+            { valor: cifrarMae(Buffer.from('Nome\u0000fictício')), codigo: 'nome_mae_invalido' },
+            { valor: cifrarMae(Buffer.from('a'.repeat(2001))), codigo: 'nome_mae_invalido' },
+          ];
+          for (const caso of casosMae) {
+            await cliente.query('UPDATE nucleo.pessoa SET nome_mae_cifrado = $1 WHERE id = $2', [caso.valor, pessoaId]);
+            const relatorio = await verificar();
+            expect(relatorio.bloqueios.map((item) => item.codigo)).toContain(caso.codigo);
+            expect(relatorio.avisos.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
+              .not.toContain('nome da mãe');
+            expect(JSON.stringify(relatorio)).not.toContain(nomeMaeFicticio);
+          }
+        } finally {
+          await cliente.query('UPDATE nucleo.pessoa SET nome_mae_cifrado = NULL WHERE id = $1', [pessoaId]);
+        }
+        expect((await verificar()).avisos.find((item) => item.codigo === 'campos_referencia_ausentes')?.mensagem)
+          .toContain('nome da mãe');
         await cliente.query("UPDATE nucleo.pessoa SET nascimento = '1990-01-01' WHERE id = $1", [pessoaId]);
         expect((await verificar()).bloqueios.map((item) => item.codigo)).toContain('nascimento_inconsistente');
         await cliente.query('UPDATE nucleo.pessoa SET nascimento = NULL WHERE id = $1', [pessoaId]);
