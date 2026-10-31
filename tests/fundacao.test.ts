@@ -1940,6 +1940,114 @@ describe('fundação em recursos descartáveis', () => {
         const alterada = {
           ...entrada, anos: anos.map((item, indice) => indice === 1 ? { ...item, faltas: 2 } : item),
         };
+        const fonteOcupada = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await fonteOcupada.connect();
+        try {
+          await fonteOcupada.query('BEGIN');
+          await fonteOcupada.query("UPDATE nucleo.vinculo SET admissao = '1981-01-01' WHERE id = $1", [vinculoId]);
+          const antes = await cliente.query<{ total: string }>('SELECT count(*) AS total FROM documentos.documento');
+          const criacaoOcupada = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, motivo, admissaoEsperada }, ...analista,
+          });
+          expect(criacaoOcupada.status, criacaoOcupada.corpo).toBe(409);
+          expect(criacaoOcupada.corpo).toContain('fonte está sendo atualizada');
+          const edicaoOcupada = await requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
+            corpo: { calculo: alterada, admissaoEsperada, motivo: 'Correção sintética', revisao: 1 }, ...analista,
+          });
+          expect(edicaoOcupada.status, edicaoOcupada.corpo).toBe(409);
+          expect(edicaoOcupada.corpo).toContain('fonte está sendo atualizada');
+          const pessoaInexistente = await requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/documentos',
+            corpo: { calculo: { ...entrada, pessoaId: randomUUID(), vinculoId: randomUUID() }, motivo, admissaoEsperada },
+            ...analista,
+          });
+          expect(pessoaInexistente.status, pessoaInexistente.corpo).toBe(409);
+          expect((await cliente.query<{ total: string }>('SELECT count(*) AS total FROM documentos.documento')).rows)
+            .toEqual(antes.rows);
+          expect((await cliente.query('SELECT revisao FROM documentos.documento WHERE id = $1', [rascunho.id])).rows[0].revisao)
+            .toBe(1);
+        } finally {
+          await fonteOcupada.query('ROLLBACK');
+          await fonteOcupada.end();
+        }
+
+        async function verificarEscritaDuranteGravacao(
+          tabela: 'documentos.documento' | 'documentos.documento_periodo',
+          requisitarGravacao: () => ReturnType<typeof requisitarApi>,
+        ) {
+          const bloqueador = new Client({
+            host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+            user: 'sisdoc_migrador', password: senhaMigrador,
+          });
+          const escritor = new Client({
+            host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+            user: 'sisdoc_migrador', password: senhaMigrador,
+          });
+          await bloqueador.connect();
+          await escritor.connect();
+          let transacaoAberta = false;
+          let pedido: ReturnType<typeof requisitarApi> | undefined;
+          let escrita: Promise<unknown> | undefined;
+          try {
+            await bloqueador.query('BEGIN');
+            transacaoAberta = true;
+            await bloqueador.query(`LOCK TABLE ${tabela} IN SHARE MODE`);
+            pedido = requisitarGravacao();
+            void pedido.catch(() => {});
+            await expect.poll(async () => {
+              const locks = await cliente.query<{ quantidade: number }>(`
+                SELECT count(*)::integer AS quantidade FROM pg_locks
+                WHERE locktype = 'advisory' AND classid = $1::oid AND objid = $2::oid
+                  AND objsubid = 2 AND mode = 'ShareLock' AND granted
+              `, [...CHAVE_BLOQUEIO_FONTE_DOF]);
+              return locks.rows[0].quantidade;
+            }, { timeout: 3000, interval: 25 }).toBeGreaterThan(0);
+            let escritaConcluida = false;
+            escrita = escritor.query("UPDATE nucleo.vinculo SET admissao = '1981-01-01' WHERE id = $1", [vinculoId]);
+            void escrita.then(() => { escritaConcluida = true; }, () => { escritaConcluida = true; });
+            await delay(200);
+            expect(escritaConcluida).toBe(false);
+            await bloqueador.query('COMMIT');
+            transacaoAberta = false;
+            const resposta = await pedido;
+            await escrita;
+            return resposta;
+          } finally {
+            if (transacaoAberta) await bloqueador.query('ROLLBACK');
+            await Promise.allSettled([...(pedido ? [pedido] : []), ...(escrita ? [escrita] : [])]);
+            await escritor.query("UPDATE nucleo.vinculo SET admissao = '1980-01-01' WHERE id = $1", [vinculoId]);
+            await bloqueador.end();
+            await escritor.end();
+          }
+        }
+        const criacaoConcorrente = await verificarEscritaDuranteGravacao('documentos.documento', () =>
+          requisitarApi(portaHttps, caPem, {
+            metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, motivo, admissaoEsperada }, ...analista,
+          }));
+        expect(criacaoConcorrente.status, criacaoConcorrente.corpo).toBe(201);
+        const extraConcorrente = rascunhoDofSchema.parse(JSON.parse(criacaoConcorrente.corpo));
+        expect(extraConcorrente.resultado.admissaoConsiderada).toBe('1980-01-01');
+        const edicaoConcorrente = await verificarEscritaDuranteGravacao('documentos.documento_periodo', () =>
+          requisitarApi(portaHttps, caPem, {
+            metodo: 'PATCH', rota: `/api/v1/documentos/${extraConcorrente.id}`,
+            corpo: { calculo: alterada, admissaoEsperada, motivo: 'Correção sintética', revisao: 1 }, ...analista,
+          }));
+        expect(edicaoConcorrente.status, edicaoConcorrente.corpo).toBe(200);
+        expect(rascunhoDofSchema.parse(JSON.parse(edicaoConcorrente.corpo))).toMatchObject({
+          revisao: 2, admissao: '1980-01-01', resultado: { admissaoConsiderada: '1980-01-01' },
+        });
+        const auditoriaFonte = await cliente.query<{ entidade: string; pessoa_id: string | null }>(`
+          SELECT entidade, pessoa_id FROM seguranca.auditoria WHERE acao = 'rascunho_fonte_ocupada'
+        `);
+        expect(auditoriaFonte.rows).toEqual(expect.arrayContaining([
+          { entidade: 'documento', pessoa_id: pessoaId },
+          { entidade: 'vinculo', pessoa_id: null },
+        ]));
+
         const edicao = await requisitarApi(portaHttps, caPem, {
           metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
           corpo: { calculo: alterada, admissaoEsperada, motivo: 'Correção sintética', revisao: 1 }, ...analista,

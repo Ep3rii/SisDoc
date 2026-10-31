@@ -88,6 +88,13 @@ function entradaOrdenada(entrada: SolicitarCalculoDof): SolicitarCalculoDof {
   return { ...entrada, anos: [...entrada.anos].sort((a, b) => a.ano - b.ano) };
 }
 
+async function tentarBloqueioFonte(cliente: PoolClient): Promise<boolean> {
+  const bloqueio = await cliente.query<{ obtido: boolean }>(
+    'SELECT pg_try_advisory_xact_lock_shared($1, $2) AS obtido', [...CHAVE_BLOQUEIO_FONTE_DOF],
+  );
+  return bloqueio.rows[0].obtido;
+}
+
 function mudancas(anterior: SolicitarCalculoDof | null, novo: SolicitarCalculoDof): Mudanca[] {
   const resultado: Mudanca[] = [];
   const adicionar = (campo: string, valorAnterior: unknown, valorNovo: unknown) => {
@@ -378,10 +385,7 @@ export class RascunhosService {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
       }
-      const bloqueio = await cliente.query<{ obtido: boolean }>(
-        'SELECT pg_try_advisory_xact_lock_shared($1, $2) AS obtido', [...CHAVE_BLOQUEIO_FONTE_DOF],
-      );
-      if (!bloqueio.rows[0].obtido) {
+      if (!await tentarBloqueioFonte(cliente)) {
         await auditarConsultaFuncional(cliente, sessao, 'preconferencia_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e verifique novamente.' } };
       }
@@ -399,6 +403,10 @@ export class RascunhosService {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
       const entrada = entradaOrdenada(dados.calculo);
+      if (!await tentarBloqueioFonte(cliente)) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_fonte_ocupada', 'vinculo', entrada.vinculoId, null, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente salvar novamente.' } };
+      }
       const calculo = await calcularDofNaTransacao(cliente, sessao, ip, entrada, dados.admissaoEsperada);
       if ('erro' in calculo) return { falha: { tipo: 'invalido', mensagem: calculo.erro } };
       if ('conflito' in calculo) {
@@ -440,7 +448,7 @@ export class RascunhosService {
   async atualizar(sessao: SessaoAutenticada, ip: string, id: string, dados: AtualizarRascunhoDof): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      let linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -453,6 +461,13 @@ export class RascunhosService {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_regra_incompativel', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A versão de regra deste rascunho não é a versão disponível para cálculo. Contate o administrador.' } };
       }
+      if (!await tentarBloqueioFonte(cliente)) {
+        await auditarConsultaFuncional(cliente, sessao, 'rascunho_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
+        return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente salvar novamente.' } };
+      }
+      const atual = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      if (!atual) throw new Error('Rascunho não pôde ser recuperado ao proteger a leitura da fonte.');
+      linha = atual;
       const anterior = await this.apresentar(cliente, linha);
       if (anterior.encaminhamento) {
         return { falha: { tipo: 'conflito', mensagem: 'Recolha o encaminhamento antes de editar o rascunho.' } };
@@ -652,10 +667,7 @@ export class RascunhosService {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_conflito', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'O rascunho foi alterado ou atingiu o limite de revisões; reabra-o antes de continuar.' } };
       }
-      const bloqueio = await cliente.query<{ obtido: boolean }>(
-        'SELECT pg_try_advisory_xact_lock_shared($1, $2) AS obtido', [...CHAVE_BLOQUEIO_FONTE_DOF],
-      );
-      if (!bloqueio.rows[0].obtido) {
+      if (!await tentarBloqueioFonte(cliente)) {
         await auditarConsultaFuncional(cliente, sessao, 'confirmacao_inicio_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente confirmar novamente.' } };
       }

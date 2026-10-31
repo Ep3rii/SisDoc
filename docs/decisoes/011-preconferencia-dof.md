@@ -36,9 +36,10 @@ O bloqueio global pode reduzir a concorrência de futuras importações ou
 sincronizações, inclusive para registros não relacionados ao documento.
 Seu desempenho, tratamento de falhas e protocolo de ordenação devem ser
 reavaliados ao implementar esses recursos. O protocolo não protege outras
-tabelas de fonte e não resolve a concorrência entre sincronização e gravação
-de rascunhos descrita na decisão 007. O setup aplica a migração apenas a banco
-novo; não há procedimento autorizado para atualizar uma instalação existente.
+tabelas de fonte. A criação e a edição de rascunhos também usam esse bloqueio,
+conforme a [decisão 007](007-rascunhos-dof.md). O setup aplica a migração
+apenas a banco novo; não há procedimento autorizado para atualizar uma
+instalação existente.
 
 ## Evidência e limites
 

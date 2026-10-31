@@ -3,10 +3,10 @@
 ## Contexto e escolha
 
 O cálculo pode ser salvo por analista ou coordenador somente como rascunho
-próprio. A restrição de autoria é provisória; o encaminhamento para conferência
-por coordenador ainda precisa ser implementado. Secretário adjunto pode
-calcular, mas não listar, criar ou editar rascunhos. O administrador técnico
-não tem acesso funcional por hierarquia.
+próprio. A restrição de autoria é provisória; um coordenador destinatário pode
+consultar um rascunho explicitamente encaminhado, sem editá-lo. Secretário
+adjunto pode calcular, mas não listar, criar ou editar rascunhos. O
+administrador técnico não tem acesso funcional por hierarquia.
 
 O servidor recalcula no salvamento e persiste a entrada e o resultado cifrados.
 Os lançamentos iniciais e cada alteração são registrados por período, ano ou
@@ -46,12 +46,20 @@ interface em Chromium com API simulada: salvamento, reabertura, conflito,
 falha de comunicação, alterações não salvas, permissões e tela estreita.
 A simulação não substitui navegador integrado ao HTTPS real e CA confiável.
 
-Ainda não há sincronização. A leitura da admissão e a gravação do rascunho
-ocorrem na mesma transação, mas não bloqueiam uma alteração concorrente da
-fonte; o resultado preserva a admissão usada e a divergência fica visível ao
-reabrir. Antes de implementar sincronização concorrente, é necessária uma
-estratégia transacional testada que evite gravar um resultado já defasado sem
-conceder ao aplicativo privilégios de alteração da fonte.
+Ainda não há sincronização. A criação e a edição tentam obter o bloqueio
+advisory compartilhado da [decisão 011](011-preconferencia-dof.md) antes de
+ler e recalcular a fonte, mantendo-o até o fim da transação. A edição relê o
+documento e a fonte após obter o bloqueio. Uma escrita já iniciada em pessoa ou
+vínculo causa conflito explícito; uma escrita iniciada depois aguarda o
+salvamento. A aplicação continua sem privilégios de alteração da fonte.
+Alterações posteriores podem tornar o resultado defasado e exigem nova
+conferência. Testes HTTPS e PostgreSQL descartáveis cobrem as duas ordens de
+concorrência e a admissão efetivamente salva.
+
+O bloqueio é global, não protege outras tabelas de fonte e pode afetar
+registros não relacionados. Antes de implementar importação ou sincronização,
+é necessário reavaliar desempenho, tratamento de falhas e ordenação dos
+bloqueios, além de proteger as demais fontes utilizadas.
 
 O editor e a prévia provisória posteriores estão descritos na
 [decisão 008](008-blocos-e-previa-dof.md); eles não alteram a condição do

@@ -126,6 +126,10 @@ Se ela mudar, prepare a tabela e confira novamente; se estiver ausente, a
 edição fica indisponível, embora o resultado salvo possa ser consultado.
 Uma versão de regra diferente da disponível bloqueia a edição. A interface não
 altera dados funcionais da fonte e o rascunho não é conferência nem emissão.
+Se pessoa ou vínculo estiver sendo atualizado ao criar ou editar, o salvamento
+retorna conflito: aguarde, reabra e confira os dados antes de tentar novamente.
+Durante o salvamento, alterações nessas tabelas aguardam um bloqueio global.
+Mudanças posteriores na fonte ainda podem exigir novo cálculo e verificação.
 
 Quando o início informado anteceder a admissão considerada, o cálculo usa a
 admissão como início efetivo. No rascunho salvo e sem alterações pendentes, o
@@ -208,8 +212,10 @@ confrontados com os lançamentos.
 Se a fonte estiver sendo atualizada durante a consulta, a operação retorna
 conflito; aguarde e tente novamente. Enquanto a consulta está em andamento,
 escritas em pessoas e vínculos aguardam um bloqueio transacional global.
-Esse mecanismo provisório e seu impacto em importações futuras devem ser
-reavaliados antes de implementar sincronização ou operação concorrente.
+O mesmo protocolo protege a criação e a edição do cálculo, mas não outras
+tabelas de fonte. Esse mecanismo provisório, sua ordenação e seu impacto em
+importações futuras devem ser reavaliados antes de implementar sincronização
+ou operação concorrente.
 
 ## Verificação de software
 

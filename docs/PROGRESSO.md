@@ -107,8 +107,8 @@ O navegador usa API simulada e dados fictícios; os testes de backend usam
 HTTPS com CA e PostgreSQL descartáveis, em execução separada.
 Playwright 1.64.1 e Chromium 156.0.8078.4 foram usados nesta máquina. O teste
 integrado de navegador com CA operacional e a revisão humana continuam
-pendentes. A concorrência entre sincronização futura da admissão e gravação
-do rascunho ainda exige solução e testes antes de implementar sincronização.
+pendentes. A proteção da admissão durante a gravação foi ampliada e verificada
+posteriormente, conforme descrito abaixo.
 
 Na continuação da fatia 5, foram adicionados blocos manuais, versões técnicas
 vazias e prévia não oficial. Os blocos são cifrados, ordenáveis e desativáveis;
@@ -195,6 +195,19 @@ passou, `npm test` passou com 90 testes em 13 arquivos e `npm audit` não
 apontou vulnerabilidades. Na suíte completa, a prévia HTTPS de 45 anos levou
 7,8 ms e a atualização local no limite de blocos chegou a 84,9 ms, ou 159,3 ms
 com milhares de delimitadores malformados.
+
+A criação e a edição do cálculo também usam o bloqueio advisory compartilhado
+da fonte: uma escrita já iniciada em pessoa ou vínculo retorna conflito, e uma
+escrita iniciada durante o salvamento aguarda a transação. A edição relê os
+dados após obter o bloqueio, sem conceder escrita da fonte à aplicação.
+`npm run typecheck` passou e os 22 testes direcionados de PostgreSQL/HTTPS
+descartáveis passaram, incluindo as duas ordens de concorrência. A suíte
+completa passou com 90 testes em 13 arquivos; `npm audit` não apontou
+vulnerabilidades. Nesta execução, a prévia HTTPS de 45 anos levou 7,6 ms; a
+atualização no limite de blocos chegou a 84,4 ms, ou 158,3 ms com milhares de
+delimitadores malformados. O bloqueio é global, não cobre outras tabelas de
+fonte e precisa ter desempenho, falhas e ordenação reavaliados antes de
+importação ou sincronização.
 
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
