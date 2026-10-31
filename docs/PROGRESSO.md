@@ -218,8 +218,18 @@ importação futura deve observar esse contrato. `npm run typecheck` e os
 `npm test` passou com 91 testes em 14 arquivos e `npm audit` não apontou
 vulnerabilidades. Nesta execução, a prévia HTTPS de 45 anos levou 7,9 ms; a
 atualização no limite de blocos chegou a 84,8 ms, ou 156,3 ms com milhares de
-delimitadores malformados. A prévia atual ainda não exibe o campo; não houve
-conferência nem aprovação.
+delimitadores malformados. Naquela etapa a prévia ainda não exibia o campo;
+essa exibição foi acrescentada posteriormente, conforme abaixo.
+
+A prévia provisória passou a mostrar os campos da fonte necessários à DOF,
+inclusive CPF integral e nome da mãe, quando disponível, somente ao autor ou
+ao coordenador destinatário. A leitura é auditada, protegida contra escrita
+concorrente e mantida apenas em memória no navegador; a tela não se atualiza
+automaticamente quando a fonte muda. O mesmo resolvedor verifica as variáveis
+na pré-conferência. A suíte completa passou (93 testes em 14 arquivos),
+incluindo autorização, integridade, escape de HTML, resposta obsoleta e
+concorrência. `npm run typecheck` passou e `npm audit` não apontou
+vulnerabilidades. Não houve conferência, aprovação de modelo ou emissão.
 
 Nenhum banco, serviço, certificado ou dado real foi alterado. A aplicação não
 possui conferência, emissão, importação ou instalação como
@@ -239,4 +249,5 @@ Divergências e decisões estão em
 [010-encaminhamento-dof.md](decisoes/010-encaminhamento-dof.md) e
 [011-preconferencia-dof.md](decisoes/011-preconferencia-dof.md) e
 [012-confirmacao-inicio-dof.md](decisoes/012-confirmacao-inicio-dof.md) e
-[013-identidade-fonte-dof.md](decisoes/013-identidade-fonte-dof.md).
+[013-identidade-fonte-dof.md](decisoes/013-identidade-fonte-dof.md) e
+[014-dados-fonte-previa-dof.md](decisoes/014-dados-fonte-previa-dof.md).

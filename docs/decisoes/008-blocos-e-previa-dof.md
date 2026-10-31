@@ -23,19 +23,22 @@ valida o mesmo contrato, exige motivo, não aceita identificadores duplicados
 ou alteração de tipo de bloco já salvo e rejeita alterações obsoletas.
 
 `GET documentos/:id/previa` devolve HTML da revisão salva, com autenticação,
-autoria, auditoria, `no-store` e CSP que proíbe recursos externos e aplica
-`sandbox`. A interface registra a abertura por essa rota, confere a revisão e
-usa o mesmo renderizador puro para refletir imediatamente os blocos locais em
-`iframe sandbox` sem permissões. A abertura é auditada; cada tecla na prévia
-local não é um evento de auditoria, e alterações só são registradas ao salvar.
-O cálculo exibido é sempre o resultado salvo, não um cálculo pendente.
+autoria ou encaminhamento, auditoria, `no-store` e CSP que proíbe recursos
+externos e aplica `sandbox`. A interface consulta os dados da fonte pela rota
+auditada `GET documentos/:id/dados-previa`, confere a revisão e usa o mesmo
+renderizador puro para refletir imediatamente os blocos locais em `iframe
+sandbox` sem permissões. A abertura é auditada; cada tecla na prévia local não
+é um evento de auditoria, e alterações só são registradas ao salvar. O cálculo
+exibido é sempre o resultado salvo, não um cálculo pendente. Os cuidados com
+identidade e leitura da fonte estão na
+[decisão 014](014-dados-fonte-previa-dof.md).
 
 Conteúdo e valores são escapados como texto. São substituídas apenas as
 variáveis exibidas pela interface; nomes não disponíveis são destacados. O
-renderizador não fornece todos os campos e formatos previstos no prompt.
-Impedir conferência por variáveis ausentes ainda precisa ser implementado no
-servidor quando houver conferência. A prévia tem indicação de ausência de
-validade e não é template institucional, aprovação, conferência ou emissão.
+renderizador não fornece todos os campos e formatos previstos no prompt. A
+verificação preliminar detecta variáveis ausentes ou malformadas, mas a
+transição de conferência ainda não existe. A prévia tem indicação de ausência
+de validade e não é template institucional, aprovação, conferência ou emissão.
 
 ## Evidência e limites
 

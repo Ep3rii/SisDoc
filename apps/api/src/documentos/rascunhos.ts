@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { REGRAS_PLANILHA } from '@sisdoc/calculo';
+import { nivelDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
   blocoRascunhoDofSchema,
   dataFuncionalSchema,
+  dadosFontePreviaDofSchema,
   numeroProcessoSchema,
   processoCorrespondeMascara,
   rascunhoDofSchema,
@@ -17,6 +18,7 @@ import {
   type Configuracao,
   type ConfirmarInicioDof,
   type CriarRascunhoDof,
+  type DadosFontePreviaDof,
   type EncaminharRascunhoDof,
   type PaginaCoordenadoresDof,
   type PaginaEncaminhamentosDof,
@@ -38,6 +40,7 @@ import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
+import { lerCpfDof, lerNomeMaeDof } from './identidade-fonte-dof';
 import { verificarPreconferenciaDof } from './preconferencia';
 
 type LinhaRascunho = {
@@ -356,12 +359,12 @@ export class RascunhosService {
   }
 
   private async obterAuditado(
-    sessao: SessaoAutenticada, ip: string, id: string, acao: 'rascunho_aberto' | 'previa_dof_aberta',
+    sessao: SessaoAutenticada, ip: string, id: string,
   ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
       const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
-      await auditarConsultaFuncional(cliente, sessao, linha ? acao : 'rascunho_nao_encontrado',
+      await auditarConsultaFuncional(cliente, sessao, linha ? 'rascunho_aberto' : 'rascunho_nao_encontrado',
         'documento', id, linha?.pessoa_id ?? null, ip);
       if (!linha) return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
       return { valor: await this.apresentar(cliente, linha) };
@@ -370,11 +373,79 @@ export class RascunhosService {
   }
 
   async obter(sessao: SessaoAutenticada, ip: string, id: string): Promise<RascunhoDof> {
-    return this.obterAuditado(sessao, ip, id, 'rascunho_aberto');
+    return this.obterAuditado(sessao, ip, id);
   }
 
-  async obterParaPrevia(sessao: SessaoAutenticada, ip: string, id: string): Promise<RascunhoDof> {
-    return this.obterAuditado(sessao, ip, id, 'previa_dof_aberta');
+  async obterParaPrevia(
+    sessao: SessaoAutenticada, ip: string, id: string,
+  ): Promise<{ rascunho: RascunhoDof; fonte: DadosFontePreviaDof }> {
+    const tentativa = await transacao<Tentativa<{ rascunho: RascunhoDof; fonte: DadosFontePreviaDof }>>(
+      this.banco, async (cliente) => {
+        await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+        const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
+        if (!linha) {
+          await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
+          return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
+        }
+        if (!await tentarBloqueioFonte(cliente)) {
+          await auditarConsultaFuncional(cliente, sessao, 'previa_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
+          return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e abra a prévia novamente.' } };
+        }
+        const atual = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
+        if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a abertura da prévia.');
+        const consulta = await cliente.query<{
+          cpf_cifrado: Buffer; cpf_hash: Buffer; nascimento: string | null; nome_mae_cifrado: Buffer | null;
+          regime_juridico: string | null; cargo: string | null; referencia: string | null; orgao_nome: string | null;
+          removido: boolean; consultado_em: Date;
+        }>(`
+          SELECT p.cpf_cifrado, p.cpf_hash, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
+            p.nome_mae_cifrado, v.regime_juridico, v.cargo, v.referencia, v.orgao_nome,
+            v.removido_na_fonte_em IS NOT NULL AS removido, clock_timestamp() AS consultado_em
+          FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
+          WHERE p.id = $1 AND v.id = $2
+        `, [atual.pessoa_id, atual.vinculo_id]);
+        const origem = consulta.rows[0];
+        if (!origem) throw new Error('Pessoa ou vínculo da prévia deixou de existir.');
+        const cpf = lerCpfDof(this.protetor, atual.pessoa_id, origem.cpf_cifrado, origem.cpf_hash);
+        const nomeMae = lerNomeMaeDof(this.protetor, atual.pessoa_id, origem.nome_mae_cifrado);
+        if ('erro' in cpf || 'erro' in nomeMae) {
+          await auditarConsultaFuncional(cliente, sessao, 'previa_identidade_invalida', 'documento', id, atual.pessoa_id, ip);
+          return {
+            falha: {
+              tipo: 'conflito',
+              mensagem: 'A identidade protegida não pôde ser validada. Verifique as pendências e solicite a correção da fonte.',
+            },
+          };
+        }
+        const nivel = nivelDof(origem.referencia ?? '');
+        const fonte = dadosFontePreviaDofSchema.safeParse({
+          documentoId: id,
+          revisao: atual.revisao,
+          consultadoEm: origem.consultado_em.toISOString(),
+          nome: atual.nome,
+          matricula: atual.matricula,
+          cpf: cpf.valor,
+          nascimento: origem.nascimento,
+          nomeMae: nomeMae.valor,
+          regimeJuridico: origem.regime_juridico,
+          cargo: origem.cargo,
+          nivel: nivel.nivel || null,
+          avisoNivel: nivel.avisos.join(' ') || null,
+          referencia: origem.referencia,
+          orgao: origem.orgao_nome,
+          admissao: atual.admissao,
+          removidoNaFonte: origem.removido,
+        });
+        if (!fonte.success) {
+          await auditarConsultaFuncional(cliente, sessao, 'previa_fonte_invalida', 'documento', id, atual.pessoa_id, ip);
+          return { falha: { tipo: 'conflito', mensagem: 'Os dados da fonte são inválidos. Solicite sua verificação antes de abrir a prévia.' } };
+        }
+        const rascunho = await this.apresentar(cliente, atual);
+        await auditarConsultaFuncional(cliente, sessao, 'previa_dof_aberta', 'documento', id, atual.pessoa_id, ip);
+        return { valor: { rascunho, fonte: fonte.data } };
+      },
+    );
+    return concluir(tentativa);
   }
 
   async verificarPreconferencia(sessao: SessaoAutenticada, ip: string, id: string): Promise<PreconferenciaDof> {

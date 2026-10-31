@@ -11,6 +11,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import * as pty from '@lydell/node-pty';
 import {
+  dadosFontePreviaDofSchema,
   detalheServidorSchema,
   paginaAuditoriaSchema,
   paginaBuscaServidoresSchema,
@@ -2251,22 +2252,41 @@ describe('fundação em recursos descartáveis', () => {
         expect(rascunhoBlocos.blocos).toEqual([]);
         const rotaBlocos = `/api/v1/documentos/${rascunhoBlocos.id}/blocos`;
         const rotaPrevia = `/api/v1/documentos/${rascunhoBlocos.id}/previa`;
+        const rotaDadosPrevia = `/api/v1/documentos/${rascunhoBlocos.id}/dados-previa`;
+        const nomeMaePrevia = 'Mãe fictícia <script>não executar</script>';
+        const cifraMaePrevia = protetor.cifrar(Buffer.from(nomeMaePrevia, 'utf8'), {
+          schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo: 'nome_mae_cifrado',
+        });
+        await cliente.query("UPDATE nucleo.pessoa SET nascimento = '1960-05-04', nome_mae_cifrado = $1 WHERE id = $2",
+          [cifraMaePrevia, pessoaId]);
+        await cliente.query(`
+          UPDATE nucleo.vinculo SET regime_juridico = 'Regime fictício', cargo = 'Cargo <b>fictício</b>',
+            referencia = 'UNICA', orgao_nome = 'Órgão & fictício' WHERE id = $1
+        `, [vinculoId]);
         const primeiroBloco = { id: randomUUID(), codigo: 'contratacao', ativo: true, texto: 'Texto contratual fictício' };
         const segundoBloco = {
           id: randomUUID(), codigo: 'progressao', ativo: true,
-          texto: '<script>window.top.intrusao=1</script> {{nome}} {{cargo}}',
+          texto: '<script>window.top.intrusao=1</script> {{nome}} {{cpf}} {{nascimento}} {{nome_mae}} '
+            + '{{regime_juridico}} {{cargo}} {{referencia}} {{orgao}}',
         };
         const motivoBlocos = 'Motivo sintético dos blocos';
         const proposta = { revisao: 1, motivo: motivoBlocos, blocos: [primeiroBloco, segundoBloco] };
         expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: rotaPrevia })).status).toBe(401);
+        expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: rotaDadosPrevia })).status).toBe(401);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaPrevia, cookie: coordenador.cookie,
+        })).status).toBe(404);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaDadosPrevia, cookie: coordenador.cookie,
         })).status).toBe(404);
         for (const papel of ['secretario_adjunto', 'admin']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão sintética ausente.');
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: rotaPrevia, cookie: sessao.cookie,
+          })).status).toBe(403);
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: rotaDadosPrevia, cookie: sessao.cookie,
           })).status).toBe(403);
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'PATCH', rota: rotaBlocos, corpo: proposta, ...sessao,
@@ -2372,10 +2392,66 @@ describe('fundação em recursos descartáveis', () => {
         expect(previa.corpo).toContain('PRÉVIA PROVISÓRIA — SEM VALIDADE OFICIAL');
         expect(previa.corpo).toContain('&lt;script&gt;window.top.intrusao=1&lt;/script&gt;');
         expect(previa.corpo).toContain('Pessoa DOF fictícia');
-        expect(previa.corpo).toContain('Variável não disponível: cargo');
+        expect(previa.corpo).toContain('Mãe fictícia &lt;script&gt;não executar&lt;/script&gt;');
+        expect(previa.corpo).toContain('Cargo &lt;b&gt;fictício&lt;/b&gt;');
+        expect(previa.corpo).toContain('Órgão &amp; fictício');
+        expect(previa.corpo).toContain('04/05/1960');
+        expect(previa.corpo).toContain(cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4'));
+        expect(previa.corpo).toContain('Referência sem hífen; confira o nível.');
+        expect(previa.corpo).not.toContain('Variável não disponível: cargo');
         expect(previa.corpo).not.toContain('<script>');
         expect(previa.corpo).not.toContain(primeiroBloco.texto);
         expect(previa.corpo.match(/<tr>/g)).toHaveLength(46);
+
+        const dadosPrevia = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: rotaDadosPrevia, cookie: analista.cookie,
+        });
+        expect(dadosPrevia.status, dadosPrevia.corpo).toBe(200);
+        expect(dadosPrevia.headers['cache-control']).toBe('no-store');
+        expect(dadosPrevia.headers['content-type']).toContain('application/json');
+        expect(dadosFontePreviaDofSchema.parse(JSON.parse(dadosPrevia.corpo))).toMatchObject({
+          documentoId: rascunhoBlocos.id, revisao: 3, cpf, nascimento: '1960-05-04',
+          nomeMae: nomeMaePrevia, cargo: 'Cargo <b>fictício</b>', nivel: null,
+          avisoNivel: 'Referência sem hífen; confira o nível.', admissao: '1980-01-01',
+        });
+        const pendenciasPrevia = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/documentos/${rascunhoBlocos.id}/preconferencia`, cookie: analista.cookie,
+        });
+        expect(pendenciasPrevia.status, pendenciasPrevia.corpo).toBe(200);
+        const relatorioPrevia = preconferenciaDofSchema.parse(JSON.parse(pendenciasPrevia.corpo));
+        expect(relatorioPrevia.bloqueios.map((item) => item.codigo)).not.toContain('variaveis_ausentes');
+        expect(relatorioPrevia.avisos.map((item) => item.codigo)).toContain('nivel_referencia');
+        expect(pendenciasPrevia.corpo).not.toContain(nomeMaePrevia);
+        expect(pendenciasPrevia.corpo).not.toContain(cpf);
+        try {
+          await cliente.query('UPDATE nucleo.pessoa SET nome_mae_cifrado = $1 WHERE id = $2', [Buffer.from('corrompido'), pessoaId]);
+          for (const rota of [rotaPrevia, rotaDadosPrevia]) {
+            const identidadeInvalida = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: analista.cookie });
+            expect(identidadeInvalida.status, identidadeInvalida.corpo).toBe(409);
+            expect(identidadeInvalida.corpo).toContain('identidade protegida');
+            expect(identidadeInvalida.corpo).not.toContain(cpf);
+            expect(identidadeInvalida.corpo).not.toContain(nomeMaePrevia);
+          }
+        } finally {
+          await cliente.query('UPDATE nucleo.pessoa SET nome_mae_cifrado = $1 WHERE id = $2', [cifraMaePrevia, pessoaId]);
+        }
+        const escritorPrevia = new Client({
+          host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+          user: 'sisdoc_migrador', password: senhaMigrador,
+        });
+        await escritorPrevia.connect();
+        try {
+          await escritorPrevia.query('BEGIN');
+          await escritorPrevia.query('UPDATE nucleo.vinculo SET cargo = cargo WHERE id = $1', [vinculoId]);
+          for (const rota of [rotaPrevia, rotaDadosPrevia]) {
+            const ocupada = await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: analista.cookie });
+            expect(ocupada.status, ocupada.corpo).toBe(409);
+            expect(ocupada.corpo).toContain('fonte está sendo atualizada');
+          }
+        } finally {
+          await escritorPrevia.query('ROLLBACK');
+          await escritorPrevia.end();
+        }
 
         const concorrentes = await Promise.all(['A', 'B'].map((valor) => requisitarApi(portaHttps, caPem, {
           metodo: 'PATCH', rota: rotaBlocos,
@@ -2416,12 +2492,14 @@ describe('fundação em recursos descartáveis', () => {
             textoProtegido, segundoBloco.id,
           ]);
           await bloqueador.query('UPDATE documentos.documento SET revisao = 5 WHERE id = $1', [rascunhoBlocos.id]);
+          await bloqueador.query("UPDATE nucleo.vinculo SET cargo = 'Cargo atualizado após espera' WHERE id = $1", [vinculoId]);
           await bloqueador.query('COMMIT');
           confirmado = true;
           const leituraCoerente = await leituraBloqueada;
           expect(leituraCoerente.status, leituraCoerente.corpo).toBe(200);
           expect(leituraCoerente.headers['x-sisdoc-revisao']).toBe('5');
           expect(leituraCoerente.corpo).toContain(textoConcorrente);
+          expect(leituraCoerente.corpo).toContain('Cargo atualizado após espera');
         } finally {
           if (!confirmado) await bloqueador.query('ROLLBACK');
           await bloqueador.end();
@@ -2431,9 +2509,12 @@ describe('fundação em recursos descartáveis', () => {
         `, [rascunhoBlocos.id]);
         expect(eventosBlocos.rows.map((evento) => evento.acao)).toEqual(expect.arrayContaining([
           'rascunho_blocos_editados', 'previa_dof_aberta', 'rascunho_conflito',
+          'previa_identidade_invalida', 'previa_fonte_ocupada',
         ]));
         expect(JSON.stringify(eventosBlocos.rows)).not.toContain(motivoBlocos);
         expect(JSON.stringify(eventosBlocos.rows)).not.toContain(segundoBloco.texto);
+        expect(JSON.stringify(eventosBlocos.rows)).not.toContain(nomeMaePrevia);
+        expect(JSON.stringify(eventosBlocos.rows)).not.toContain(cpf);
 
         const rotaProcesso = `/api/v1/documentos/${rascunhoBlocos.id}/processo`;
         const pedidoProcesso = { revisao: 5, processo: '1234/5678', motivo: 'Processo fictício informado' };
@@ -3157,6 +3238,16 @@ describe('fundação em recursos descartáveis', () => {
         expect(previa.status, previa.corpo).toBe(200);
         expect(previa.headers['x-sisdoc-revisao']).toBe('4');
         expect(previa.corpo).toContain('Bloco fictício');
+        const dadosRecebidos = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rota}/dados-previa`, cookie: primeiro.cookie,
+        });
+        expect(dadosRecebidos.status, dadosRecebidos.corpo).toBe(200);
+        expect(dadosFontePreviaDofSchema.parse(JSON.parse(dadosRecebidos.corpo))).toMatchObject({
+          documentoId: rascunho.id, revisao: 4, cpf,
+        });
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `${rota}/dados-previa`, cookie: segundo.cookie,
+        })).status).toBe(404);
         expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: segundo.cookie })).status).toBe(404);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota, cookie: sessao('outro-analista').cookie,
@@ -3198,6 +3289,9 @@ describe('fundação em recursos descartáveis', () => {
           expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: primeiro.cookie })).status).toBe(404);
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: rotaPreconferencia, cookie: primeiro.cookie,
+          })).status).toBe(404);
+          expect((await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `${rota}/dados-previa`, cookie: primeiro.cookie,
           })).status).toBe(404);
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: '/api/v1/documentos/encaminhados', cookie: primeiro.cookie,

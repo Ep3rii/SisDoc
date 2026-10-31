@@ -1,6 +1,11 @@
-import type { RascunhoDof } from '@sisdoc/contratos';
+import type { DadosFontePreviaDof, RascunhoDof } from '@sisdoc/contratos';
 
-type DadosVariaveisDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'resultado' | 'processo'>;
+type CamposFonteVariaveisDof = Omit<Pick<DadosFontePreviaDof,
+  'nome' | 'matricula' | 'cpf' | 'nascimento' | 'nomeMae' | 'regimeJuridico' | 'cargo' | 'nivel' | 'referencia' | 'orgao'
+>, 'cpf'> & { cpf: string | null };
+type DadosVariaveisDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'resultado' | 'processo'> & {
+  fonte?: CamposFonteVariaveisDof;
+};
 export type ParteTextoDof =
   | { tipo: 'texto'; conteudo: string }
   | { tipo: 'variavel'; conteudo: string; nome: string }
@@ -13,9 +18,18 @@ function data(dataIso: string): string {
 
 export function valoresVariaveisDof(dados: DadosVariaveisDof): ReadonlyMap<string, string> {
   const { resultado } = dados;
+  const fonte = dados.fonte;
   return new Map<string, string>([
-    ['nome', dados.nome],
-    ['matricula', dados.matricula],
+    ['nome', fonte?.nome ?? dados.nome],
+    ['matricula', fonte?.matricula ?? dados.matricula],
+    ['cpf', fonte?.cpf ? fonte.cpf.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4') : ''],
+    ['nascimento', fonte?.nascimento ? data(fonte.nascimento) : ''],
+    ['nome_mae', fonte?.nomeMae ?? ''],
+    ['regime_juridico', fonte?.regimeJuridico ?? ''],
+    ['cargo', fonte?.cargo ?? ''],
+    ['nivel', fonte?.nivel ?? ''],
+    ['referencia', fonte?.referencia ?? ''],
+    ['orgao', fonte?.orgao ?? ''],
     ['processo', dados.processo ?? ''],
     ['admissao', data(resultado.admissaoConsiderada)],
     ['inicio', data(resultado.periodo.inicioEfetivo)],
@@ -75,7 +89,7 @@ export function verificarVariaveisDof(
     if (!bloco.ativo) continue;
     for (const parte of analisarTextoDof(bloco.texto)) {
       if (parte.tipo === 'malformada') malformadas = true;
-      if (parte.tipo === 'variavel' && !valores.get(parte.nome)) indisponiveis.add(parte.nome);
+      if (parte.tipo === 'variavel' && !valores.get(parte.nome)?.trim()) indisponiveis.add(parte.nome);
     }
   }
   return { indisponiveis: [...indisponiveis].sort(), malformadas };

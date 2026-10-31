@@ -1,8 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
-import { atualizarBlocosDofSchema, resultadoCalculoDofSchema, type BlocoRascunhoDof } from '@sisdoc/contratos';
+import {
+  atualizarBlocosDofSchema, dadosFontePreviaDofSchema, resultadoCalculoDofSchema, type BlocoRascunhoDof,
+} from '@sisdoc/contratos';
 import { analisarTextoDof, renderizarPreviaDof, verificarVariaveisDof } from '@sisdoc/templates';
 import { describe, expect, it } from 'vitest';
+import { cpfSintetico } from './dados-sinteticos.js';
 
 function resultadoSintetico() {
   const calculo = calcular({
@@ -108,5 +111,38 @@ describe('blocos e prévia provisória de DOF', () => {
     expect(partes.filter((parte) => parte.tipo === 'malformada')).toHaveLength(0);
     expect(verificarVariaveisDof({ ...dados, blocos: [{ ...bloco, ativo: false, texto: '{{faltando' }] }))
       .toEqual({ indisponiveis: [], malformadas: false });
+  });
+
+  it('exibe os campos consultados e escapa tanto a identidade como as variáveis', () => {
+    const fonte = dadosFontePreviaDofSchema.parse({
+      documentoId: randomUUID(), revisao: 3, consultadoEm: '2026-01-01T12:00:00.000Z',
+      nome: 'Pessoa <img src=x>', matricula: 'FICTICIA&1', cpf: cpfSintetico(),
+      nascimento: '1960-05-04', nomeMae: 'Mãe <script>fictícia</script>',
+      regimeJuridico: 'Regime fictício', cargo: 'Cargo <b>fictício</b>',
+      nivel: null, avisoNivel: 'Referência sem hífen; confira o nível.', referencia: 'UNICA',
+      orgao: 'Órgão & fictício', admissao: '1981-01-01', removidoNaFonte: true,
+    });
+    const dados = {
+      nome: 'Nome anterior', matricula: 'ANTERIOR', revisao: 3, resultado: resultadoSintetico(), processo: null, fonte,
+      blocos: [{ ...bloco, texto: '{{nome_mae}} {{cpf}} {{cargo}} {{nivel}} {{orgao}}' }],
+    };
+    const html = renderizarPreviaDof(dados);
+    expect(html).toContain('Pessoa &lt;img src=x&gt;');
+    expect(html).toContain('Mãe &lt;script&gt;fictícia&lt;/script&gt;');
+    expect(html).toContain('Cargo &lt;b&gt;fictício&lt;/b&gt;');
+    expect(html).toContain('Órgão &amp; fictício');
+    expect(html).toContain('04/05/1960');
+    expect(html).toContain('Referência sem hífen; confira o nível.');
+    expect(html).toContain('O vínculo está marcado como removido na fonte.');
+    expect(html).toContain('A admissão atual difere da utilizada no cálculo');
+    expect(html).toContain('Variável não disponível: nivel');
+    expect(html).not.toContain('Nome anterior');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img');
+    expect(verificarVariaveisDof(dados)).toEqual({ indisponiveis: ['nivel'], malformadas: false });
+    expect(verificarVariaveisDof({ ...dados, fonte: { ...fonte, cargo: '   ' } }))
+      .toEqual({ indisponiveis: ['cargo', 'nivel'], malformadas: false });
+    expect(dadosFontePreviaDofSchema.safeParse({ ...fonte, dadoExtra: true }).success).toBe(false);
+    expect(dadosFontePreviaDofSchema.safeParse({ ...fonte, cpf: '00000000000' }).success).toBe(false);
   });
 });

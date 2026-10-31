@@ -15,10 +15,11 @@ import {
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
-import { renderizarPreviaDof, verificarVariaveisDof } from '@sisdoc/templates';
+import { verificarVariaveisDof } from '@sisdoc/templates';
 import { chromium, type Browser, type Page, type Route } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { cpfSintetico } from './dados-sinteticos.js';
 
 const pessoaId = '11111111-1111-4111-8111-111111111111';
 const vinculoId = '22222222-2222-4222-8222-222222222222';
@@ -42,6 +43,8 @@ type Simulacao = {
   escritas: number;
   anosConfirmados: number[];
   previas: number;
+  adiarPrevia: boolean;
+  liberarPrevia: (() => void) | null;
   adiarPreconferencia: boolean;
   liberarPreconferencia: (() => void) | null;
 };
@@ -80,6 +83,16 @@ function resumo(rascunho: RascunhoDof) {
   };
 }
 
+function fonteSintetica(rascunho: RascunhoDof, admissao: string | null) {
+  return {
+    documentoId: rascunho.id, revisao: rascunho.revisao, consultadoEm: new Date().toISOString(),
+    nome: rascunho.nome, matricula: rascunho.matricula, cpf: cpfSintetico(),
+    nascimento: '1960-05-04', nomeMae: 'Mãe fictícia <img src=x>', regimeJuridico: 'ESTATUTARIO',
+    cargo: 'Cargo fictício', nivel: null, avisoNivel: 'Referência sem hífen; confira o nível.',
+    referencia: 'UNICA', orgao: 'Órgão fictício', admissao, removidoNaFonte: false,
+  };
+}
+
 async function responder(rota: Route, status: number, corpo: unknown) {
   await rota.fulfill({ status, contentType: 'application/json', body: JSON.stringify(corpo) });
 }
@@ -88,7 +101,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
   const estado: Simulacao = {
     papel: 'analista', admissao: '1980-01-01', rascunho: null,
     conflito: false, falhaRede: false, falhaListagem: false, extras: 0, erros: [], escritas: 0, anosConfirmados: [], previas: 0,
-    adiarPreconferencia: false, liberarPreconferencia: null,
+    adiarPrevia: false, liberarPrevia: null, adiarPreconferencia: false, liberarPreconferencia: null,
   };
   await pagina.route('**/api/v1/**', async (rota) => {
     try {
@@ -186,16 +199,19 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === `/api/v1/documentos/${documentoId}` && metodo === 'GET' && estado.rascunho) {
         return responder(rota, 200, { ...estado.rascunho, admissao: estado.admissao });
       }
-      if (caminho === `/api/v1/documentos/${documentoId}/previa` && metodo === 'GET' && estado.rascunho) {
+      if (caminho === `/api/v1/documentos/${documentoId}/dados-previa` && metodo === 'GET' && estado.rascunho) {
+        if (estado.falhaRede) return rota.abort('failed');
         estado.previas += 1;
-        return rota.fulfill({
-          status: 200, contentType: 'text/html; charset=utf-8',
-          headers: { 'X-Sisdoc-Revisao': String(estado.rascunho.revisao) },
-          body: renderizarPreviaDof(estado.rascunho),
-        });
+        const fonte = fonteSintetica(estado.rascunho, estado.admissao);
+        if (estado.adiarPrevia) {
+          await new Promise<void>((resolve) => { estado.liberarPrevia = resolve; });
+        }
+        return responder(rota, 200, fonte);
       }
       if (caminho === `/api/v1/documentos/${documentoId}/preconferencia` && metodo === 'GET' && estado.rascunho) {
-        const variaveis = verificarVariaveisDof(estado.rascunho);
+        const variaveis = verificarVariaveisDof({
+          ...estado.rascunho, fonte: fonteSintetica(estado.rascunho, estado.admissao),
+        });
         const resposta = {
           documentoId, revisao: estado.rascunho.revisao, verificadoEm: new Date().toISOString(),
           status: 'nao_conferido', conferenciaDisponivel: false,
@@ -386,6 +402,7 @@ describe('interface de rascunhos com API sintética', () => {
   });
 
   afterEach(async () => {
+    estado.liberarPrevia?.();
     estado.liberarPreconferencia?.();
     await pagina.close({ runBeforeUnload: false });
     expect(estado.erros).toEqual([]);
@@ -518,16 +535,19 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
 
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
-    const textoInicial = '<script>window.top.intrusao=1</script> {{nome}} {{cargo}}';
+    const textoInicial = '<script>window.top.intrusao=1</script> {{nome}} {{cargo}} {{desconhecida}}';
     await pagina.getByLabel('Texto do bloco 1').fill(textoInicial);
     expect(await pagina.getByLabel('Fim do período').isDisabled()).toBe(true);
     expect(await pagina.getByText('Há alterações não salvas.').isVisible()).toBe(true);
     await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
     expect(estado.previas).toBe(1);
     const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
-    await quadro.getByText('Variável não disponível: cargo').waitFor();
+    await quadro.getByText('Variável não disponível: desconhecida').waitFor();
     expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').getAttribute('sandbox')).toBe('');
     expect(await quadro.locator('script').count()).toBe(0);
+    expect(await quadro.locator('img').count()).toBe(0);
+    expect(await quadro.getByText('Cargo fictício', { exact: false }).count()).toBeGreaterThan(0);
+    expect(await quadro.getByText('Mãe fictícia <img src=x>', { exact: false }).count()).toBeGreaterThan(0);
     expect(await quadro.getByText('Pessoa Ficticia', { exact: false }).count()).toBeGreaterThan(0);
     expect(await pagina.evaluate(() => Reflect.has(window, 'intrusao'))).toBe(false);
 
@@ -590,6 +610,29 @@ describe('interface de rascunhos com API sintética', () => {
     expect(medidas.conteudo).toBeLessThanOrEqual(medidas.tela);
     expect(medidas.local).toBe(0);
     expect(medidas.sessao).toBe(0);
+  });
+
+  it('rejeita dados de prévia recebidos após mudança da revisão', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+
+    estado.adiarPrevia = true;
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await expect.poll(() => estado.liberarPrevia !== null).toBe(true);
+    await pagina.getByLabel('Número do processo').fill('1234/5678');
+    await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
+    await pagina.getByRole('button', { name: 'Salvar processo' }).click();
+    await pagina.getByText('Processo salvo na revisão 2.', { exact: false }).waitFor();
+    estado.adiarPrevia = false;
+    estado.liberarPrevia?.();
+    await pagina.getByRole('alert').getByText(/O rascunho foi alterado/).waitFor();
+    expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').count()).toBe(0);
+    await pagina.getByRole('button', { name: 'Abrir prévia' }).click();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText('Processo: 1234/5678.', { exact: false }).waitFor();
   });
 
   it('mantém a prévia abaixo de um segundo no limite técnico de blocos', async () => {

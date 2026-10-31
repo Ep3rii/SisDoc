@@ -1,10 +1,12 @@
-import { TITULOS_BLOCOS_DOF, type RascunhoDof } from '@sisdoc/contratos';
+import { TITULOS_BLOCOS_DOF, type DadosFontePreviaDof, type RascunhoDof } from '@sisdoc/contratos';
 import { analisarTextoDof, valoresVariaveisDof } from './variaveis-dof';
 
 export { analisarTextoDof, valoresVariaveisDof, verificarVariaveisDof } from './variaveis-dof';
 export type { ParteTextoDof } from './variaveis-dof';
 
-type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resultado' | 'blocos' | 'processo'>;
+type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resultado' | 'blocos' | 'processo'> & {
+  fonte?: DadosFontePreviaDof;
+};
 
 function escapar(valor: string | number): string {
   return String(valor).replace(/[&<>"']/g, (caractere) => ({
@@ -32,7 +34,7 @@ export function renderizarPreviaDof(dados: DadosPreviaDof): string {
         html += `<mark>Expressão malformada: ${escapar(parte.conteudo)}</mark>`;
       } else {
         const valor = variaveis.get(parte.nome);
-        if (valor) {
+        if (valor?.trim()) {
           html += escapar(valor);
         } else {
           ausentes.add(parte.nome);
@@ -54,6 +56,20 @@ export function renderizarPreviaDof(dados: DadosPreviaDof): string {
   const avisoVariaveis = ausentes.size
     ? `<p class="aviso">Variáveis não disponíveis nesta prévia: ${[...ausentes].map(escapar).join(', ')}.</p>` : '';
   const avisoMalformadas = malformadas ? '<p class="aviso">Há expressões de variáveis malformadas nos blocos ativos.</p>' : '';
+  const campoFonte = (nome: string): string => {
+    const valor = variaveis.get(nome);
+    return valor?.trim() ? escapar(valor) : 'não informado';
+  };
+  const fonte = dados.fonte;
+  const dadosFonte = fonte ? `
+<p>CPF: ${campoFonte('cpf')}. Nascimento: ${campoFonte('nascimento')}. Nome da mãe: ${campoFonte('nome_mae')}.</p>
+<p>Regime jurídico: ${campoFonte('regime_juridico')}. Cargo: ${campoFonte('cargo')}. Nível: ${campoFonte('nivel')}. Referência/padrão: ${campoFonte('referencia')}. Órgão de origem: ${campoFonte('orgao')}.</p>
+<p>Admissão atual na fonte: ${fonte.admissao ? escapar(data(fonte.admissao)) : 'não informada'}.</p>
+${fonte.avisoNivel ? `<p class="aviso">${escapar(fonte.avisoNivel)}</p>` : ''}
+${fonte.removidoNaFonte ? '<p class="aviso">O vínculo está marcado como removido na fonte.</p>' : ''}
+${fonte.admissao !== resultado.admissaoConsiderada ? '<p class="aviso">A admissão atual difere da utilizada no cálculo; reabra e confira o rascunho.</p>' : ''}
+<p>Fonte consultada em ${escapar(new Date(fonte.consultadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))}. Mudanças posteriores não aparecem automaticamente; feche e reabra a prévia.</p>
+` : '<p class="aviso">Os demais dados da fonte não estão disponíveis nesta prévia.</p>';
 
   return `<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8">
@@ -68,7 +84,8 @@ h1{font-size:1.25rem}h2{font-size:1rem;margin-top:1.4rem}
 </style></head><body>
 <h1>PRÉVIA PROVISÓRIA — SEM VALIDADE OFICIAL</h1>
 <p class="aviso">Não é modelo aprovado, conferência nem emissão. Revisão salva de referência: ${escapar(dados.revisao)}.</p>
-<p>Nome: ${escapar(dados.nome)}. Matrícula: ${escapar(dados.matricula)}.</p>
+<p>Nome: ${escapar(fonte?.nome ?? dados.nome)}. Matrícula: ${escapar(fonte?.matricula ?? dados.matricula)}.</p>
+${dadosFonte}
 <p>Processo: ${dados.processo ? escapar(dados.processo) : 'não informado'}.</p>
 <p>Admissão considerada: ${escapar(data(resultado.admissaoConsiderada))}. Período efetivo: ${escapar(data(resultado.periodo.inicioEfetivo))} a ${escapar(data(resultado.periodo.fim))}.</p>
 <p>Regra provisória: ${escapar(resultado.regra.codigo)} — ${escapar(resultado.regra.versao)}.</p>

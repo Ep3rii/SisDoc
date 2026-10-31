@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { nivelDof } from '@sisdoc/calculo';
 import {
   normalizarMatricula,
   preconferenciaDofSchema,
@@ -76,6 +77,10 @@ export async function verificarPreconferenciaDof(
         ? 'O nome da mãe protegido não pôde ser lido. Solicite a verificação de integridade e das chaves ao administrador.'
         : 'O nome da mãe protegido está vazio ou contém texto inválido. Solicite a correção na fonte.',
     });
+  }
+  const nivel = nivelDof(fonte.referencia ?? '');
+  if (nivel.avisos.length) {
+    avisos.push({ codigo: 'nivel_referencia', mensagem: nivel.avisos.join(' ') });
   }
 
   if (!rascunho.matricula.trim() || normalizarMatricula(rascunho.matricula) !== fonte.matricula_norm) {
@@ -173,7 +178,21 @@ export async function verificarPreconferenciaDof(
       && !rascunho.mascarasProcesso.some((mascara) => processoCorrespondeMascara(rascunho.processo ?? '', mascara))) {
     bloqueios.push({ codigo: 'processo_invalido', mensagem: 'O processo salvo não corresponde às máscaras atuais.' });
   }
-  const variaveis = verificarVariaveisDof(rascunho);
+  const variaveis = verificarVariaveisDof({
+    ...rascunho,
+    fonte: {
+      nome: rascunho.nome,
+      matricula: rascunho.matricula,
+      cpf: 'valor' in cpf ? cpf.valor : null,
+      nascimento: fonte.nascimento,
+      nomeMae: 'valor' in nomeMae ? nomeMae.valor : null,
+      regimeJuridico: fonte.regime_juridico,
+      cargo: fonte.cargo,
+      nivel: nivel.nivel || null,
+      referencia: fonte.referencia,
+      orgao: fonte.orgao_nome,
+    },
+  });
   if (variaveis.indisponiveis.length) {
     bloqueios.push({
       codigo: 'variaveis_ausentes',

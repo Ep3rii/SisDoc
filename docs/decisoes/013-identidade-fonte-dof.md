@@ -17,8 +17,9 @@ validado e comparado ao HMAC pelo mesmo componente de leitura da identidade.
 
 O campo ausente continua como aviso, pois sua obrigatoriedade depende do
 modelo institucional aprovado. Um campo presente e íntegro não comprova que
-o nome corresponde à pessoa; é necessária conferência humana. A prévia
-atual ainda não exibe esse dado, e não há conferência ou emissão habilitadas.
+o nome corresponde à pessoa; é necessária conferência humana. A exibição
+posterior na prévia está descrita na [decisão 014](014-dados-fonte-previa-dof.md).
+Não há conferência ou emissão habilitadas.
 
 ## Evidência e limites
 

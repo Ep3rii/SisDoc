@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { resultadoCalculoDofSchema, solicitarCalculoDofSchema } from './calculo';
-import { dataFuncionalSchema } from './dominio';
+import { cpfSchema, dataFuncionalSchema } from './dominio';
 import { mascaraProcessoSchema, numeroProcessoSchema } from './processo';
 
 const motivoSchema = z.string().trim().min(1, 'Informe o motivo dos lançamentos.').max(2000);
@@ -103,6 +103,25 @@ export const paginaEncaminhamentosDofSchema = z.strictObject({
   proximoCursor: z.uuid().nullable(),
 });
 
+export const dadosFontePreviaDofSchema = z.strictObject({
+  documentoId: z.uuid(),
+  revisao: revisaoSchema,
+  consultadoEm: z.iso.datetime(),
+  nome: z.string(),
+  matricula: z.string(),
+  cpf: cpfSchema,
+  nascimento: dataFuncionalSchema.nullable(),
+  nomeMae: z.string().nullable(),
+  regimeJuridico: z.string().nullable(),
+  cargo: z.string().nullable(),
+  nivel: z.string().nullable(),
+  avisoNivel: z.string().nullable(),
+  referencia: z.string().nullable(),
+  orgao: z.string().nullable(),
+  admissao: dataFuncionalSchema.nullable(),
+  removidoNaFonte: z.boolean(),
+});
+
 const codigoPendenciaConferenciaDofSchema = z.enum([
   'conferencia_indisponivel',
   'aprovacao_modelo_nao_verificada',
@@ -135,6 +154,7 @@ const codigoAvisoConferenciaDofSchema = z.enum([
   'dados_antigos',
   'data_fonte_futura',
   'campos_referencia_ausentes',
+  'nivel_referencia',
 ]);
 
 export const preconferenciaDofSchema = z.strictObject({
@@ -194,5 +214,6 @@ export type ConfirmarInicioDof = z.infer<typeof confirmarInicioDofSchema>;
 export type PaginaCoordenadoresDof = z.infer<typeof paginaCoordenadoresDofSchema>;
 export type PaginaEncaminhamentosDof = z.infer<typeof paginaEncaminhamentosDofSchema>;
 export type PaginaRascunhosDof = z.infer<typeof paginaRascunhosDofSchema>;
+export type DadosFontePreviaDof = z.infer<typeof dadosFontePreviaDofSchema>;
 export type PreconferenciaDof = z.infer<typeof preconferenciaDofSchema>;
 export type RascunhoDof = z.infer<typeof rascunhoDofSchema>;

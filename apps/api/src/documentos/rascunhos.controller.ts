@@ -52,12 +52,19 @@ export class RascunhosController {
   @ExigirAcao('criar_rascunho')
   @Get(':id/previa')
   async previa(@Param('id') id: string, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
-    const rascunho = await this.rascunhos.obterParaPrevia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
+    const { rascunho, fonte } = await this.rascunhos.obterParaPrevia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
     resposta.setHeader('Content-Type', 'text/html; charset=utf-8');
     resposta.setHeader('Content-Security-Policy',
       "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'; sandbox");
     resposta.setHeader('X-Sisdoc-Revisao', String(rascunho.revisao));
-    resposta.end(renderizarPreviaDof(rascunho));
+    resposta.end(renderizarPreviaDof({ ...rascunho, fonte }));
+  }
+
+  @ExigirAcao('criar_rascunho')
+  @Get(':id/dados-previa')
+  async dadosPrevia(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
+    const { fonte } = await this.rascunhos.obterParaPrevia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
+    return fonte;
   }
 
   @ExigirAcao('conferir')

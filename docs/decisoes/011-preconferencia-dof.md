@@ -18,6 +18,8 @@ admissão permanece bloqueado sem a confirmação específica descrita na
 [decisão 012](012-confirmacao-inicio-dof.md). O parser usado pela prévia também detecta variáveis sem
 valor e expressões malformadas em blocos ativos. Campos presentes na
 referência, mas ainda sem obrigatoriedade institucional definida, geram aviso.
+As variáveis de identidade e vínculo usam a mesma fonte e o mesmo resolvedor da
+[prévia](014-dados-fonte-previa-dof.md); referência sem hífen gera aviso.
 Para o nome da mãe são verificadas a integridade da cifra e a validade técnica
 do texto, sem comprovar que ele corresponde à pessoa; a ausência continua
 como aviso. O contrato e os limites estão na

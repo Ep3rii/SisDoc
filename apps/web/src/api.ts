@@ -6,6 +6,7 @@ import {
   paginaEncaminhamentosDofSchema,
   paginaRascunhosDofSchema,
   paginaUsuariosSchema,
+  dadosFontePreviaDofSchema,
   preconferenciaDofSchema,
   detalheServidorSchema,
   rascunhoDofSchema,
@@ -19,6 +20,7 @@ import {
   type CriarRascunhoDof,
   type CriarUsuario,
   type ConfirmarInicioDof,
+  type DadosFontePreviaDof,
   type DetalheServidor,
   type PaginaAuditoria,
   type PaginaBuscaServidores,
@@ -182,35 +184,7 @@ export const api = {
   async verificarPreconferenciaDof(id: string): Promise<PreconferenciaDof> {
     return validar(preconferenciaDofSchema, await requisitar(`documentos/${id}/preconferencia`));
   },
-  async obterPreviaDof(id: string): Promise<number> {
-    let resposta: Response;
-    try {
-      resposta = await fetch(`/api/v1/documentos/${id}/previa`, { credentials: 'same-origin', cache: 'no-store' });
-    } catch {
-      throw new ErroApi(0, 'Não foi possível conectar ao SisDoc. Verifique a conexão e tente novamente.');
-    }
-    if (!resposta.ok) {
-      let problema: unknown;
-      try {
-        problema = await resposta.json();
-      } catch {
-        throw new ErroApi(resposta.status, 'O servidor retornou uma resposta inválida. Contate o administrador.');
-      }
-      const detalhe = typeof problema === 'object' && problema !== null && 'detail' in problema
-        && typeof problema.detail === 'string' ? problema.detail : 'Não foi possível abrir a prévia.';
-      throw new ErroApi(resposta.status, detalhe);
-    }
-    const revisao = resposta.headers.get('x-sisdoc-revisao');
-    const conteudo = resposta.headers.get('content-type');
-    if (!revisao || !/^[1-9]\d*$/.test(revisao) || Number(revisao) > 2147483647
-        || !conteudo?.toLowerCase().startsWith('text/html')) {
-      throw new ErroApi(0, 'O servidor retornou uma prévia inválida. Contate o administrador.');
-    }
-    try {
-      await resposta.text();
-    } catch {
-      throw new ErroApi(0, 'A transferência da prévia foi interrompida. Tente novamente.');
-    }
-    return Number(revisao);
+  async obterPreviaDof(id: string): Promise<DadosFontePreviaDof> {
+    return validar(dadosFontePreviaDofSchema, await requisitar(`documentos/${id}/dados-previa`));
   },
 };

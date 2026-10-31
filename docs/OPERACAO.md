@@ -149,11 +149,17 @@ alterações de cálculo, blocos e processo em conjunto. Salve ou descarte uma c
 antes de editar a outra.
 
 **Abrir prévia** registra a consulta e mostra o cálculo salvo com as alterações
-locais dos blocos, mesmo antes de salvá-las. A prévia é isolada e não tem
-validade oficial; seu layout e textos não foram aprovados. Apenas as variáveis
-listadas na interface são resolvidas, e as demais aparecem como indisponíveis.
-Se outra sessão alterar o rascunho, reabra-o e confira a revisão. Os limites
-técnicos são 200 blocos, 8.000 caracteres por bloco e 20.000 no total.
+locais dos blocos, mesmo antes de salvá-las. Ela exibe CPF integral e nome da
+mãe, quando disponível, além dos demais campos da fonte necessários à DOF;
+proteja a tela e não compartilhe a prévia. Somente o autor ou coordenador
+destinatário tem acesso. A prévia é isolada e não tem validade oficial; seu
+layout e textos não foram aprovados. Apenas as variáveis listadas na interface
+são resolvidas, e as demais aparecem como indisponíveis. Se a fonte mudar,
+feche e reabra a prévia; uma mudança posterior não atualiza a tela
+automaticamente. Se a fonte estiver ocupada ou a identidade protegida estiver
+inválida, a abertura informa conflito. Se outra sessão alterar o rascunho,
+reabra-o e confira a revisão. Os limites técnicos são 200 blocos, 8.000
+caracteres por bloco e 20.000 no total.
 
 ## Processo do rascunho
 
@@ -207,8 +213,8 @@ ativos. Dados do vínculo sem data de sincronização, com mais de 24 horas ou
 com data futura geram avisos. Outros campos da referência ainda dependem de
 definição institucional. Se o nome da mãe estiver presente, a verificação
 testa a cifra e a validade técnica do texto; não comprova sua correspondência
-com a pessoa nem o mostra na prévia atual. Os registros de afastamento e
-incorporação não são automaticamente confrontados com os lançamentos.
+com a pessoa. Os registros de afastamento e incorporação não são
+automaticamente confrontados com os lançamentos.
 
 Se a fonte estiver sendo atualizada durante a consulta, a operação retorna
 conflito; aguarde e tente novamente. Enquanto a consulta está em andamento,
