@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import type { IncomingHttpHeaders } from 'node:http';
@@ -17,8 +17,11 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { HealthController } from '../apps/api/dist/app.module.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
+import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
+import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
 import { validarDestinos } from '../scripts/isolar-testes.cjs';
+import { cpfSintetico } from './dados-sinteticos.js';
 
 const senhaMigrador = 'MigracaoFicticia!12345';
 const senhaAplicativo = 'AplicativoFicticio!12345';
@@ -205,6 +208,32 @@ async function aguardarResposta(porta: number, ca: string): Promise<void> {
   throw new Error('O serviço HTTPS não ficou disponível no prazo.');
 }
 
+async function rejeitarSql(cliente: Client, sql: string, valores: unknown[], codigo: string): Promise<void> {
+  await cliente.query('SAVEPOINT teste_rejeicao');
+  try {
+    await expect(cliente.query(sql, valores)).rejects.toMatchObject({ code: codigo });
+  } finally {
+    await cliente.query('ROLLBACK TO SAVEPOINT teste_rejeicao');
+    await cliente.query('RELEASE SAVEPOINT teste_rejeicao');
+  }
+}
+
+async function inserirPessoaEVinculo(cliente: Client): Promise<{ pessoa: string; vinculo: string }> {
+  const pessoa = randomUUID();
+  const vinculo = randomUUID();
+  await cliente.query(
+    `INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
+     VALUES ($1, $2, $3, 'Pessoa sintética', 'pessoa sintetica')`,
+    [pessoa, randomBytes(48), randomBytes(32)],
+  );
+  await cliente.query(
+    `INSERT INTO nucleo.vinculo (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem)
+     VALUES ($1, $2, $3, $3, 'fonte-sintetica', $4)`,
+    [vinculo, pessoa, `M-${vinculo}`, randomUUID()],
+  );
+  return { pessoa, vinculo };
+}
+
 describe('fundação em recursos descartáveis', () => {
   let temporario = '';
   let raiz = '';
@@ -270,6 +299,7 @@ describe('fundação em recursos descartáveis', () => {
     await administradorBanco.query(`CREATE ROLE sisdoc_aplicativo LOGIN PASSWORD '${senhaAplicativo}'`);
     await administradorBanco.query('CREATE DATABASE sisdoc_verificacao OWNER sisdoc_migrador');
     await administradorBanco.query('CREATE DATABASE sisdoc_ocupado OWNER sisdoc_migrador');
+    await administradorBanco.query('CREATE DATABASE sisdoc_atualizacao OWNER sisdoc_migrador');
     const ocupado = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_ocupado',
       user: 'sisdoc_migrador', password: senhaMigrador,
@@ -419,6 +449,459 @@ describe('fundação em recursos descartáveis', () => {
     );
     expect(privilegios.rows[0]).toEqual({ pode_apagar: false, superusuario: false });
     await cliente.end();
+  });
+
+  it('aplica a migração versão 001 de forma transacional e idempotente sobre a fundação', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: 'sisdoc_atualizacao',
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    try {
+      await cliente.query(`
+        CREATE SCHEMA seguranca;
+        CREATE TABLE seguranca.usuario (
+          id uuid PRIMARY KEY,
+          matricula text NOT NULL UNIQUE,
+          nome text NOT NULL,
+          email text,
+          senha_hash text NOT NULL,
+          papel text NOT NULL CHECK (papel IN ('analista', 'coordenador', 'secretario_adjunto', 'admin')),
+          ativo boolean NOT NULL DEFAULT true,
+          tentativas_falhas integer NOT NULL DEFAULT 0 CHECK (tentativas_falhas >= 0),
+          bloqueado_ate timestamptz,
+          troca_senha_obrigatoria boolean NOT NULL DEFAULT true,
+          ultimo_login timestamptz,
+          criado_em timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE TABLE seguranca.migracao (versao text PRIMARY KEY, aplicada_em timestamptz NOT NULL DEFAULT now());
+        INSERT INTO seguranca.migracao (versao) VALUES ('000-fundacao');
+        GRANT USAGE ON SCHEMA seguranca TO sisdoc_aplicativo;
+        GRANT SELECT, INSERT, UPDATE ON seguranca.usuario TO sisdoc_aplicativo;
+        CREATE SCHEMA documentos;
+        CREATE TABLE documentos.sentinela (id integer PRIMARY KEY);
+        INSERT INTO documentos.sentinela VALUES (1);
+      `);
+      const usuario = randomUUID();
+      await cliente.query(
+        "INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel) VALUES ($1, 'TESTE', 'Usuário sintético', 'hash-fictício', 'admin')",
+        [usuario],
+      );
+      await cliente.query('BEGIN');
+      await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toMatchObject({ code: '42P06' });
+      await cliente.query('ROLLBACK');
+      expect((await cliente.query('SELECT id FROM documentos.sentinela')).rows).toEqual([{ id: 1 }]);
+      expect((await cliente.query<{ existe: boolean }>(
+        "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'nucleo') AS existe",
+      )).rows[0].existe).toBe(false);
+      expect((await cliente.query('SELECT versao FROM seguranca.migracao')).rows).toEqual([{ versao: '000-fundacao' }]);
+      await cliente.query('DROP TABLE documentos.sentinela');
+      await cliente.query('DROP SCHEMA documentos');
+
+      await cliente.query('BEGIN');
+      expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(true);
+      await cliente.query('COMMIT');
+      expect((await cliente.query('SELECT id FROM seguranca.usuario')).rows).toEqual([{ id: usuario }]);
+      expect((await cliente.query('SELECT versao FROM seguranca.migracao ORDER BY versao')).rows).toEqual([
+        { versao: '000-fundacao' }, { versao: '001-modelo' },
+      ]);
+      await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toMatchObject({ code: '25P01' });
+      await expect(aplicarModelo(cliente, 'papel";DROP SCHEMA seguranca')).rejects.toThrow('Papel do aplicativo inválido');
+      await cliente.query('BEGIN');
+      expect(await aplicarModelo(cliente, 'sisdoc_aplicativo')).toBe(false);
+      await cliente.query("INSERT INTO seguranca.migracao (versao) VALUES ('999-desconhecida')");
+      await expect(aplicarModelo(cliente, 'sisdoc_aplicativo')).rejects.toThrow('Histórico de migrações');
+      await cliente.query('ROLLBACK');
+      const concorrente = new Client({
+        host: '127.0.0.1', port: portaBanco, database: 'sisdoc_atualizacao',
+        user: 'sisdoc_migrador', password: senhaMigrador,
+      });
+      await concorrente.connect();
+      try {
+        await cliente.query('BEGIN');
+        await cliente.query('SELECT pg_advisory_xact_lock($1, $2)', [1936286820, 1]);
+        await concorrente.query('BEGIN');
+        await expect(aplicarModelo(concorrente, 'sisdoc_aplicativo')).rejects.toThrow('outra migração');
+      } finally {
+        await concorrente.query('ROLLBACK');
+        await concorrente.end();
+        await cliente.query('ROLLBACK');
+      }
+    } finally {
+      await cliente.end();
+    }
+  });
+
+  it('mantém schemas privados e restringe escritas da conta do aplicativo', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_aplicativo', password: senhaAplicativo,
+    });
+    await cliente.connect();
+    try {
+      const schemas = await cliente.query<{ nspname: string }>(
+        "SELECT nspname FROM pg_namespace WHERE nspname IN ('legado', 'nucleo', 'documentos', 'seguranca') ORDER BY nspname",
+      );
+      expect(schemas.rows.map((linha) => linha.nspname)).toEqual(['documentos', 'legado', 'nucleo', 'seguranca']);
+      const privilegios = await cliente.query<{
+        alterar_usuario: boolean; inserir_pessoa: boolean; inserir_emissao: boolean;
+        inserir_auditoria: boolean; alterar_auditoria: boolean; apagar_auditoria: boolean;
+        publico_le_usuario: boolean; publico_usa_nucleo: boolean;
+      }>(`
+        SELECT has_table_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
+               has_table_privilege(current_user, 'nucleo.pessoa', 'INSERT') AS inserir_pessoa,
+               has_table_privilege(current_user, 'documentos.emissao', 'INSERT') AS inserir_emissao,
+               has_table_privilege(current_user, 'seguranca.auditoria', 'INSERT') AS inserir_auditoria,
+               has_table_privilege(current_user, 'seguranca.auditoria', 'UPDATE') AS alterar_auditoria,
+               has_table_privilege(current_user, 'seguranca.auditoria', 'DELETE') AS apagar_auditoria,
+               EXISTS (
+                 SELECT 1 FROM aclexplode((SELECT relacl FROM pg_class WHERE oid = 'seguranca.usuario'::regclass))
+                 WHERE grantee = 0 AND privilege_type = 'SELECT'
+               ) AS publico_le_usuario,
+               EXISTS (
+                 SELECT 1 FROM aclexplode((SELECT nspacl FROM pg_namespace WHERE nspname = 'nucleo'))
+                 WHERE grantee = 0 AND privilege_type = 'USAGE'
+               ) AS publico_usa_nucleo
+      `);
+      expect(privilegios.rows[0]).toEqual({
+        alterar_usuario: false, inserir_pessoa: false, inserir_emissao: false, inserir_auditoria: true,
+        alterar_auditoria: false, apagar_auditoria: false, publico_le_usuario: false, publico_usa_nucleo: false,
+      });
+      await cliente.query('BEGIN');
+      await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");
+      await rejeitarSql(cliente, "UPDATE seguranca.usuario SET nome = 'Alteração indevida'", [], '42501');
+      await rejeitarSql(cliente, 'DELETE FROM seguranca.auditoria', [], '42501');
+      await rejeitarSql(cliente, 'TRUNCATE seguranca.auditoria', [], '42501');
+      await cliente.query('ROLLBACK');
+    } finally {
+      await cliente.end();
+    }
+  });
+
+  it('valida vínculos, entradas anuais e intervalos e retenção do staging', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    await cliente.query('BEGIN');
+    try {
+      const primeiro = await inserirPessoaEVinculo(cliente);
+      const segundo = await inserirPessoaEVinculo(cliente);
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
+        SELECT gen_random_uuid(), cpf_cifrado, cpf_hash, 'Pessoa repetida', 'pessoa repetida'
+          FROM nucleo.pessoa WHERE id = $1
+      `, [primeiro.pessoa], '23505');
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.vinculo (pessoa_id, matricula, matricula_norm, sistema_origem, id_origem)
+        SELECT pessoa_id, matricula, matricula_norm, sistema_origem, 'origem-distinta'
+          FROM nucleo.vinculo WHERE id = $1
+      `, [primeiro.vinculo], '23505');
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.vinculo (pessoa_id, matricula, matricula_norm, sistema_origem, id_origem, matricula_anterior_id)
+        VALUES ($1, 'M-nova', 'M-nova', 'fonte-sintetica', 'outra-origem', $2)
+      `, [primeiro.pessoa, segundo.vinculo], '23503');
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.afastamento (vinculo_id, tipo, fonte) VALUES ($1, 'falta', 'fonte')
+      `, [primeiro.vinculo], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.afastamento (vinculo_id, tipo, ano_ref, fonte)
+        VALUES ($1, 'falta', 2024, 'fonte')
+      `, [primeiro.vinculo], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.afastamento (vinculo_id, tipo, data_inicio, data_fim, fonte)
+        VALUES ($1, 'falta', '2024-02-02', '2024-02-01', 'fonte')
+      `, [primeiro.vinculo], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.afastamento (vinculo_id, tipo, ano_ref, dias_ano, fonte)
+        VALUES ($1, 'falta', 2024, 367, 'fonte')
+      `, [primeiro.vinculo], '23514');
+      await cliente.query(`
+        INSERT INTO nucleo.afastamento (vinculo_id, tipo, ano_ref, dias_ano, fonte)
+        VALUES ($1, 'licenca_ts', 2024, 366, 'fonte')
+      `, [primeiro.vinculo]);
+      await cliente.query(`
+        INSERT INTO nucleo.afastamento (vinculo_id, tipo, data_inicio, data_fim, fonte)
+        VALUES ($1, 'falta', '2024-02-01', '2024-02-29', 'fonte')
+      `, [primeiro.vinculo]);
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.incorporacao (vinculo_id, tipo, origem) VALUES ($1, 'PB', 'fonte')
+      `, [primeiro.vinculo], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.incorporacao (vinculo_id, tipo, data_inicio, data_fim, origem)
+        VALUES ($1, 'PB', '2024-01-01', '2024-01-31', 'fonte')
+      `, [primeiro.vinculo], '23514');
+      await cliente.query(`
+        INSERT INTO nucleo.incorporacao (vinculo_id, tipo, data_inicio, data_fim, convencao, origem)
+        VALUES ($1, 'PB', '2024-01-01', '2024-01-31', 'exclusivo', 'fonte')
+      `, [primeiro.vinculo]);
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.periodo_ipam (pessoa_id, mes_inicio, mes_fim, fonte)
+        VALUES ($1, '2024-01-02', '2024-02-01', 'fonte')
+      `, [primeiro.pessoa], '23514');
+
+      const lote = randomUUID();
+      const recente = randomUUID();
+      const antigo = randomUUID();
+      await cliente.query(
+        "INSERT INTO nucleo.sincronizacao_lote (id, origem, tipo, status) VALUES ($1, 'fonte', 'completa', 'concluido')",
+        [lote],
+      );
+      await cliente.query(`
+        INSERT INTO nucleo.staging_api (id, lote_id, id_origem, payload_cifrado, recebido_em, processado_em)
+        VALUES ($1, $2, 'recente', $3, now(), now()),
+               ($4, $2, 'antigo', $3, now() - interval '31 days', NULL)
+      `, [recente, lote, randomBytes(48), antigo]);
+      await rejeitarSql(cliente, 'DELETE FROM nucleo.staging_api WHERE id = $1', [recente], '55000');
+      await rejeitarSql(cliente, 'DELETE FROM nucleo.staging_api WHERE id = $1', [antigo], '55000');
+      await cliente.query('UPDATE nucleo.staging_api SET processado_em = now() WHERE id = $1', [antigo]);
+      expect((await cliente.query('DELETE FROM nucleo.staging_api WHERE id = $1', [antigo])).rowCount).toBe(1);
+    } finally {
+      await cliente.query('ROLLBACK');
+      await cliente.end();
+    }
+  });
+
+  it('persiste CPF cifrado e usa HMAC normalizado para a unicidade', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    const protetor = new ProtetorDados({
+      cifra: randomBytes(32).toString('base64'), hmac: randomBytes(32).toString('base64'),
+    });
+    const pessoa = randomUUID();
+    const cpf = cpfSintetico();
+    const contexto = { schema: 'nucleo' as const, tabela: 'pessoa', registroId: pessoa, campo: 'cpf_cifrado' };
+    const cifrado = protetor.cifrar(Buffer.from(cpf, 'ascii'), contexto);
+    await cliente.connect();
+    await cliente.query('BEGIN');
+    try {
+      await cliente.query(`
+        INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
+        VALUES ($1, $2, $3, 'Pessoa sintética', 'pessoa sintetica')
+      `, [pessoa, cifrado, protetor.hashCpf(cpf)]);
+      const resultado = await cliente.query<{ cpf_cifrado: Buffer; cpf_hash: Buffer }>(
+        'SELECT cpf_cifrado, cpf_hash FROM nucleo.pessoa WHERE cpf_hash = $1', [protetor.hashCpf(cpf)],
+      );
+      expect(resultado.rows).toHaveLength(1);
+      expect(resultado.rows[0].cpf_cifrado.includes(Buffer.from(cpf, 'ascii'))).toBe(false);
+      expect(protetor.decifrar(resultado.rows[0].cpf_cifrado, contexto).toString('ascii')).toBe(cpf);
+      await rejeitarSql(cliente, `
+        INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
+        VALUES ($1, $2, $3, 'Outra pessoa sintética', 'outra pessoa sintetica')
+      `, [randomUUID(), randomBytes(48), protetor.hashCpf(cpf)], '23505');
+    } finally {
+      await cliente.query('ROLLBACK');
+      await cliente.end();
+    }
+  });
+
+  it('protege os estados do documento, períodos e registros imutáveis', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    await cliente.query('BEGIN');
+    try {
+      const { pessoa, vinculo } = await inserirPessoaEVinculo(cliente);
+      const outra = await inserirPessoaEVinculo(cliente);
+      const usuario = (await cliente.query<{ id: string }>('SELECT id FROM seguranca.usuario LIMIT 1')).rows[0].id;
+      const regra = randomUUID();
+      const templateDof = randomUUID();
+      const templateDtc = randomUUID();
+      const templateComissionado = randomUUID();
+      const dof = randomUUID();
+      const dtc = randomUUID();
+      const comissionado = randomUUID();
+      const conteudo = randomBytes(48);
+      await cliente.query(`
+        INSERT INTO documentos.regra_versao (id, codigo, versao, configuracao, evidencia, vigente_de)
+        VALUES ($1, 'regra-sintetica', '1', '{}', 'inferido', '2024-01-01');
+      `, [regra]);
+      await cliente.query(`
+        INSERT INTO documentos.template_versao (id, tipo, versao, html, css, vigente_de)
+        VALUES ($1, 'DOF', '1', '<p>Modelo sintético</p>', '', '2024-01-01'),
+               ($2, 'DTC_INSS', '1', '<p>Modelo sintético</p>', '', '2024-01-01'),
+               ($3, 'DTC_COMISSIONADO', '1', '<p>Modelo sintético</p>', '', '2024-01-01')
+      `, [templateDof, templateDtc, templateComissionado]);
+      const inserirDocumento = `
+        INSERT INTO documentos.documento (
+          id, tipo, pessoa_id, vinculo_id, entrada_cifrada, template_versao_id,
+          regra_versao_id, criado_por, atualizado_por
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+      `;
+      await rejeitarSql(cliente, inserirDocumento, [
+        randomUUID(), 'DOF', pessoa, outra.vinculo, conteudo, templateDof, regra, usuario,
+      ], '23503');
+      await rejeitarSql(cliente, inserirDocumento, [
+        randomUUID(), 'DOF', pessoa, vinculo, conteudo, templateDtc, regra, usuario,
+      ], '23503');
+      await cliente.query(inserirDocumento, [dof, 'DOF', pessoa, vinculo, conteudo, templateDof, regra, usuario]);
+      await cliente.query(inserirDocumento, [dtc, 'DTC_INSS', pessoa, vinculo, conteudo, templateDtc, regra, usuario]);
+      await cliente.query(inserirDocumento, [
+        comissionado, 'DTC_COMISSIONADO', pessoa, vinculo, conteudo, templateComissionado, regra, usuario,
+      ]);
+      await rejeitarSql(cliente, `
+        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = now() WHERE id = $1
+      `, [dof, usuario], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 2, '2020-01-01', '2020-12-31')
+      `, [dof], '23514');
+      await cliente.query(`
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 1, '2020-01-01', '2020-12-31')
+      `, [dof]);
+      await cliente.query(`
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 1, '2000-01-01', '2000-12-31')
+      `, [dtc]);
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 2, '2000-12-31', '2001-12-31')
+      `, [dtc], '23514');
+      await cliente.query(`
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 2, '2001-01-01', '2001-12-31'),
+               ($1, 3, '2002-01-01', '2002-12-31'),
+               ($1, 4, '2003-01-01', '2003-12-31')
+      `, [dtc]);
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 5, '2004-01-01', '2004-12-31')
+      `, [dtc], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.documento_cargo_comissionado (
+          documento_id, ordem, cargo, decreto_nomeacao, publicacao_nomeacao, data_entrada_exercicio
+        ) VALUES ($1, 1, 'Cargo sintético', 'Decreto', 'Publicação', '2020-01-01')
+      `, [dtc], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.documento_cargo_comissionado (
+          documento_id, ordem, cargo, decreto_nomeacao, publicacao_nomeacao, data_entrada_exercicio, decreto_exoneracao
+        ) VALUES ($1, 1, 'Cargo sintético', 'Decreto', 'Publicação', '2020-01-01', 'Exoneração')
+      `, [comissionado], '23514');
+      await cliente.query(`
+        INSERT INTO documentos.documento_cargo_comissionado (
+          documento_id, ordem, cargo, decreto_nomeacao, publicacao_nomeacao, data_entrada_exercicio
+        ) VALUES ($1, 1, 'Cargo 1', 'Decreto', 'Publicação', '2020-01-01'),
+                 ($1, 2, 'Cargo 2', 'Decreto', 'Publicação', '2021-01-01'),
+                 ($1, 3, 'Cargo 3', 'Decreto', 'Publicação', '2022-01-01')
+      `, [comissionado]);
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.documento_cargo_comissionado (
+          documento_id, ordem, cargo, decreto_nomeacao, publicacao_nomeacao, data_entrada_exercicio
+        ) VALUES ($1, 4, 'Cargo 4', 'Decreto', 'Publicação', '2023-01-01')
+      `, [comissionado], '23514');
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.ajuste_campo (documento_id, campo, valor_novo_cifrado, motivo_cifrado, usuario_id)
+        VALUES ($1, 'cargo', $2, $3, $4)
+      `, [dof, conteudo, Buffer.alloc(0), usuario], '23514');
+      await cliente.query(`
+        INSERT INTO documentos.ajuste_campo (documento_id, campo, valor_novo_cifrado, motivo_cifrado, usuario_id)
+        VALUES ($1, 'cargo', $2, $2, $3)
+      `, [dof, conteudo, usuario]);
+      await rejeitarSql(cliente, "UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [dof], '23514');
+      await cliente.query(`
+        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = now() WHERE id = $1
+      `, [dof, usuario]);
+      await rejeitarSql(cliente, "UPDATE documentos.documento SET status = 'rascunho' WHERE id = $1", [dof], '23514');
+      await cliente.query(`
+        UPDATE documentos.documento SET status = 'rascunho', conferido_por = NULL, conferido_em = NULL WHERE id = $1
+      `, [dof]);
+      await cliente.query('UPDATE documentos.documento SET entrada_cifrada = $2 WHERE id = $1', [dof, conteudo]);
+      await cliente.query(`
+        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = now() WHERE id = $1
+      `, [dof, usuario]);
+      await rejeitarSql(cliente, `
+        UPDATE documentos.documento SET entrada_cifrada = $2 WHERE id = $1
+      `, [dof, randomBytes(48)], '55000');
+      await rejeitarSql(cliente, `
+        UPDATE documentos.documento_periodo SET fim = '2020-12-30' WHERE documento_id = $1
+      `, [dof], '55000');
+      await rejeitarSql(cliente, `
+        INSERT INTO documentos.ajuste_campo (documento_id, campo, valor_novo_cifrado, motivo_cifrado, usuario_id)
+        VALUES ($1, 'cargo', $2, $2, $3)
+      `, [dof, conteudo, usuario], '55000');
+      await rejeitarSql(cliente, "UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [dof], '23514');
+      const emissao = randomUUID();
+      await cliente.query(`
+        INSERT INTO documentos.emissao (
+          id, documento_id, tipo, ano, numero, numero_formatado, chave_idempotencia, snapshot_cifrado, emitido_por
+        ) VALUES ($1, $2, 'DOF', 2024, 1, '1/2024', 'idempotencia-sintetica', $3, $4)
+      `, [emissao, dof, conteudo, usuario]);
+      await cliente.query("UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [dof]);
+      await rejeitarSql(cliente, 'UPDATE documentos.emissao SET snapshot_cifrado = $2 WHERE id = $1', [emissao, randomBytes(48)], '55000');
+      await rejeitarSql(cliente, 'DELETE FROM documentos.emissao WHERE id = $1', [emissao], '55000');
+      await rejeitarSql(cliente, "UPDATE documentos.regra_versao SET versao = '2' WHERE id = $1", [regra], '55000');
+      await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");
+      await rejeitarSql(cliente, "UPDATE seguranca.auditoria SET acao = 'alterada'", [], '55000');
+      await rejeitarSql(cliente, 'DELETE FROM seguranca.auditoria', [], '55000');
+      await rejeitarSql(cliente, 'TRUNCATE seguranca.auditoria', [], '55000');
+      await cliente.query(`
+        UPDATE documentos.documento SET status = 'cancelado', cancelado_por = $2, cancelado_em = now(),
+          motivo_cancelamento_cifrado = $3 WHERE id = $1
+      `, [dof, usuario, conteudo]);
+      await rejeitarSql(cliente, "UPDATE documentos.documento SET status = 'rascunho' WHERE id = $1", [dof], '55000');
+      expect((await cliente.query('SELECT snapshot_cifrado FROM documentos.emissao WHERE id = $1', [emissao])).rows[0]
+        .snapshot_cifrado).toEqual(conteudo);
+    } finally {
+      await cliente.query('ROLLBACK');
+      await cliente.end();
+    }
+  });
+
+  it('impede períodos sobrepostos em transações concorrentes', async () => {
+    const parametros = {
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    };
+    const preparador = new Client(parametros);
+    const primeiro = new Client(parametros);
+    const segundo = new Client(parametros);
+    await Promise.all([preparador.connect(), primeiro.connect(), segundo.connect()]);
+    try {
+      const { pessoa, vinculo } = await inserirPessoaEVinculo(preparador);
+      const usuario = (await preparador.query<{ id: string }>('SELECT id FROM seguranca.usuario LIMIT 1')).rows[0].id;
+      const regra = randomUUID();
+      const template = randomUUID();
+      const documento = randomUUID();
+      await preparador.query(`
+        INSERT INTO documentos.regra_versao (id, codigo, versao, configuracao, evidencia, vigente_de)
+        VALUES ($1, $2, '1', '{}', 'inferido', '2024-01-01')
+      `, [regra, `regra-${regra}`]);
+      await preparador.query(`
+        INSERT INTO documentos.template_versao (id, tipo, versao, html, css, vigente_de)
+        VALUES ($1, 'DTC_INSS', $2, '<p>Modelo sintético</p>', '', '2024-01-01')
+      `, [template, `versao-${template}`]);
+      await preparador.query(`
+        INSERT INTO documentos.documento (
+          id, tipo, pessoa_id, vinculo_id, entrada_cifrada, template_versao_id, regra_versao_id, criado_por, atualizado_por
+        ) VALUES ($1, 'DTC_INSS', $2, $3, $4, $5, $6, $7, $7)
+      `, [documento, pessoa, vinculo, randomBytes(48), template, regra, usuario]);
+      await Promise.all([primeiro.query('BEGIN'), segundo.query('BEGIN')]);
+      await primeiro.query(`
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 1, '2000-01-01', '2000-12-31')
+      `, [documento]);
+      let terminou = false;
+      const concorrente = segundo.query(`
+        INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
+        VALUES ($1, 2, '2000-12-31', '2001-12-31')
+      `, [documento]).then(
+        () => { terminou = true; return undefined; },
+        (erro: unknown) => { terminou = true; return erro; },
+      );
+      await delay(200);
+      expect(terminou).toBe(false);
+      await primeiro.query('COMMIT');
+      expect(await concorrente).toMatchObject({ code: '23514' });
+    } finally {
+      await Promise.all([primeiro.query('ROLLBACK'), segundo.query('ROLLBACK')]);
+      await Promise.all([preparador.end(), primeiro.end(), segundo.end()]);
+    }
   });
 
   it('inicia npm start em HTTPS verificado, com health e página inicial', async () => {

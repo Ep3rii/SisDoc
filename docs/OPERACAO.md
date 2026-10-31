@@ -30,10 +30,10 @@ operacionalmente até a conclusão das demais fatias e autorização formal.
 Após instalar dependências do lockfile com `npm ci`, `npm run setup` deve ser
 executado por operador autorizado em terminal interativo. O comando solicita os
 parâmetros acima, senhas sem eco e confirmação explícita `CRIAR`. Ele aplica a
-estrutura inicial ao banco vazio, cria chaves próprias e um administrador com
-troca de senha obrigatória. Não cria banco ou papéis PostgreSQL e não importa
-dados. Se a transação ficar com estado incerto, preserve a raiz e verifique o
-banco antes de qualquer nova tentativa.
+estrutura versionada ao banco vazio, cria chaves próprias e um administrador
+com troca de senha obrigatória. Não cria banco ou papéis PostgreSQL e não
+importa dados. Se a transação ficar com estado incerto, preserve a raiz e
+verifique o banco antes de qualquer nova tentativa.
 
 O caminho da configuração externa aparece ao final do comando. Na mesma
 sessão PowerShell, defina `SISDOC_CONFIG` com esse caminho e execute
@@ -51,4 +51,6 @@ temporário existente, externo ao checkout e à instalação operacional. Não h
 ambiente permanente de teste. `npm run typecheck` verifica os tipos.
 
 Backup, restauração, atualização de instalações existentes e recuperação das
-chaves ainda não estão implementados; não há evidência de prontidão operacional.
+chaves ainda não estão implementados. A migração de uma fundação anterior foi
+testada apenas em banco descartável; não há comando autorizado para executá-la
+em instalação existente. Não há evidência de prontidão operacional.
