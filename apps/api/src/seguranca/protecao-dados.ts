@@ -25,6 +25,7 @@ const tamanhoNonce = 12;
 const tamanhoTag = 16;
 const tamanhoCabecalho = 1 + tamanhoNonce + tamanhoTag;
 
+/** Exige chave de 256 bits em Base64 canônico, recusando truncamento e codificações ambíguas. */
 function decodificarChave(valor: string): Buffer {
   const chave = Buffer.from(valor, 'base64');
   if (chave.length !== 32 || chave.toString('base64') !== valor) {
@@ -33,6 +34,7 @@ function decodificarChave(valor: string): Buffer {
   return chave;
 }
 
+/** Vincula ciphertext ao schema, tabela, UUID e campo; a ordem é parte do formato persistido. */
 function dadosAutenticados(contexto: ContextoCifra): Buffer {
   const valido = contextoSchema.parse(contexto);
   return Buffer.from(JSON.stringify([
@@ -44,6 +46,7 @@ export class ProtetorDados {
   private readonly chaveCifra: Buffer;
   private readonly chaveHmac: Buffer;
 
+  /** Carrega chaves distintas para cifra e HMAC sem persistir cópias em texto no protetor. */
   constructor(chaves: Configuracao['chaves']) {
     this.chaveCifra = decodificarChave(chaves.cifra);
     this.chaveHmac = decodificarChave(chaves.hmac);
@@ -52,6 +55,7 @@ export class ProtetorDados {
     }
   }
 
+  /** Produz envelope versionado AES-GCM com nonce aleatório e autenticação do contexto. */
   cifrar(valor: Buffer, contexto: ContextoCifra): Buffer {
     const autenticados = dadosAutenticados(contexto);
     const nonce = randomBytes(tamanhoNonce);
@@ -61,6 +65,7 @@ export class ProtetorDados {
     return Buffer.concat([Buffer.from([versao]), nonce, cifra.getAuthTag(), conteudo]);
   }
 
+  /** Valida envelope e tag GCM antes de entregar bytes; falhas não revelam detalhes criptográficos. */
   decifrar(valor: Buffer, contexto: ContextoCifra): Buffer {
     const autenticados = dadosAutenticados(contexto);
     if (valor.length < tamanhoCabecalho || valor[0] !== versao) {
@@ -79,16 +84,19 @@ export class ProtetorDados {
     }
   }
 
+  /** Indexa CPF validado com HMAC separado por domínio, sem armazenar CPF em índice aberto. */
   hashCpf(valor: string): Buffer {
     const cpf = cpfSchema.parse(valor);
     return createHmac('sha256', this.chaveHmac).update('sisdoc/cpf/v1\0', 'utf8').update(cpf, 'ascii').digest();
   }
 
+  /** Assina representação JSON da origem para detectar alterações sem expor seu conteúdo. */
   hashConteudo(dominio: 'importacao' | 'sincronizacao', tabela: string, dados: unknown): Buffer {
     return createHmac('sha256', this.chaveHmac).update(`sisdoc/${dominio}/${tabela}/v1\0`, 'utf8')
       .update(JSON.stringify(dados), 'utf8').digest();
   }
 
+  /** Assina documento e revisões de pessoa/vínculo no formato usado pela prova DOF. */
   assinarRevisaoFonteDof(entrada: z.input<typeof revisaoFonteDofSchema>): Buffer {
     const dados = revisaoFonteDofSchema.parse(entrada);
     const revisoes = [
@@ -100,9 +108,17 @@ export class ProtetorDados {
       .update(JSON.stringify(revisoes), 'utf8').digest();
   }
 
+  /** Vincula relatório à sessão e ao conteúdo; assinatura não concede autorização por si só. */
   assinarRelatorioDof(hashSessao: Buffer, conteudo: Buffer): Buffer {
     if (hashSessao.length !== 32) throw new Error('Identificador de sessão inválido para o relatório.');
     return createHmac('sha256', this.chaveHmac).update('sisdoc/dof/relatorio/v1\0', 'utf8')
       .update(hashSessao).update(conteudo).digest();
   }
+
+}
+
+/** Decifra campo textual opcional do núcleo; validações semânticas pertencem ao consumidor. */
+export function decifrarTexto(protetor: ProtetorDados, id: string, tabela: string, campo: string, valor: Buffer | null): string | null {
+  if (valor === null) return null;
+  return protetor.decifrar(valor, { schema: 'nucleo', tabela, registroId: id, campo }).toString('utf8');
 }

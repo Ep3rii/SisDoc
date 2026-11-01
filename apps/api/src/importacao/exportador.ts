@@ -1,7 +1,7 @@
 import { UnprocessableEntityException } from '@nestjs/common';
 import type { ExportarDados } from '@sisdoc/contratos';
 import type { PoolClient } from 'pg';
-import type { ProtetorDados } from '../seguranca/protecao-dados';
+import { decifrarTexto, type ProtetorDados } from '../seguranca/protecao-dados';
 import { COLUNAS, COLUNAS_AFASTAMENTO_INTERVALO } from './formatos';
 import { escreverCsv, escreverXlsx, LIMITE_ARQUIVO_BYTES } from './planilhas';
 
@@ -14,11 +14,7 @@ export const CAMPOS_PESSOA_EXPORTACAO = {
   NUMRG: 'rg_numero_cifrado', NUMTITEL: 'titulo_eleitor_cifrado', ENDERECO: 'endereco_cifrado',
 } as const;
 
-export function decifrarTexto(protetor: ProtetorDados, id: string, tabela: string, campo: string, valor: Buffer | null): string | null {
-  if (valor === null) return null;
-  return protetor.decifrar(valor, { schema: 'nucleo', tabela, registroId: id, campo }).toString('utf8');
-}
-
+/** Exporta origem validada, recusando ambiguidades, excesso de tamanho e fórmulas CSV sem alterar células. */
 export async function gerarExportacao(cliente: PoolClient, protetor: ProtetorDados, dados: ExportarDados): Promise<Buffer> {
   const { tipo, origem } = dados;
   let sql: string;

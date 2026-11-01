@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import {
   historicoEmissoesSchema,
   situacaoEmissaoSchema,
@@ -19,11 +19,9 @@ import { papeisPermitidos, perfilPermiteAcao } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
 import { ArmazenamentoPdf } from './armazenamento-pdf';
-import { MAXIMO_TENTATIVAS_PDF } from './processador-pdf-emissao';
 import { nomePdf } from './nome-pdf';
-
-type Falha = { tipo: 'invalido' | 'conflito' | 'nao_encontrado'; mensagem: string };
-type Tentativa<T> = { valor: T } | { falha: Falha };
+import { MAXIMO_TENTATIVAS_PDF } from './processador-pdf-emissao';
+import { concluir, type Tentativa } from './resultado-transacao';
 type LinhaSituacao = {
   id: string;
   documento_id: string;
@@ -54,13 +52,6 @@ const tiposPorGrupo = {
   DOF: ['DOF'],
   DTC: ['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'],
 } as const;
-
-function concluir<T>(tentativa: Tentativa<T>): T {
-  if ('valor' in tentativa) return tentativa.valor;
-  if (tentativa.falha.tipo === 'conflito') throw new ConflictException(tentativa.falha.mensagem);
-  if (tentativa.falha.tipo === 'nao_encontrado') throw new NotFoundException(tentativa.falha.mensagem);
-  throw new BadRequestException(tentativa.falha.mensagem);
-}
 
 const consultaSituacao = `
   SELECT e.id, e.documento_id, d.pessoa_id, d.revisao, e.tipo, e.numero_formatado, e.emitido_em, e.emitido_por,
@@ -271,3 +262,6 @@ export class EmissoesService {
     return concluir(tentativa);
   }
 }
+
+/** Bloqueio comum DOF/DTC: aprovação formal de regra e modelo é obrigatória. */
+export const MENSAGEM_SEM_APROVACAO = 'Emissão operacional bloqueada: regra/template provisórios ainda não aprovados. Registre a aprovação com npm run aprovar-modelo.';

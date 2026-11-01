@@ -30,7 +30,7 @@ import { criarAplicacao } from '../apps/api/dist/aplicacao.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { ArmazenamentoPdf } from '../apps/api/dist/documentos/armazenamento-pdf.js';
 import { ProcessadorPdfEmissao } from '../apps/api/dist/documentos/processador-pdf-emissao.js';
-import { MENSAGEM_SEM_APROVACAO } from '../apps/api/dist/documentos/rascunhos.js';
+import { MENSAGEM_SEM_APROVACAO } from '../apps/api/dist/documentos/emissoes.js';
 import { WorkerPdfEmissao } from '../apps/api/dist/documentos/worker-pdf-emissao.js';
 import { SEQUENCIA_MIGRACOES } from '../apps/api/dist/migracoes/sequencia.js';
 import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';

@@ -3,7 +3,7 @@ import { documentoDtcSchema, ROTULOS_DTC, OBSERVACAO_PADRAO_INSS, type ConteudoD
 import { chromium, type Browser, type Page } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { calcularDtc } from '../apps/api/dist/documentos/dtcs.js';
+import { calcularDtc } from '../apps/api/dist/calculos/calculo-dtc.js';
 import { anosDoPeriodo } from '../apps/web/src/dtc/anos-dtc.js';
 import { cpfSintetico } from './dados-sinteticos.js';
 import { CSP_APLICACAO } from '../apps/api/dist/aplicacao.js';

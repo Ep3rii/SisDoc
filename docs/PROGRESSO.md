@@ -1,5 +1,25 @@
 # Progresso da construção
 
+## Modularização — etapa 3: consulta e cálculo DTC — 01/11/2026
+
+Serviço DTC decomposto em cálculo puro, consulta/validação da fonte e
+coordenação transacional. JSDoc específico cobre todas as funções nomeadas
+dessas unidades. Consultas usam o protetor e cliente da transação existente;
+revisões, locks, auditoria, conferência, aprovação, idempotência, numeração,
+snapshot e job PDF permanecem compatíveis.
+
+Resultado pós-transação compartilhado entre DTC, DOF e emissões, mantendo
+auditoria de falhas esperadas antes de lançar a resposta HTTP. Mensagem de
+aprovação deixou de depender de rascunhos DOF. Helper de decifração textual
+movido para segurança, retirando dependência Cadastro → Exportador.
+Proteção de dados e exportador documentados após leitura.
+
+Typecheck aprovado; suíte completa **217/217 testes em 28 arquivos**,
+com quatro novos casos de tradução do resultado e regressões de integração
+e navegador. Sem migrações ou dados operacionais alterados.
+Revisão integral ainda pendente nas demais unidades, conforme
+[ARQUITETURA.md](ARQUITETURA.md).
+
 ## Modularização — etapa 2: interface por domínio — 01/11/2026
 
 Interface reorganizada em aplicação, autenticação, infraestrutura,

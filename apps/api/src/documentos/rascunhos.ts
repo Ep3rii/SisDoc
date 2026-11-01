@@ -1,19 +1,18 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto';
-import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, ServiceUnavailableException } from '@nestjs/common';
 import { nivelDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
   blocoRascunhoDofSchema,
-  dataFuncionalSchema,
   dadosFontePreviaDofSchema,
+  dataFuncionalSchema,
   numeroProcessoSchema,
   processoCorrespondeMascara,
   rascunhoDofSchema,
   resultadoCalculoDofSchema,
-  resultadoCopiaEmitidoSchema,
-  snapshotEmissaoDofSchema,
   resultadoConferenciaDofSchema,
+  resultadoCopiaEmitidoSchema,
   resultadoDevolucaoConferidoDofSchema,
   resultadoDevolucaoDofSchema,
+  snapshotEmissaoDofSchema,
   solicitarCalculoDofSchema,
   ultimaDevolucaoDofSchema,
   type AtualizarBlocosDof,
@@ -21,30 +20,31 @@ import {
   type AtualizarRascunhoDof,
   type BlocoRascunhoDof,
   type CodigoBlocoDof,
-  type Configuracao,
   type ConferirDof,
+  type Configuracao,
   type ConfirmarInicioDof,
   type CriarRascunhoDof,
   type DadosFontePreviaDof,
-  type DevolverRascunhoDof,
   type DevolverConferidoDof,
+  type DevolverRascunhoDof,
   type EmitirDof,
   type EncaminharRascunhoDof,
+  type PaginaConferidosDof,
   type PaginaCoordenadoresDof,
   type PaginaEncaminhamentosDof,
-  type PaginaConferidosDof,
   type PaginaRascunhosDof,
   type PreconferenciaDof,
   type RascunhoDof,
   type RecolherRascunhoDof,
-  type ResultadoCopiaEmitido,
-  type ResultadoDevolucaoDof,
   type ResultadoConferenciaDof,
+  type ResultadoCopiaEmitido,
   type ResultadoDevolucaoConferidoDof,
+  type ResultadoDevolucaoDof,
   type SituacaoEmissao,
   type SolicitarCalculoDof,
   type UltimaDevolucaoDof,
 } from '@sisdoc/contratos';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { z } from 'zod';
 import { transacao } from '../banco';
@@ -59,9 +59,10 @@ import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
-import { consultarSituacaoEmissao } from './emissoes';
+import { consultarSituacaoEmissao, MENSAGEM_SEM_APROVACAO } from './emissoes';
 import { lerCpfDof, lerNomeMaeDof } from './identidade-fonte-dof';
 import { verificarPreconferenciaDof } from './preconferencia';
+import { concluir, type Tentativa } from './resultado-transacao';
 
 type LinhaRascunho = {
   id: string;
@@ -82,9 +83,6 @@ type LinhaRascunho = {
   regra_versao: string;
   regra_atual: boolean;
 };
-
-type Falha = { tipo: 'invalido' | 'conflito' | 'nao_encontrado'; mensagem: string };
-type Tentativa<T> = { valor: T } | { falha: Falha };
 type Mudanca = { campo: string; anterior: unknown; novo: unknown };
 type LinhaEncaminhamento = {
   id: string;
@@ -107,14 +105,7 @@ const confirmacaoInicioProtegidaSchema = z.strictObject({
   perfilConfirmante: z.literal('admin').optional(),
 });
 
-export const MENSAGEM_SEM_APROVACAO = 'Emissão operacional bloqueada: regra/template provisórios ainda não aprovados. Registre a aprovação com npm run aprovar-modelo.';
 
-function concluir<T>(tentativa: Tentativa<T>): T {
-  if ('valor' in tentativa) return tentativa.valor;
-  if (tentativa.falha.tipo === 'conflito') throw new ConflictException(tentativa.falha.mensagem);
-  if (tentativa.falha.tipo === 'nao_encontrado') throw new NotFoundException(tentativa.falha.mensagem);
-  throw new BadRequestException(tentativa.falha.mensagem);
-}
 
 function entradaOrdenada(entrada: SolicitarCalculoDof): SolicitarCalculoDof {
   return { ...entrada, anos: [...entrada.anos].sort((a, b) => a.ano - b.ano) };

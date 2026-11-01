@@ -1,38 +1,32 @@
-import { randomUUID } from 'node:crypto';
-import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { calcular, converterDias, REGRAS_PLANILHA, textoPeriodos, textoTempo } from '@sisdoc/calculo';
+import { ServiceUnavailableException } from '@nestjs/common';
+import { REGRAS_PLANILHA } from '@sisdoc/calculo';
 import {
   conteudoDtcSchema,
-  documentoDtcSchema,
-  fonteDtcSchema,
-  numeroProcessoSchema,
-  processoCorrespondeMascara,
-  resultadoCalculoDtcSchema,
   resultadoCopiaEmitidoSchema,
   resultadoTransicaoDtcSchema,
   snapshotEmissaoDtcSchema,
   validarConteudoDtc,
   type AtualizarDtc,
-  type Configuracao,
   type ConferirDtc,
+  type Configuracao,
   type ConsultaDtc,
   type ConteudoDtc,
   type CriarDtc,
   type DevolverDtc,
   type DocumentoDtc,
   type EmitirDtc,
-  type FonteDtc,
-  type LinhaTotalDtc,
   type PaginaDtc,
   type PreviaDtc,
   type ResultadoCalculoDtc,
   type ResultadoCopiaEmitido,
   type ResultadoTransicaoDtc,
   type SituacaoEmissao,
-  type TipoDtc,
+  type TipoDtc
 } from '@sisdoc/contratos';
+import { randomUUID } from 'node:crypto';
 import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { transacao } from '../banco';
+import { calcularDtc } from '../calculos/calculo-dtc';
 import { dataEmSaoPaulo } from '../data';
 import { TEMPLATES_DTC } from '../migracoes/dtc';
 import { CHAVE_BLOQUEIO_FONTE_DOF } from '../migracoes/preconferencia-dof';
@@ -41,51 +35,15 @@ import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
-import { consultarSituacaoEmissao } from './emissoes';
-import { lerCpfDof, lerNomeMaeDof } from './identidade-fonte-dof';
-import { MENSAGEM_SEM_APROVACAO } from './rascunhos';
-import { assinarFonteDtc, lerPeriodosFonteDtc, provasDtcIguais, tentarBloqueioPeriodosDtc, type PeriodoFonteDtc } from './revisao-fonte-dtc';
+import { ConsultasDtc, TIPOS_DTC } from './consulta-dtc';
+import { consultarSituacaoEmissao, MENSAGEM_SEM_APROVACAO } from './emissoes';
+import { concluir, type Tentativa } from './resultado-transacao';
+import { tentarBloqueioPeriodosDtc } from './revisao-fonte-dtc';
 
-const TIPOS_DTC: readonly TipoDtc[] = ['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'];
 const REVISAO_MAXIMA = 2147483647;
-
-type LinhaDtc = {
-  id: string;
-  tipo: TipoDtc;
-  pessoa_id: string;
-  vinculo_id: string;
-  criado_por: string;
-  autor_nome: string;
-  nome: string;
-  matricula: string;
-  admissao: string | null;
-  status: 'rascunho' | 'conferido';
-  revisao: number;
-  criado_em: Date;
-  atualizado_em: Date;
-  entrada_cifrada: Buffer;
-  resultado_calculo_cifrado: Buffer | null;
-  processo_cifrado: Buffer | null;
-  conferido_por_nome: string | null;
-  conferido_em: Date | null;
-  regra_codigo: string;
-  regra_versao: string;
-  regra_atual: boolean;
-};
-
-type Falha = { tipo: 'invalido' | 'conflito' | 'nao_encontrado'; mensagem: string };
-type Tentativa<T> = { valor: T } | { falha: Falha };
-type RevisoesFonte = { pessoa_revisao: string; vinculo_revisao: string; periodos: PeriodoFonteDtc[] };
 type Mudanca = { campo: string; anterior: unknown; novo: unknown };
-type LeituraFonte = { fonte: FonteDtc; fonteSelecionadaAlterada: boolean | null } | { erro: 'identidade' | 'fonte' };
 
-function concluir<T>(tentativa: Tentativa<T>): T {
-  if ('valor' in tentativa) return tentativa.valor;
-  if (tentativa.falha.tipo === 'conflito') throw new ConflictException(tentativa.falha.mensagem);
-  if (tentativa.falha.tipo === 'nao_encontrado') throw new NotFoundException(tentativa.falha.mensagem);
-  throw new BadRequestException(tentativa.falha.mensagem);
-}
-
+/** Adquire locks compartilhados de cadastro e períodos na mesma transação, sem aguardar uma carga em andamento. */
 async function tentarBloqueioFonte(cliente: PoolClient): Promise<boolean> {
   const bloqueio = await cliente.query<{ obtido: boolean }>(
     'SELECT pg_try_advisory_xact_lock_shared($1, $2) AS obtido', [...CHAVE_BLOQUEIO_FONTE_DOF],
@@ -106,6 +64,7 @@ function normalizar(conteudo: ConteudoDtc): ConteudoDtc {
   });
 }
 
+/** Identifica grupos efetivamente alterados para auditar valores anteriores e novos cifrados. */
 function mudancas(anterior: ConteudoDtc | null, novo: ConteudoDtc): Mudanca[] {
   const resultado: Mudanca[] = [];
   const campos: Array<keyof ConteudoDtc> = ['periodos', 'cargos', 'inss', 'processo', 'confirmarInicioAjustado'];
@@ -118,301 +77,24 @@ function mudancas(anterior: ConteudoDtc | null, novo: ConteudoDtc): Mudanca[] {
   return resultado;
 }
 
-const ROTULOS_TOTAIS: ReadonlyArray<[LinhaTotalDtc['codigo'], string, boolean]> = [
-  ['total_contribuicao', 'Tempo Total de Contribuição', false],
-  ['efetivo_exercicio', 'Tempo de Efetivo Exercício na PMSL', false],
-  ['incorporacao_pb', 'Tempo de Incorporação de PB', true],
-  ['incorporacao_pv', 'Tempo de Incorporação de PV', true],
-  ['incorporacao_pb_pv', 'Tempo de Incorporação de PB/PV', true],
-  ['licenca_premio', 'Tempo de Incorporação de Licença-prêmio', true],
-];
-
-export function calcularDtc(
-  tipo: TipoDtc, conteudo: ConteudoDtc, admissao: string, dataReferencia: string,
-): { resultado: ResultadoCalculoDtc } | { erro: string } {
-  const calculo = calcular({
-    tipo,
-    posse: admissao,
-    dataReferencia,
-    periodos: conteudo.periodos.map((periodo) => ({ inicio: periodo.inicio, fim: periodo.fim, anos: periodo.anos })),
-    regras: REGRAS_PLANILHA,
-  });
-  if (!calculo.sucesso) {
-    return { erro: [...new Set(calculo.erros.map((erro) => erro.periodo ? `${erro.periodo}º período: ${erro.mensagem}` : erro.mensagem))].join(' ') };
-  }
-  const { totais } = calculo;
-  const dias: Record<LinhaTotalDtc['codigo'], number> = {
-    total_contribuicao: totais.totalContribuicao,
-    efetivo_exercicio: totais.efetivoExercicio,
-    incorporacao_pb: totais.pb,
-    incorporacao_pv: totais.pv,
-    incorporacao_pb_pv: totais.pb + totais.pv,
-    licenca_premio: totais.licencaPremio,
-  };
-  const linhasTotais = ROTULOS_TOTAIS.map(([codigo, rotulo, incorporacao]) => {
-    const convertido = converterDias(dias[codigo], calculo.regras);
-    return {
-      codigo,
-      rotulo,
-      dias: dias[codigo],
-      anos: convertido.anos,
-      meses: convertido.meses,
-      diasRestantes: convertido.dias,
-      texto: textoTempo(dias[codigo], calculo.regras),
-      // Incorporações não têm regra aprovada para DTC; no Comissionado e no INSS todo o bloco é inferido.
-      provisoria: incorporacao || tipo !== 'DTC_IPAM',
-    };
-  });
-  return {
-    resultado: resultadoCalculoDtcSchema.parse({
-      tipo,
-      admissaoConsiderada: admissao,
-      regra: { codigo: calculo.regras.codigo, versao: calculo.regras.versao, classificacao: calculo.regras.classificacao },
-      periodos: calculo.periodos.map((periodo) => ({
-        ordem: periodo.ordem,
-        inicioInformado: periodo.inicioInformado,
-        inicioEfetivo: periodo.inicioEfetivo,
-        fim: periodo.fim,
-        linhas: periodo.linhas,
-        excessoTs: periodo.excessoTs,
-        excessoPf: periodo.excessoPf,
-        totais: periodo.totais,
-      })),
-      totais,
-      textoPeriodos: textoPeriodos(calculo.periodos),
-      textoTotal: textoTempo(totais.totalContribuicao, calculo.regras),
-      linhasTotais,
-      avisos: calculo.avisos,
-    }),
-  };
-}
-
 export class DtcService {
   private readonly protetor: ProtetorDados;
-  private readonly mascarasProcesso: string[];
+  private readonly consulta: ConsultasDtc;
 
+  /** Compõe consultas com o mesmo protetor; apenas este serviço abre transações e decide transições. */
   constructor(private readonly banco: Pool, configuracao: Configuracao) {
     this.protetor = new ProtetorDados(configuracao.chaves);
-    this.mascarasProcesso = configuracao.processos?.mascaras ?? [];
+    this.consulta = new ConsultasDtc(this.protetor, configuracao.processos?.mascaras ?? []);
   }
 
+  /** Cifra JSON vinculando o valor à tabela, ao registro e ao campo de destino. */
   private cifrar(tabela: string, id: string, campo: string, valor: unknown): Buffer {
     return this.protetor.cifrar(Buffer.from(JSON.stringify(valor), 'utf8'), {
       schema: 'documentos', tabela, registroId: id, campo,
     });
   }
 
-  private ler(tabela: string, id: string, campo: string, valor: Buffer): unknown {
-    return JSON.parse(this.protetor.decifrar(valor, {
-      schema: 'documentos', tabela, registroId: id, campo,
-    }).toString('utf8'));
-  }
-
-  private lerTextoPessoa(pessoaId: string, campo: string, cifrado: Buffer | null): { valor: string | null } | { erro: true } {
-    if (cifrado === null) return { valor: null };
-    let protegido: Buffer;
-    try {
-      protegido = this.protetor.decifrar(cifrado, { schema: 'nucleo', tabela: 'pessoa', registroId: pessoaId, campo });
-    } catch (erro) {
-      if (!(erro instanceof Error) || erro.message !== 'Dado protegido inválido ou corrompido.') throw erro;
-      return { erro: true };
-    }
-    const texto = protegido.toString('utf8');
-    if (!Buffer.from(texto, 'utf8').equals(protegido) || texto.length > 2000 || /[\u0000-\u001f\u007f]/.test(texto)) {
-      return { erro: true };
-    }
-    return { valor: texto.trim() ? texto : null };
-  }
-
-  private processoValido(processo: string | null): boolean {
-    return processo === null || this.mascarasProcesso.some((mascara) => processoCorrespondeMascara(processo, mascara));
-  }
-
-  private assinarFonte(linha: LinhaDtc, revisoes: RevisoesFonte): Buffer {
-    return assinarFonteDtc(this.protetor, {
-      documentoId: linha.id,
-      documentoRevisao: linha.revisao,
-      pessoaId: linha.pessoa_id,
-      pessoaRevisao: revisoes.pessoa_revisao,
-      vinculoId: linha.vinculo_id,
-      vinculoRevisao: revisoes.vinculo_revisao,
-    }, revisoes.periodos);
-  }
-
-  private async consultarRevisoesFonte(cliente: PoolClient, linha: LinhaDtc): Promise<RevisoesFonte> {
-    const consulta = await cliente.query<RevisoesFonte>(`
-      SELECT p.revisao_fonte::text AS pessoa_revisao, v.revisao_fonte::text AS vinculo_revisao
-      FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
-      WHERE p.id = $1 AND v.id = $2
-    `, [linha.pessoa_id, linha.vinculo_id]);
-    if (!consulta.rows[0]) throw new Error('Pessoa ou vínculo da DTC deixou de existir.');
-    return { ...consulta.rows[0], periodos: await lerPeriodosFonteDtc(cliente, linha.pessoa_id) };
-  }
-
-  private fonteCorresponde(linha: LinhaDtc, revisoes: RevisoesFonte, prova: string): boolean {
-    return provasDtcIguais(prova, this.assinarFonte(linha, revisoes));
-  }
-
-  private async fonteConferidaCorresponde(cliente: PoolClient, linha: LinhaDtc, revisoes: RevisoesFonte): Promise<boolean> {
-    const campo = `dtc.provaFonte.${linha.revisao}`;
-    const consulta = await cliente.query<{ id: string; valor_novo_cifrado: Buffer }>(`
-      SELECT id, valor_novo_cifrado FROM documentos.ajuste_campo WHERE documento_id = $1 AND campo = $2
-    `, [linha.id, campo]);
-    if (consulta.rows.length !== 1) return false;
-    const registro = consulta.rows[0];
-    const prova = this.ler('ajuste_campo', registro.id, 'valor_novo_cifrado', registro.valor_novo_cifrado);
-    return typeof prova === 'string' && this.fonteCorresponde(linha, revisoes, prova);
-  }
-
-  private async linha(
-    cliente: PoolClient,
-    sessao: SessaoAutenticada,
-    id: string,
-    opcoes: { estados: Array<'rascunho' | 'conferido'>; bloquear?: 'leitura' | 'alteracao'; somenteAutor?: boolean },
-  ): Promise<LinhaDtc | undefined> {
-    const acessoTerceiros = sessao.usuario.papel === 'admin'
-      || (sessao.usuario.papel === 'coordenador' && !opcoes.somenteAutor);
-    const consulta = await cliente.query<LinhaDtc>(`
-      SELECT d.id, d.tipo, d.pessoa_id, d.vinculo_id, d.criado_por, autor.nome AS autor_nome, p.nome, v.matricula,
-        to_char(v.admissao, 'YYYY-MM-DD') AS admissao, d.status, d.revisao, d.criado_em, d.atualizado_em,
-        d.entrada_cifrada, d.resultado_calculo_cifrado, d.processo_cifrado,
-        conferente.nome AS conferido_por_nome, d.conferido_em,
-        r.codigo AS regra_codigo, r.versao AS regra_versao,
-        (r.codigo = $3 AND r.versao = $4 AND r.configuracao = $5::jsonb) AS regra_atual
-      FROM documentos.documento d
-      JOIN nucleo.pessoa p ON p.id = d.pessoa_id
-      JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
-      JOIN seguranca.usuario autor ON autor.id = d.criado_por
-      LEFT JOIN seguranca.usuario conferente ON conferente.id = d.conferido_por
-      JOIN documentos.regra_versao r ON r.id = d.regra_versao_id
-      WHERE d.id = $1 AND d.tipo = ANY($6::text[]) AND d.status = ANY($7::text[])
-        AND (d.criado_por = $2 OR $8::boolean)
-      ${opcoes.bloquear === 'alteracao' ? 'FOR UPDATE OF d' : opcoes.bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
-    `, [
-      id, sessao.usuario.id, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA),
-      TIPOS_DTC, opcoes.estados, acessoTerceiros,
-    ]);
-    return consulta.rows[0];
-  }
-
-  private apresentar(linha: LinhaDtc): DocumentoDtc {
-    if (!linha.resultado_calculo_cifrado) throw new Error('DTC sem resultado de cálculo.');
-    const entrada = conteudoDtcSchema.parse(this.ler('documento', linha.id, 'entrada_cifrada', linha.entrada_cifrada));
-    const processo = linha.processo_cifrado
-      ? numeroProcessoSchema.parse(this.ler('documento', linha.id, 'processo_cifrado', linha.processo_cifrado)) : null;
-    const conteudo: ConteudoDtc = { ...entrada, processo };
-    const resultado = resultadoCalculoDtcSchema.parse(
-      this.ler('documento', linha.id, 'resultado_calculo_cifrado', linha.resultado_calculo_cifrado),
-    );
-    if (resultado.tipo !== linha.tipo || resultado.regra.codigo !== linha.regra_codigo || resultado.regra.versao !== linha.regra_versao) {
-      throw new Error('Tipo ou versão de regra da DTC é inconsistente.');
-    }
-    if (resultado.periodos.length !== conteudo.periodos.length) throw new Error('Períodos calculados da DTC são inconsistentes.');
-    const pendencias = validarConteudoDtc(linha.tipo, conteudo).map((problema) => problema.mensagem);
-    if (!processo) pendencias.push('Informe o número do processo.');
-    else if (!this.processoValido(processo)) pendencias.push('O número do processo não corresponde às máscaras configuradas.');
-    if (resultado.avisos.some((aviso) => aviso.codigo === 'inicio_ajustado_posse') && !conteudo.confirmarInicioAjustado) {
-      pendencias.push('Confirme o ajuste do início do período à data de posse.');
-    }
-    if (!linha.regra_atual) pendencias.push('A versão de regra deste documento não é a vigente; crie uma cópia.');
-    if (linha.admissao !== resultado.admissaoConsiderada) {
-      pendencias.push('A admissão mudou na fonte; salve o rascunho novamente para recalcular.');
-    }
-    return documentoDtcSchema.parse({
-      id: linha.id,
-      tipo: linha.tipo,
-      pessoaId: linha.pessoa_id,
-      vinculoId: linha.vinculo_id,
-      nome: linha.nome,
-      matricula: linha.matricula,
-      admissao: linha.admissao,
-      status: linha.status,
-      revisao: linha.revisao,
-      criadoEm: linha.criado_em.toISOString(),
-      atualizadoEm: linha.atualizado_em.toISOString(),
-      autorNome: linha.autor_nome,
-      conferidoPorNome: linha.conferido_por_nome,
-      conferidoEm: linha.conferido_em ? linha.conferido_em.toISOString() : null,
-      conteudo,
-      resultado,
-      mascarasProcesso: this.mascarasProcesso,
-      pendencias,
-    });
-  }
-
-  private async lerFonte(cliente: PoolClient, linha: LinhaDtc): Promise<LeituraFonte> {
-    const consulta = await cliente.query<RevisoesFonte & {
-      cpf_cifrado: Buffer; cpf_hash: Buffer; nascimento: string | null; nome_mae_cifrado: Buffer | null;
-      nome_pai_cifrado: Buffer | null; pis_pasep_cifrado: Buffer | null; rg_numero_cifrado: Buffer | null;
-      rg_orgao: string | null; rg_expedicao: string | null; titulo_eleitor_cifrado: Buffer | null;
-      endereco_cifrado: Buffer | null; regime_juridico: string | null; cargo: string | null; referencia: string | null;
-      orgao_nome: string | null; removido: boolean; consultado_em: Date; fonte_selecionada_alterada: boolean | null;
-    }>(`
-      SELECT p.cpf_cifrado, p.cpf_hash, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
-        p.nome_mae_cifrado, p.nome_pai_cifrado, p.pis_pasep_cifrado, p.rg_numero_cifrado, p.rg_orgao,
-        to_char(p.rg_expedicao, 'YYYY-MM-DD') AS rg_expedicao, p.titulo_eleitor_cifrado, p.endereco_cifrado,
-        v.regime_juridico, v.cargo, v.referencia, v.orgao_nome,
-        p.revisao_fonte::text AS pessoa_revisao, v.revisao_fonte::text AS vinculo_revisao,
-        v.removido_na_fonte_em IS NOT NULL AS removido, clock_timestamp() AS consultado_em,
-        (c.revisao_pessoa <> p.revisao_fonte OR c.revisao_vinculo <> v.revisao_fonte) AS fonte_selecionada_alterada
-      FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
-      LEFT JOIN documentos.conferencia_dtc c ON c.documento_id = $3 AND c.revisao_documento = $4
-      WHERE p.id = $1 AND v.id = $2
-    `, [linha.pessoa_id, linha.vinculo_id, linha.id, linha.revisao]);
-    const origem = consulta.rows[0];
-    if (!origem) throw new Error('Pessoa ou vínculo da DTC deixou de existir.');
-    if (linha.status === 'conferido' && origem.fonte_selecionada_alterada === null) {
-      throw new Error('DTC conferida sem registro correspondente.');
-    }
-    const periodos = await lerPeriodosFonteDtc(cliente, linha.pessoa_id);
-    const revisoes = { ...origem, periodos };
-    const ipam = periodos.filter((periodo) => periodo.removido_em === null)
-      .sort((a, b) => a.inicio.localeCompare(b.inicio) || a.fim.localeCompare(b.fim) || a.id.localeCompare(b.id))
-      .map(({ inicio, fim }) => ({ inicio, fim }));
-    const cpf = lerCpfDof(this.protetor, linha.pessoa_id, origem.cpf_cifrado, origem.cpf_hash);
-    const nomeMae = lerNomeMaeDof(this.protetor, linha.pessoa_id, origem.nome_mae_cifrado);
-    if ('erro' in cpf || 'erro' in nomeMae) return { erro: 'identidade' };
-    const textos = {
-      nomePai: this.lerTextoPessoa(linha.pessoa_id, 'nome_pai_cifrado', origem.nome_pai_cifrado),
-      pisPasep: this.lerTextoPessoa(linha.pessoa_id, 'pis_pasep_cifrado', origem.pis_pasep_cifrado),
-      rg: this.lerTextoPessoa(linha.pessoa_id, 'rg_numero_cifrado', origem.rg_numero_cifrado),
-      tituloEleitor: this.lerTextoPessoa(linha.pessoa_id, 'titulo_eleitor_cifrado', origem.titulo_eleitor_cifrado),
-      endereco: this.lerTextoPessoa(linha.pessoa_id, 'endereco_cifrado', origem.endereco_cifrado),
-    };
-    const valores: Record<keyof typeof textos, string | null> = {
-      nomePai: null, pisPasep: null, rg: null, tituloEleitor: null, endereco: null,
-    };
-    for (const chave of Object.keys(textos) as Array<keyof typeof textos>) {
-      const leitura = textos[chave];
-      if ('erro' in leitura) return { erro: 'fonte' };
-      valores[chave] = leitura.valor;
-    }
-    const fonte = fonteDtcSchema.safeParse({
-      documentoId: linha.id,
-      revisao: linha.revisao,
-      provaFonte: this.assinarFonte(linha, revisoes).toString('hex'),
-      consultadoEm: origem.consultado_em.toISOString(),
-      nome: linha.nome,
-      matricula: linha.matricula,
-      cpf: cpf.valor,
-      nascimento: origem.nascimento,
-      nomeMae: nomeMae.valor,
-      ...valores,
-      rgOrgao: origem.rg_orgao,
-      rgExpedicao: origem.rg_expedicao,
-      regimeJuridico: origem.regime_juridico,
-      cargo: origem.cargo,
-      referencia: origem.referencia,
-      orgao: origem.orgao_nome,
-      admissao: linha.admissao,
-      periodosIpam: ipam,
-      removidoNaFonte: origem.removido,
-    });
-    if (!fonte.success) return { erro: 'fonte' };
-    return { fonte: fonte.data, fonteSelecionadaAlterada: linha.status === 'conferido'
-      ? !await this.fonteConferidaCorresponde(cliente, linha, revisoes) : null };
-  }
-
+  /** Registra alterações e motivo cifrados no cliente da transação que modifica o documento. */
   private async registrarAjustes(
     cliente: PoolClient, documentoId: string, usuarioId: string, motivo: string, alteracoes: Mudanca[],
   ): Promise<void> {
@@ -432,6 +114,7 @@ export class DtcService {
     }
   }
 
+  /** Substitui períodos e cargos atomicamente na transação existente, mantendo sua ordem explícita. */
   private async gravarFilhos(cliente: PoolClient, documentoId: string, conteudo: ConteudoDtc): Promise<void> {
     await cliente.query('DELETE FROM documentos.documento_periodo WHERE documento_id = $1', [documentoId]);
     await cliente.query('DELETE FROM documentos.documento_cargo_comissionado WHERE documento_id = $1', [documentoId]);
@@ -454,6 +137,7 @@ export class DtcService {
     }
   }
 
+  /** Consulta admissão apenas quando o vínculo pertence à pessoa informada. */
   private async admissao(cliente: PoolClient, pessoaId: string, vinculoId: string): Promise<{ admissao: string | null } | undefined> {
     const consulta = await cliente.query<{ admissao: string | null }>(`
       SELECT to_char(admissao, 'YYYY-MM-DD') AS admissao FROM nucleo.vinculo WHERE id = $1 AND pessoa_id = $2
@@ -461,6 +145,7 @@ export class DtcService {
     return consulta.rows[0];
   }
 
+  /** Exige modelo do tipo e configuração exata da regra vigente antes da criação. */
   private async versoes(cliente: PoolClient, tipo: TipoDtc): Promise<{ template_id: string; regra_id: string }> {
     const versoes = await cliente.query<{ template_id: string; regra_id: string }>(`
       SELECT t.id AS template_id, r.id AS regra_id
@@ -472,6 +157,7 @@ export class DtcService {
     return versao;
   }
 
+  /** Grava rascunho, processo, filhos e ajustes de criação em uma única transação. */
   private async inserir(
     cliente: PoolClient, sessao: SessaoAutenticada, tipo: TipoDtc, pessoaId: string, vinculoId: string,
     conteudo: ConteudoDtc, resultado: ResultadoCalculoDtc, motivo: string,
@@ -498,6 +184,7 @@ export class DtcService {
     return id;
   }
 
+  /** Lista até 50 documentos visíveis, excluindo exclusões pendentes e auditando a consulta. */
   async listar(sessao: SessaoAutenticada, ip: string, consulta: ConsultaDtc): Promise<PaginaDtc> {
     return transacao(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
@@ -526,25 +213,27 @@ export class DtcService {
     });
   }
 
+  /** Recupera revisão salva autorizada e mantém auditoria inclusive quando não encontrada. */
   async obter(sessao: SessaoAutenticada, ip: string, id: string): Promise<DocumentoDtc> {
     const tentativa = await transacao<Tentativa<DocumentoDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
-      const linha = await this.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'] });
+      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'] });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'DTC não encontrada.' } };
       }
       await auditarConsultaFuncional(cliente, sessao, 'dtc_consultada', 'documento', id, linha.pessoa_id, ip);
-      return { valor: this.apresentar(linha) };
+      return { valor: this.consulta.apresentar(linha) };
     });
     return concluir(tentativa);
   }
 
+  /** Valida fonte e processo, calcula e cria rascunho sem conferir ou emitir implicitamente. */
   async criar(sessao: SessaoAutenticada, ip: string, dados: CriarDtc): Promise<DocumentoDtc> {
     const tentativa = await transacao<Tentativa<DocumentoDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
       const conteudo = normalizar(dados);
-      if (!this.processoValido(conteudo.processo)) {
+      if (!this.consulta.processoValido(conteudo.processo)) {
         return { falha: { tipo: 'invalido', mensagem: 'O número do processo não corresponde às máscaras configuradas.' } };
       }
       if (!await tentarBloqueioFonte(cliente)) {
@@ -560,17 +249,18 @@ export class DtcService {
         cliente, sessao, dados.tipo, dados.pessoaId, dados.vinculoId, conteudo, calculo.resultado, 'Criação do rascunho de DTC.',
       );
       await auditarConsultaFuncional(cliente, sessao, 'dtc_criada', 'documento', id, dados.pessoaId, ip);
-      const linha = await this.linha(cliente, sessao, id, { estados: ['rascunho'] });
+      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'] });
       if (!linha) throw new Error('DTC recém-criada não pôde ser recuperada.');
-      return { valor: this.apresentar(linha) };
+      return { valor: this.consulta.apresentar(linha) };
     });
     return concluir(tentativa);
   }
 
+  /** Trava a revisão autorizada, recalcula pela admissão atual e audita alterações com motivo. */
   async atualizar(sessao: SessaoAutenticada, ip: string, id: string, dados: AtualizarDtc): Promise<DocumentoDtc> {
     const tentativa = await transacao<Tentativa<DocumentoDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      const linha = await this.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao', somenteAutor: true });
+      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao', somenteAutor: true });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho de DTC não encontrado.' } };
@@ -586,17 +276,17 @@ export class DtcService {
       const conteudo = normalizar(informado);
       const problemas = validarConteudoDtc(linha.tipo, conteudo);
       if (problemas.length > 0) return { falha: { tipo: 'invalido', mensagem: problemas.map((item) => item.mensagem).join(' ') } };
-      if (!this.processoValido(conteudo.processo)) {
+      if (!this.consulta.processoValido(conteudo.processo)) {
         return { falha: { tipo: 'invalido', mensagem: 'O número do processo não corresponde às máscaras configuradas.' } };
       }
       if (!await tentarBloqueioFonte(cliente)) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente salvar novamente.' } };
       }
-      const atual = await this.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao', somenteAutor: true });
+      const atual = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao', somenteAutor: true });
       if (!atual) throw new Error('Rascunho de DTC não pôde ser recuperado.');
       if (!atual.admissao) return { falha: { tipo: 'invalido', mensagem: 'A data de admissão do vínculo não está informada na fonte.' } };
-      const anterior = this.apresentar(atual);
+      const anterior = this.consulta.apresentar(atual);
       const calculo = calcularDtc(atual.tipo, conteudo, atual.admissao, dataEmSaoPaulo(new Date()));
       if ('erro' in calculo) return { falha: { tipo: 'invalido', mensagem: calculo.erro } };
       await this.gravarFilhos(cliente, id, conteudo);
@@ -613,17 +303,18 @@ export class DtcService {
       if (atualizado.rowCount !== 1) throw new Error('A atualização da DTC não pôde ser registrada.');
       await this.registrarAjustes(cliente, id, sessao.usuario.id, motivo, mudancas(anterior.conteudo, conteudo));
       await auditarConsultaFuncional(cliente, sessao, 'dtc_atualizada', 'documento', id, atual.pessoa_id, ip);
-      const relida = await this.linha(cliente, sessao, id, { estados: ['rascunho'], somenteAutor: true });
+      const relida = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'], somenteAutor: true });
       if (!relida) throw new Error('DTC atualizada não pôde ser recuperada.');
-      return { valor: this.apresentar(relida) };
+      return { valor: this.consulta.apresentar(relida) };
     });
     return concluir(tentativa);
   }
 
+  /** Lê revisão e fonte sob locks compartilhados e entrega prova usada na conferência/emissão. */
   async previa(sessao: SessaoAutenticada, ip: string, id: string): Promise<PreviaDtc> {
     const tentativa = await transacao<Tentativa<PreviaDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
-      const linha = await this.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'], bloquear: 'leitura' });
+      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'], bloquear: 'leitura' });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'DTC não encontrada.' } };
@@ -631,7 +322,7 @@ export class DtcService {
       if (!await tentarBloqueioFonte(cliente)) {
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e abra a prévia novamente.' } };
       }
-      const leitura = await this.lerFonte(cliente, linha);
+      const leitura = await this.consulta.lerFonte(cliente, linha);
       if ('erro' in leitura) {
         await auditarConsultaFuncional(cliente, sessao, 'previa_dtc_fonte_invalida', 'documento', id, linha.pessoa_id, ip);
         return {
@@ -645,16 +336,17 @@ export class DtcService {
       }
       await auditarConsultaFuncional(cliente, sessao, 'previa_dtc_aberta', 'documento', id, linha.pessoa_id, ip);
       return {
-        valor: { documento: this.apresentar(linha), fonte: leitura.fonte, fonteSelecionadaAlterada: leitura.fonteSelecionadaAlterada },
+        valor: { documento: this.consulta.apresentar(linha), fonte: leitura.fonte, fonteSelecionadaAlterada: leitura.fonteSelecionadaAlterada },
       };
     });
     return concluir(tentativa);
   }
 
+  /** Confere somente revisão e fonte correspondentes à prévia, registrando prova da nova revisão. */
   async conferir(sessao: SessaoAutenticada, ip: string, id: string, dados: ConferirDtc): Promise<ResultadoTransicaoDtc> {
     const tentativa = await transacao<Tentativa<ResultadoTransicaoDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('conferir'));
-      const linha = await this.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao' });
+      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao' });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'conferencia_dtc_nao_encontrada', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho de DTC não encontrado para conferência.' } };
@@ -665,24 +357,24 @@ export class DtcService {
       if (!await tentarBloqueioFonte(cliente)) {
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente novamente.' } };
       }
-      const revisoes = await this.consultarRevisoesFonte(cliente, linha);
-      if (!this.fonteCorresponde(linha, revisoes, dados.provaFonte)) {
+      const revisoes = await this.consulta.consultarRevisoesFonte(cliente, linha);
+      if (!this.consulta.fonteCorresponde(linha, revisoes, dados.provaFonte)) {
         await auditarConsultaFuncional(cliente, sessao, 'conferencia_dtc_fonte_alterada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte mudou desde a prévia. Feche e reabra a prévia antes de conferir.' } };
       }
-      const documento = this.apresentar(linha);
+      const documento = this.consulta.apresentar(linha);
       if (documento.pendencias.length > 0) {
         await auditarConsultaFuncional(cliente, sessao, 'conferencia_dtc_com_pendencias', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: `Há pendências que impedem a conferência. ${documento.pendencias.join(' ')}` } };
       }
-      const leitura = await this.lerFonte(cliente, linha);
+      const leitura = await this.consulta.lerFonte(cliente, linha);
       if ('erro' in leitura || leitura.fonte.removidoNaFonte) {
         return { falha: { tipo: 'conflito', mensagem: 'Os dados da fonte não puderam ser validados ou o vínculo foi removido na fonte.' } };
       }
       const conferenciaId = randomUUID();
       await this.registrarAjustes(cliente, id, sessao.usuario.id, 'Prova da fonte validada na conferência de DTC.', [{
         campo: `dtc.provaFonte.${linha.revisao + 1}`, anterior: null,
-        novo: this.assinarFonte({ ...linha, revisao: linha.revisao + 1 }, revisoes).toString('hex'),
+        novo: this.consulta.assinarFonte({ ...linha, revisao: linha.revisao + 1 }, revisoes).toString('hex'),
       }]);
       await cliente.query(`
         INSERT INTO documentos.conferencia_dtc
@@ -706,10 +398,11 @@ export class DtcService {
     return concluir(tentativa);
   }
 
+  /** Devolve conferido a rascunho com motivo cifrado, limpando conferência atual sem apagar seu histórico. */
   async devolver(sessao: SessaoAutenticada, ip: string, id: string, dados: DevolverDtc): Promise<ResultadoTransicaoDtc> {
     const tentativa = await transacao<Tentativa<ResultadoTransicaoDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('receber_encaminhamento'));
-      const linha = await this.linha(cliente, sessao, id, { estados: ['conferido'], bloquear: 'alteracao' });
+      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['conferido'], bloquear: 'alteracao' });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'conferido_dtc_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'DTC conferida não encontrada.' } };
@@ -742,6 +435,7 @@ export class DtcService {
     return concluir(tentativa);
   }
 
+  /** Reconhece repetição oficial do mesmo emitente/documento; reutilização incompatível é conflito auditado. */
   private async emissaoPorChave(
     cliente: PoolClient, sessao: SessaoAutenticada, ip: string, id: string, chave: string,
   ): Promise<Tentativa<SituacaoEmissao> | undefined> {
@@ -760,14 +454,16 @@ export class DtcService {
     return { valor: await consultarSituacaoEmissao(cliente, existente.id) };
   }
 
+  /** Emite com aprovação formal, fonte conferida, número e snapshot atômicos; repetições não duplicam emissão. */
   async emitir(
     sessao: SessaoAutenticada, ip: string, id: string, chave: string, dados: EmitirDtc,
   ): Promise<SituacaoEmissao> {
+    /** Executa tentativa completa; só conflito na chave única permite nova leitura idempotente. */
     const executar = () => transacao<Tentativa<SituacaoEmissao>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('emitir'));
       const repetida = await this.emissaoPorChave(cliente, sessao, ip, id, chave);
       if (repetida) return repetida;
-      const linha = await this.linha(cliente, sessao, id, { estados: ['conferido'], bloquear: 'alteracao' });
+      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['conferido'], bloquear: 'alteracao' });
       if (!linha) {
         const concorrente = await this.emissaoPorChave(cliente, sessao, ip, id, chave);
         if (concorrente) return concorrente;
@@ -780,8 +476,8 @@ export class DtcService {
       if (!await tentarBloqueioFonte(cliente)) {
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente emitir novamente.' } };
       }
-      const revisoes = await this.consultarRevisoesFonte(cliente, linha);
-      if (!this.fonteCorresponde(linha, revisoes, dados.provaFonte)) {
+      const revisoes = await this.consulta.consultarRevisoesFonte(cliente, linha);
+      if (!this.consulta.fonteCorresponde(linha, revisoes, dados.provaFonte)) {
         await auditarConsultaFuncional(cliente, sessao, 'emissao_dtc_fonte_alterada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte ou a revisão mudou desde a prévia. Reabra a prévia antes de emitir.' } };
       }
@@ -794,16 +490,16 @@ export class DtcService {
       `, [id, linha.revisao]);
       const conferido = conferencia.rows[0];
       if (!conferido) throw new Error('DTC conferida sem registro correspondente.');
-      if (!await this.fonteConferidaCorresponde(cliente, linha, revisoes)) {
+      if (!await this.consulta.fonteConferidaCorresponde(cliente, linha, revisoes)) {
         await auditarConsultaFuncional(cliente, sessao, 'emissao_dtc_fonte_alterada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte (pessoa, vínculo ou períodos IPAM) mudou após a conferência ou não possui prova completa. Devolva a DTC para nova conferência.' } };
       }
-      const documento = this.apresentar(linha);
+      const documento = this.consulta.apresentar(linha);
       if (documento.pendencias.length > 0 || !documento.conteudo.processo) {
         await auditarConsultaFuncional(cliente, sessao, 'emissao_dtc_com_pendencias', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: `Há pendências que impedem a emissão. Devolva a DTC para correção. ${documento.pendencias.join(' ')}`.trim() } };
       }
-      const leitura = await this.lerFonte(cliente, linha);
+      const leitura = await this.consulta.lerFonte(cliente, linha);
       if ('erro' in leitura) {
         return { falha: { tipo: 'conflito', mensagem: 'Os dados da fonte não puderam ser validados. Solicite a verificação da fonte antes de emitir.' } };
       }
@@ -910,6 +606,7 @@ export class DtcService {
     }
   }
 
+  /** Cria novo pedido a partir de snapshot oficial, recalculando e exigindo novo processo e confirmação. */
   async copiar(sessao: SessaoAutenticada, ip: string, documentoId: string): Promise<ResultadoCopiaEmitido> {
     const tentativa = await transacao<Tentativa<ResultadoCopiaEmitido>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
@@ -952,7 +649,7 @@ export class DtcService {
         `Cópia da emissão ${snapshot.numeroFormatado}.`,
       );
       await auditarConsultaFuncional(cliente, sessao, 'dtc_copiada', 'documento', id, linha.pessoa_id, ip);
-      const criada = await this.linha(cliente, sessao, id, { estados: ['rascunho'] });
+      const criada = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'] });
       if (!criada) throw new Error('Cópia da DTC não pôde ser recuperada.');
       return {
         valor: resultadoCopiaEmitidoSchema.parse({ documentoId: id, revisao: criada.revisao, origemEmissaoId: linha.emissao_id }),

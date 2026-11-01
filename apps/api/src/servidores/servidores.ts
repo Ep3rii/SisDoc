@@ -19,9 +19,8 @@ import { transacao } from '../banco';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
-import { ProtetorDados } from '../seguranca/protecao-dados';
+import { decifrarTexto, ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
-import { decifrarTexto } from '../importacao/exportador';
 
 type LinhaBusca = {
   pessoa_id: string;

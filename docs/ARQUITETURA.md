@@ -136,6 +136,35 @@ referências e cálculo no limite de tamanho.
 
 ## Comentários dentro do código
 
+### Serviços de documentos — etapa 3
+
+O serviço DTC foi separado em:
+
+- `calculos/calculo-dtc.ts`: adaptação pura do motor e linhas de totais;
+- `documentos/consulta-dtc.ts`: leitura, decifração, validação e prova da fonte;
+- `documentos/dtcs.ts`: autorização, locks e transições transacionais.
+
+`ConsultasDtc` recebe o protetor existente e o `PoolClient` de cada operação.
+Não abre conexão ou transação e não substitui os locks do serviço. Revisões,
+conferência, idempotência, aprovação, numeração, snapshot e job PDF permanecem
+atômicos. Todas as funções nomeadas dessas três unidades receberam JSDoc
+específico após leitura do fluxo completo.
+
+`resultado-transacao.ts` reúne o resultado discriminado e a tradução HTTP
+antes duplicados em DTC, rascunhos DOF e emissões. A tradução permanece
+**fora** da transação, preservando o commit da auditoria de falhas esperadas.
+A mensagem comum de aprovação pertence a emissões, não ao serviço DOF.
+
+Decifração textual do núcleo foi movida do exportador para proteção de dados,
+eliminando a dependência do cadastro no domínio importação sem alterar
+validação ou valores. O protetor e o exportador receberam JSDoc específico.
+
+Typecheck aprovado e suíte completa **217/217 testes em 28 arquivos**,
+incluindo quatro novos casos de resultado transacional e regressões HTTPS,
+fonte DTC, cifragem, concorrência, documentos, importação e navegador.
+Rascunhos DOF, importador e sincronização ainda precisam revisão/decomposição
+aprofundadas; essa etapa não conclui a revisão integral.
+
 Formato acordado: **JSDoc em cada função nomeada e método**, com propósito,
 contrato relevante e efeitos/riscos não óbvios. Explicar referências entre
 módulos, tokens e regras; não comentar indiscriminadamente imports,
