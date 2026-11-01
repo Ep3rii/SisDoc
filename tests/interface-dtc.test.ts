@@ -4,7 +4,7 @@ import { chromium, type Browser, type Page } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { calcularDtc } from '../apps/api/dist/documentos/dtcs.js';
-import { anosDoPeriodo } from '../apps/web/src/anos-dtc.js';
+import { anosDoPeriodo } from '../apps/web/src/dtc/anos-dtc.js';
 import { cpfSintetico } from './dados-sinteticos.js';
 import { CSP_APLICACAO } from '../apps/api/dist/aplicacao.js';
 

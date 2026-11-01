@@ -61,6 +61,12 @@ efetivo e as evidências ficam em [PROGRESSO.md](../PROGRESSO.md).
 
 ## Modularização autorizada
 
+A interface também foi organizada por domínio, com transporte HTTP separado
+dos clientes tipados e componentes Cadastro/DTC decompostos. Estado, guardas
+de edição e prévias permanecem compatíveis. Serviços maiores e documentação
+integral das funções ainda estão em revisão; evidências e árvore atual em
+[ARQUITETURA.md](../ARQUITETURA.md).
+
 A refatoração de 01/11/2026 preserva o monólito local e é publicada por
 etapas validadas. A composição da API usa módulos NestJS por domínio, sem
 exportar seus serviços indiscriminadamente; somente pool/configuração são

@@ -1,5 +1,23 @@
 # Progresso da construção
 
+## Modularização — etapa 2: interface por domínio — 01/11/2026
+
+Interface reorganizada em aplicação, autenticação, infraestrutura,
+componentes compartilhados, administração, cadastro, DOF, DTC, documentos
+e transferência. Transporte HTTP separado de sete clientes tipados;
+fachada pública e comportamento das requisições preservados.
+
+Cadastro e DTC decompostos em componentes coesos de busca, lista, detalhe,
+referências, eventos, editor e documento. Entrada React reduzida à montagem.
+JSDoc específico nas unidades revisadas, sem comentários automáticos genéricos.
+Estado dos formulários, prévias salvas, confirmação de saída, autorizações,
+CSS e contratos preservados. Nenhuma migração ou carga de dados reais.
+
+Typecheck e build web aprovados; **30/30 testes em quatro suítes de navegador**.
+Prévia no limite de 45 anos/200 blocos/20.000 caracteres abaixo de 175 ms
+nos cenários sintéticos. Serviços maiores, editor DOF, transferência,
+pacotes e demais funções continuam na revisão; etapa 2 não é conclusão integral.
+
 ## Modularização — etapa 1: composição da API — 01/11/2026
 
 Revisão estrutural do grafo local de todos os fontes e testes, sem ciclos

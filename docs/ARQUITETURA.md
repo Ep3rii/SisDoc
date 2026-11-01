@@ -30,7 +30,7 @@ transacionais não são provados por essa verificação.
 | Segurança | Guarda global aplica políticas e CSRF; serviços também confirmam sessão em transações. | Preservar as duas camadas; modularizar não substitui autorização. |
 | Documentos | Rascunhos (~87 KB) e DTC (~55 KB) concentram consultas, cálculo e transições. | Revisar e extrair unidades coesas em etapa própria, preservando locks, revisões e atomicidade. |
 | Cadastro e transferência | Cadastro importa um helper do exportador; rascunhos referenciam constantes de migrações. | Dependências existentes a revisar; não mover helpers ou constantes sem ler todos os consumidores. |
-| Web | 25 arquivos na raiz, com editor DOF, DTC e cadastro extensos. Cliente HTTP reúne vários domínios. | Próxima etapa: pastas por tarefa, transporte compartilhado e decomposição dos editores. |
+| Web | 25 arquivos na raiz, com editor DOF, DTC e cadastro extensos. Cliente HTTP reúne vários domínios. | Etapa 2: pastas por domínio, transporte compartilhado, clientes tipados e componentes Cadastro/DTC separados. Editor DOF e transferência ainda precisam decomposição. |
 | Pacotes | Motor compartilhado evita divergência entre navegador/API; contratos e templates têm arquivos agregadores com lógica. | Preservar API pública; separar implementação dos exports quando os domínios forem revisados. |
 | Testes | Fundação reúne instalação, banco, autorização e documentos em um arquivo amplo. | Preservar regressões; separar fixtures e suítes apenas com isolamento comprovado. |
 | Documentação | Cobertura JSDoc é baixa: 14 de 811 declarações com corpo na varredura inicial, contando métodos e construtores. | Documentar função por função durante a revisão de cada módulo; não gerar comentários genéricos. |
@@ -83,6 +83,41 @@ flowchart TD
 ```
 
 ## Invariantes de modularização
+
+### Interface — etapa 2
+
+```text
+apps/web/src/
+  main.tsx                  montagem React e validação do elemento raiz
+  aplicacao/app.tsx          sessão, navegação, menu e proteção de edição
+  autenticacao/acesso.tsx    entrada e troca obrigatória de senha
+  infraestrutura/
+    http.ts                 transporte, erros e validação de respostas
+    api.ts                  fachada tipada composta por domínio
+    *.api.ts                autenticação, administração, cadastro,
+                            sincronização, documentos, DOF e DTC
+  compartilhado/            abas, filtros de lista e estilos
+  administracao/            usuários e auditoria
+  cadastro/                 lista, busca, detalhe, referências,
+                            eventos e editor local
+  dtc/                      lista, seleção, contexto, editor e documento
+  dof/                      cálculo e etapas do fluxo DOF
+  documentos/               histórico, emissão e exclusão
+  transferencia/            importação/exportação, promoção e sincronização
+```
+
+Os componentes extraídos preservam sua posição na árvore React, chaves,
+estado, efeitos e guardas de saída. O cliente continua usando a mesma
+fachada `api`; transporte centraliza cookies, CSRF, prova da fonte, erros
+e contratos sem duplicação. Imports dos consumidores foram atualizados,
+sem criar wrappers para os caminhos antigos.
+
+JSDoc específico cobre os clientes e transporte, autenticação/composição,
+grupos Cadastro/DTC, filtros, abas e download de emissão. Isso ainda não
+representa cobertura integral das funções web ou revisão semântica dos
+grandes serviços. Typecheck e build web aprovados; **30 testes em quatro
+suítes de navegador** passaram, incluindo rascunhos, DTC, transferência,
+referências e cálculo no limite de tamanho.
 
 - Registrar `InfraestruturaModule.registrar(...)` uma única vez no módulo
   raiz. Somente `BANCO` e `CONFIGURACAO` são exports globais.
