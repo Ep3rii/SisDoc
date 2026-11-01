@@ -739,8 +739,8 @@ describe('emissão da DOF em recursos descartáveis', () => {
       aplicativo: { usuario: 'sisdoc_aplicativo', senha: senhaAplicativo },
     };
     const atualizado = await migrar(provisionamento);
-    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '014-dtc' });
-    expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total).toBe(15);
+    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '015-importacao' });
+    expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total).toBe(16);
 
     const anterior = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_migrar', user: 'sisdoc_migrador', password: senhaMigrador,
@@ -776,9 +776,9 @@ describe('emissão da DOF em recursos descartáveis', () => {
       const semEmissao = await anterior.query("SELECT to_regclass('documentos.aprovacao_modelo') IS NULL AS ausente");
       expect(semEmissao.rows[0].ausente).toBe(true);
       const primeiraExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(primeiraExecucao).toEqual({ aplicadas: ['013-emissao', '014-dtc'], versaoAtual: '014-dtc' });
+      expect(primeiraExecucao).toEqual({ aplicadas: ['013-emissao', '014-dtc', '015-importacao'], versaoAtual: '015-importacao' });
       const segundaExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '014-dtc' });
+      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '015-importacao' });
       const privilegios = await anterior.query<{ inserir: boolean; aprovar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.emissao', 'snapshot_cifrado', 'INSERT') AS inserir,
           has_table_privilege('sisdoc_aplicativo', 'documentos.aprovacao_modelo', 'INSERT') AS aprovar

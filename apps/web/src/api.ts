@@ -77,6 +77,15 @@ import {
   type UsuarioAdministrativo,
   type UltimaDevolucaoDof,
 } from '@sisdoc/contratos';
+import {
+  loteSincronizacaoSchema,
+  paginaSincronizacoesSchema,
+  situacaoSincronizacaoSchema,
+  type IniciarSincronizacao,
+  type LoteSincronizacao,
+  type PaginaSincronizacoes,
+  type SituacaoSincronizacao,
+} from '@sisdoc/contratos';
 
 export class ErroApi extends Error {
   constructor(readonly status: number, mensagem: string) {
@@ -84,7 +93,7 @@ export class ErroApi extends Error {
   }
 }
 
-async function requisitar(
+export async function requisitar(
   rota: string,
   metodo: 'GET' | 'POST' | 'PATCH' = 'GET',
   corpo?: unknown,
@@ -124,7 +133,7 @@ async function requisitar(
   return dados;
 }
 
-function validar<T>(
+export function validar<T>(
   esquema: { safeParse: (entrada: unknown) => { success: true; data: T } | { success: false } },
   entrada: unknown,
 ): T {
@@ -173,6 +182,15 @@ export const api = {
   },
   async auditoria(cursor?: string): Promise<PaginaAuditoria> {
     return validar(paginaAuditoriaSchema, await requisitar(`admin/auditoria?${parametros(cursor)}`));
+  },
+  async situacaoSincronizacao(): Promise<SituacaoSincronizacao> {
+    return validar(situacaoSincronizacaoSchema, await requisitar('sincronizacao/situacao'));
+  },
+  async listarSincronizacoes(cursor?: string): Promise<PaginaSincronizacoes> {
+    return validar(paginaSincronizacoesSchema, await requisitar(`admin/sincronizacoes?${parametros(cursor)}`));
+  },
+  async iniciarSincronizacao(csrf: string, tipo: IniciarSincronizacao['tipo']): Promise<LoteSincronizacao> {
+    return validar(loteSincronizacaoSchema, await requisitar('admin/sincronizacoes', 'POST', { tipo }, csrf));
   },
   async buscarServidores(q: string, tipo: TipoBuscaServidor, cursor?: string): Promise<PaginaBuscaServidores> {
     const consulta = new URLSearchParams({ q, tipo, limite: '25' });

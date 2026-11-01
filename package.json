@@ -17,6 +17,8 @@
     "usuario": "node apps/api/dist/seguranca/usuarios.cli.js",
     "migrar": "node apps/api/dist/setup/migrar.cli.js",
     "aprovar-modelo": "node apps/api/dist/setup/aprovar-modelo.cli.js",
+    "importacao": "node apps/api/dist/importacao/importacao.cli.js",
+    "importacao:conferir": "node apps/api/dist/importacao/conferir.cli.js",
     "test": "npm run build && node scripts/executar-testes.cjs"
   },
   "devDependencies": {

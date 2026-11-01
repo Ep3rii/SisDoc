@@ -505,3 +505,25 @@ Na finalização, dois testes antigos foram ajustados ao novo comportamento:
 A instalação local foi atualizada, com backup `pg_dump` prévio, por
 `npm run migrar`, que aplicou `014-dtc`. A aplicação foi reiniciada em
 `https://localhost:3443/`. Nenhuma aprovação de DTC foi registrada.
+
+## Fatia 7 concluída — importação, legado e sincronização — 31/10/2026
+
+- **Importação** (CLI `npm run importacao` e tela **Importação**, admin):
+  CSV/XLSX dos cinco tipos, dry-run por padrão, quarentena/rejeição/
+  duplicadas/divergências/anomalias com CPF mascarado, consolidação por CPF,
+  idempotência por hash do arquivo e por registro, transação única, rollback
+  LIFO, conferência `npm run importacao:conferir` com amostra mascarada e
+  modelos sintéticos em `referencias/modelos-importacao/`
+  ([decisão 024](decisoes/024-importacao.md),
+  [DADOS_E_IMPORTACAO.md](DADOS_E_IMPORTACAO.md)).
+- **Base legada**: mapeamento JSON configurável; falha clara se faltar coluna.
+  O esquema real ainda não foi recebido.
+- **Sincronização** com API simulada (`tools/api-simulada/`): carga completa
+  e incremental, staging, `hash_conteudo`, exclusão lógica após reconciliação
+  completa, disjuntor e aviso offline; a emissão não depende da API
+  ([decisão 025](decisoes/025-sincronizacao.md)). Só servidores e vínculos
+  são sincronizados.
+- Migração `015-importacao`: o papel da aplicação passa a ter INSERT/UPDATE
+  por coluna nas tabelas do núcleo; DELETE continua negado.
+- 20 mil vínculos importados em segundos no teste. `npm test` passou com
+  **166 testes em 21 arquivos**; `npm run typecheck` passou.

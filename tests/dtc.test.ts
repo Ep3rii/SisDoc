@@ -879,8 +879,8 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       await anterior.query('COMMIT');
       const semDtc = await anterior.query("SELECT to_regclass('documentos.conferencia_dtc') IS NULL AS ausente");
       expect(semDtc.rows[0].ausente).toBe(true);
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: ['014-dtc'], versaoAtual: '014-dtc' });
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '014-dtc' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: ['014-dtc', '015-importacao'], versaoAtual: '015-importacao' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '015-importacao' });
       const privilegios = await anterior.query<{ conferencia: boolean; tabela: boolean; categoria: boolean; apagar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'conferido_por', 'INSERT') AS conferencia,
           has_table_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'INSERT') AS tabela,

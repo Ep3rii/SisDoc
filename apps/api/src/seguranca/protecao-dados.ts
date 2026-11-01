@@ -84,6 +84,11 @@ export class ProtetorDados {
     return createHmac('sha256', this.chaveHmac).update('sisdoc/cpf/v1\0', 'utf8').update(cpf, 'ascii').digest();
   }
 
+  hashConteudo(dominio: 'importacao' | 'sincronizacao', tabela: string, dados: unknown): Buffer {
+    return createHmac('sha256', this.chaveHmac).update(`sisdoc/${dominio}/${tabela}/v1\0`, 'utf8')
+      .update(JSON.stringify(dados), 'utf8').digest();
+  }
+
   assinarRevisaoFonteDof(entrada: z.input<typeof revisaoFonteDofSchema>): Buffer {
     const dados = revisaoFonteDofSchema.parse(entrada);
     const revisoes = [

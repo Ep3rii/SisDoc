@@ -10,16 +10,17 @@ cancelamento está implementada, mas **bloqueada até a aprovação formal** da
 regra e do template ([decisão 022](docs/decisoes/022-aprovacao-formal-e-emissao.md)).
 As DTCs IPAM, Comissionado e INSS seguem o mesmo fluxo e também ficam
 bloqueadas até a aprovação formal de cada tipo; o modelo INSS é provisório
-([decisão 023](docs/decisoes/023-dtc-ipam-comissionado-inss.md)). Importação
-das fontes, backup e serviço automático da aplicação ainda não estão
-implementados.
+([decisão 023](docs/decisoes/023-dtc-ipam-comissionado-inss.md)). A
+importação de planilhas e da base legada está disponível ao administrador
+([dados e importação](docs/DADOS_E_IMPORTACAO.md)); backup e serviço
+automático da aplicação ainda não estão implementados.
 
 ## Estado atual
 
 - PostgreSQL permanente em loopback, banco `sisdoc` e papéis separados.
 - HTTPS local com certificado confiável no Windows.
-- Administrador inicial com troca obrigatória de senha; banco sem pessoas
-  importadas.
+- Administrador inicial com troca obrigatória de senha; dados reais ainda
+  não importados (use `npm run importacao` ou a tela **Importação**).
 - Autenticação, usuários, auditoria, busca e fluxo provisório de rascunhos DOF.
 - Layout inspirado no [protótipo](Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg):
   menu lateral, busca global, abas, editor com prévia à direita e totais fixos.
@@ -66,6 +67,7 @@ caminhos ASCII ou 8.3; consulte [operação](docs/OPERACAO.md).
 
 - [Instalação local e próximas etapas](docs/INSTALACAO_LOCAL.md).
 - [Operação, controles e uso da interface](docs/OPERACAO.md).
+- [Dados e importação](docs/DADOS_E_IMPORTACAO.md).
 - [Progresso e evidências de verificação](docs/PROGRESSO.md).
 - [Contexto e convenções de construção](docs/ia/CONTEXTO.md).
 - [Guia descritivo das declarações](Modelos%20e%20Documentação/guia_descritivo_declaracoes_funcionais_e_tempo_contribuicao.md).

@@ -20,6 +20,8 @@ const esperado: Record<Acao, Papel[]> = {
   gerenciar_usuarios: ['admin'],
   consultar_auditoria: ['secretario_adjunto', 'admin'],
   administrar_importacao: ['admin'],
+  administrar_sincronizacao: ['admin'],
+  consultar_situacao_sincronizacao: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
   sincronizar_individual: ['analista', 'coordenador'],
 };
 

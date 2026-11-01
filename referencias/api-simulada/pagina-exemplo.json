@@ -1,0 +1,89 @@
+{
+  "itens": [
+    {
+      "id": "SRV-0001",
+      "alterado_em": "2024-01-01T00:00:00.000Z",
+      "cpf": "700.000.001-59",
+      "nome": "Servidor Ficticio API 0001",
+      "nascimento": "1960-01-01",
+      "nome_mae": "Mae Ficticia API 0001",
+      "nome_pai": null,
+      "pis_pasep": null,
+      "rg_numero": "RG-FIC-0001",
+      "rg_orgao": "SSP-FIC",
+      "rg_expedicao": null,
+      "titulo_eleitor": null,
+      "endereco": "Rua Ficticia 0001",
+      "vinculos": [
+        {
+          "id": "VIN-0001-1",
+          "matricula": "API-0001-1",
+          "regime_juridico": "ESTATUTARIO",
+          "cargo": "Cargo ficticio",
+          "classe": null,
+          "nivel": null,
+          "referencia": "UNICA",
+          "setor": "Setor ficticio",
+          "orgao_codigo": "ORG-FIC",
+          "orgao_nome": "Orgao ficticio",
+          "admissao": "1979-01-01",
+          "desligamento": null
+        }
+      ]
+    },
+    {
+      "id": "SRV-0002",
+      "alterado_em": "2024-02-01T12:00:00.000-03:00",
+      "cpf": "70000000230",
+      "nome": "Servidora Ficticia API 0002",
+      "nascimento": "1965-07-15",
+      "nome_mae": "Mae Ficticia API 0002",
+      "nome_pai": "Pai Ficticio API 0002",
+      "pis_pasep": "000.00000.00-0",
+      "rg_numero": "RG-FIC-0002",
+      "rg_orgao": "SSP-FIC",
+      "rg_expedicao": "1985-03-10",
+      "titulo_eleitor": null,
+      "endereco": "Avenida Ficticia 0002",
+      "vinculos": [
+        {
+          "id": "VIN-0002-1",
+          "matricula": "API-0002-1",
+          "regime_juridico": "ESTATUTARIO",
+          "cargo": "Cargo ficticio",
+          "classe": "A",
+          "nivel": "I",
+          "referencia": "A-I",
+          "setor": "Setor ficticio",
+          "orgao_codigo": "ORG-FIC",
+          "orgao_nome": "Orgao ficticio",
+          "admissao": "1985-04-01",
+          "desligamento": "1999-12-31"
+        },
+        {
+          "id": "VIN-0002-2",
+          "matricula": "API-0002-2",
+          "regime_juridico": "CELETISTA",
+          "cargo": "Cargo ficticio",
+          "classe": null,
+          "nivel": null,
+          "referencia": null,
+          "setor": null,
+          "orgao_codigo": "ORG-FIC",
+          "orgao_nome": "Orgao ficticio",
+          "admissao": "2000-01-03",
+          "desligamento": null
+        }
+      ]
+    },
+    {
+      "id": "SRV-0003",
+      "alterado_em": "2024-03-01T00:00:00.000Z",
+      "cpf": "70000000311",
+      "nome": "Item Ficticio Invalido 0003",
+      "vinculos": []
+    }
+  ],
+  "proximo_cursor": "U1JWLTAwMDM",
+  "gerado_em": "2024-03-02T00:00:00.000Z"
+}

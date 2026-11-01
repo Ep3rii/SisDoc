@@ -82,6 +82,21 @@ export async function carregarConfiguracao(arquivo: string | undefined): Promise
       throw new Error('A lista de senhas deve ficar fora do repositório.');
     }
   }
+  const credencialSincronizacao = resultado.data.sincronizacao?.credencialArquivo;
+  if (credencialSincronizacao !== undefined) {
+    if (!path.isAbsolute(credencialSincronizacao)) {
+      throw new Error('A credencial da sincronização deve usar caminho absoluto fora do repositório.');
+    }
+    let credencialReal: string;
+    try {
+      credencialReal = await caminhoReal(credencialSincronizacao);
+    } catch {
+      throw new Error('Não foi possível localizar o arquivo de credencial da sincronização.');
+    }
+    if (estaDentro(credencialReal, repositorio)) {
+      throw new Error('A credencial da sincronização deve ficar fora do repositório.');
+    }
+  }
   const diretorioPdf = resultado.data.pdf?.diretorio
     ?? path.join(path.dirname(path.dirname(arquivoReal)), 'pdf');
   if (!path.isAbsolute(diretorioPdf) || estaDentro(path.resolve(diretorioPdf), repositorio)) {

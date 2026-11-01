@@ -792,6 +792,7 @@ describe('fundação em recursos descartáveis', () => {
         alterar_pessoa: boolean; alterar_vinculo: boolean; inserir_conferencia: boolean;
         alterar_conferencia: boolean; apagar_conferencia: boolean; truncar_conferencia: boolean;
         alterar_devolucao_conferido: boolean; apagar_devolucao_conferido: boolean;
+        apagar_pessoa: boolean; apagar_vinculo: boolean;
       }>(`
         SELECT has_any_column_privilege(current_user, 'seguranca.usuario', 'UPDATE') AS alterar_usuario,
                has_table_privilege(current_user, 'nucleo.pessoa', 'INSERT') AS inserir_pessoa,
@@ -816,6 +817,8 @@ describe('fundação em recursos descartáveis', () => {
                has_table_privilege(current_user, 'documentos.conferencia_dof', 'TRUNCATE') AS truncar_conferencia,
                has_any_column_privilege(current_user, 'documentos.devolucao_conferido_dof', 'UPDATE') AS alterar_devolucao_conferido,
                has_table_privilege(current_user, 'documentos.devolucao_conferido_dof', 'DELETE') AS apagar_devolucao_conferido,
+               has_table_privilege(current_user, 'nucleo.pessoa', 'DELETE') AS apagar_pessoa,
+               has_table_privilege(current_user, 'nucleo.vinculo', 'DELETE') AS apagar_vinculo,
                EXISTS (
                  SELECT 1 FROM aclexplode((SELECT relacl FROM pg_class WHERE oid = 'seguranca.usuario'::regclass))
                  WHERE grantee = 0 AND privilege_type = 'SELECT'
@@ -825,15 +828,17 @@ describe('fundação em recursos descartáveis', () => {
                  WHERE grantee = 0 AND privilege_type = 'USAGE'
                ) AS publico_usa_nucleo
       `);
+      // Importação pela tela e sincronização gravam pessoa/vínculo (migração 015); DELETE continua negado.
       expect(privilegios.rows[0]).toEqual({
-        alterar_usuario: true, inserir_pessoa: false, inserir_emissao: false, inserir_auditoria: true,
+        alterar_usuario: true, inserir_pessoa: true, inserir_emissao: false, inserir_auditoria: true,
         alterar_auditoria: false, apagar_auditoria: false, publico_le_usuario: false, publico_usa_nucleo: false,
         alterar_matricula: false, alterar_rascunho: true, alterar_status: true, apagar_ajuste: false,
         alterar_bloco: true, apagar_bloco: false, alterar_versao_bloco: false,
         alterar_processo_cifrado: true, alterar_processo_texto: false,
-        alterar_pessoa: false, alterar_vinculo: false, inserir_conferencia: true,
+        alterar_pessoa: true, alterar_vinculo: true, inserir_conferencia: true,
         alterar_conferencia: false, apagar_conferencia: false, truncar_conferencia: false,
         alterar_devolucao_conferido: false, apagar_devolucao_conferido: false,
+        apagar_pessoa: false, apagar_vinculo: false,
       });
       await cliente.query('BEGIN');
       await cliente.query("INSERT INTO seguranca.auditoria (acao, entidade) VALUES ('teste', 'sintetico')");

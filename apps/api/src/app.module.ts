@@ -19,6 +19,10 @@ import { UsuariosService } from './seguranca/usuarios';
 import { UsuariosController } from './seguranca/usuarios.controller';
 import { ServidoresController } from './servidores/servidores.controller';
 import { ServidoresService } from './servidores/servidores';
+import { SincronizacaoController } from './sincronizacao/sincronizacao.controller';
+import { SincronizacaoService } from './sincronizacao/sincronizacao';
+import { ImportacaoController } from './importacao/importacao.controller';
+import { ImportacaoService } from './importacao/importacao';
 
 export interface BancoSaude {
   query(sql: string): Promise<unknown>;
@@ -46,7 +50,7 @@ export class AppModule {
   static registrar(banco: Pool, configuracao: Configuracao): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController, RascunhosController, EmissoesController, DtcController],
+      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController, RascunhosController, EmissoesController, DtcController, SincronizacaoController, ImportacaoController],
       providers: [
         { provide: BANCO, useValue: banco },
         { provide: CONFIGURACAO, useValue: configuracao },
@@ -88,6 +92,16 @@ export class AppModule {
         {
           provide: WorkerPdfEmissao,
           useFactory: (pool: Pool, config: Configuracao) => new WorkerPdfEmissao(pool, config),
+          inject: [BANCO, CONFIGURACAO],
+        },
+        {
+          provide: SincronizacaoService,
+          useFactory: (pool: Pool, config: Configuracao) => new SincronizacaoService(pool, config),
+          inject: [BANCO, CONFIGURACAO],
+        },
+        {
+          provide: ImportacaoService,
+          useFactory: (pool: Pool, config: Configuracao) => new ImportacaoService(pool, config),
           inject: [BANCO, CONFIGURACAO],
         },
         { provide: APP_GUARD, useClass: GuardaAcesso },

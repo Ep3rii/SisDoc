@@ -175,3 +175,12 @@ th { background: #e7eef2; }
   .barra-totais .acoes button { flex: 1; font-size: .8rem; }
   .estudio-dof { padding-bottom: 11rem; }
 }
+.atraso { color: #6b4500; background: #fff7e0; border-color: #b7791f; }
+.situacao-sincronizacao { margin: 0 0 1rem; font-size: .8rem; }
+
+.relatorio-importacao { margin-top: 1rem; }
+.relatorio-importacao .contagens { display: grid; grid-template-columns: repeat(auto-fill, minmax(8rem, 1fr)); gap: .5rem; margin: 0 0 1rem; }
+.relatorio-importacao .contagens div { padding: .5rem .75rem; background: #eef3f6; border-radius: .35rem; }
+.relatorio-importacao .contagens dt { font-size: .75rem; color: #526775; }
+.relatorio-importacao .contagens dd { margin: 0; font-size: 1.2rem; font-weight: 700; }
+.relatorio-importacao .discreta { color: #526775; font-size: .8rem; }

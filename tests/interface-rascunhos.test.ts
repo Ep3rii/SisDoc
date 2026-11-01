@@ -142,6 +142,12 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === '/api/v1/admin/usuarios') {
         return responder(rota, 200, { itens: [], proximoCursor: null });
       }
+      if (caminho === '/api/v1/sincronizacao/situacao') {
+        return responder(rota, 200, {
+          configurada: false, ultimaSincronizacaoEm: null, horasDesdeUltima: null, limiteHoras: 24,
+          avisoAtraso: false, disjuntorAberto: false,
+        });
+      }
       if (caminho === '/api/v1/servidores') {
         return responder(rota, 200, {
           itens: [{ pessoaId, vinculoId, nome, matricula, orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false }],

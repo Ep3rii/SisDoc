@@ -8,6 +8,8 @@ import { TelaDtc } from './dtc';
 import { Historico } from './historico';
 import { RascunhosDof } from './rascunhos-dof';
 import { BuscaGlobal, Servidores, type Consulta } from './servidores';
+import { AvisoSincronizacao, EstadoSincronizacao, SincronizacaoAdmin } from './sincronizacao';
+import { ImportacaoAdmin } from './importacao';
 import { nomesPerfis, Usuarios } from './usuarios';
 import './estilos.css';
 
@@ -83,7 +85,7 @@ function App() {
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
   const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos' | 'historico'
-    | 'DTC_IPAM' | 'DTC_COMISSIONADO' | 'DTC_INSS'>('busca');
+    | 'DTC_IPAM' | 'DTC_COMISSIONADO' | 'DTC_INSS' | 'sincronizacao' | 'importacao'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [menuAberto, setMenuAberto] = useState(false);
@@ -217,6 +219,10 @@ function App() {
               {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <p className="grupo-menu">Administração</p>}
               {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
                 onClick={() => navegar('usuarios')}>Usuários</button>}
+              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'sincronizacao' ? 'page' : undefined}
+                onClick={() => navegar('sincronizacao')}>Sincronização</button>}
+              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'importacao' ? 'page' : undefined}
+                onClick={() => navegar('importacao')}>Importação</button>}
               {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
                 onClick={() => navegar('historico')}>Histórico de emissões</button>}
               {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <button type="button"
@@ -234,7 +240,7 @@ function App() {
         {funcional && !sessao.usuario.trocaSenhaObrigatoria
           ? <BuscaGlobal onBuscar={(busca) => navegar('busca', busca)} onErro={tratarErro} />
           : <span>Declarações funcionais e de tempo de contribuição</span>}
-        <span className="estado-fonte">Consulta local · sincronização indisponível</span>
+        {funcional && !sessao.usuario.trocaSenhaObrigatoria ? <EstadoSincronizacao key={`estado-${chaveTela}`} /> : <span className="estado-fonte">Consulta local</span>}
       </header>
       <main>
       <div className="conteudo">
@@ -252,6 +258,13 @@ function App() {
         ) : (
           <>
             {alteracoesPendentes && <p className="etiqueta" role="status">Há alterações não salvas.</p>}
+            {funcional && <AvisoSincronizacao key={`situacao-${chaveTela}`} />}
+            {sessao.usuario.papel === 'admin' && tela === 'sincronizacao' && (
+              <SincronizacaoAdmin key={chaveTela} csrf={sessao.csrf} onErro={tratarErro} onMensagem={informar} />
+            )}
+            {sessao.usuario.papel === 'admin' && tela === 'importacao' && (
+              <ImportacaoAdmin key={chaveTela} csrf={sessao.csrf} onErro={tratarErro} onMensagem={informar} />
+            )}
             {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf} podeSalvar={podeSalvar}
               consulta={consulta}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}

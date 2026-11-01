@@ -10,7 +10,10 @@ até o registro da aprovação formal** da regra e do template
 ([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)). As DTCs IPAM,
 Comissionado e INSS têm o mesmo fluxo e o mesmo bloqueio por tipo; o modelo
 INSS é provisório ([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)).
-**Não há importação, backup ou serviço Windows da aplicação implementados**. A prévia
+A importação de planilhas e da base legada está disponível ao administrador
+(ver [Importação de dados](#importação-de-dados) e
+[DADOS_E_IMPORTACAO.md](DADOS_E_IMPORTACAO.md)). **Backup e serviço Windows
+da aplicação ainda não estão implementados**. A prévia
 segue identificada como provisória; confira o conteúdo antes de qualquer uso
 oficial.
 
@@ -165,6 +168,111 @@ não registra esse termo na auditoria ou em log de acesso, mas histórico de
 rede, extensões, proxies ou servidores intermediários podem registrar URLs.
 Não habilite publicação por proxy sem configurar e verificar a supressão de
 parâmetros sensíveis em seus logs. A consulta é local e não faz sincronização.
+
+## Importação de dados
+
+O administrador importa os dados funcionais e, depois, eventos,
+afastamentos, incorporações e períodos IPAM, pela tela **Importação** ou por
+`npm run importacao`. Formatos, regras e exemplos estão em
+[DADOS_E_IMPORTACAO.md](DADOS_E_IMPORTACAO.md). Procedimento recomendado:
+
+1. Copie os arquivos reais para `dados-reais\` (fora do Git); não os abra em
+   máquinas ou ferramentas não autorizadas.
+2. Faça backup do banco (`pg_dump -Fc`) antes da primeira carga de cada
+   origem.
+3. Valide sem gravar (padrão), revise quarentenas, rejeições, duplicadas e
+   divergências e corrija na fonte; o sistema não corrige dados sem registro.
+4. Grave com `--commit` (ou **Gravar importação** na tela) e confira com
+   `npm run importacao:conferir`, inclusive a amostra mascarada.
+5. Se necessário, desfaça com `npm run importacao -- --rollback <lote>`
+   antes de consultar ou emitir documentos dos servidores afetados; depois
+   disso, o rollback é recusado e a correção deve ser feita por nova
+   importação.
+
+Repetir o mesmo arquivo não altera nada. Documentos emitidos mantêm seu
+snapshot e não mudam com novas importações.
+
+## Sincronização
+
+A sincronização copia servidores e vínculos de uma API externa para o modelo
+canônico local (decisão 025). Ela é opcional: sem o bloco `sincronizacao` na
+configuração externa, a situação informa "não configurada" e o início é
+recusado com 409. Busca, cálculo, prévia e emissão nunca dependem da API.
+
+### Configuração
+
+Bloco `sincronizacao` em `config\aplicacao.json` (fora do repositório; a URL
+real e o token nunca entram no Git):
+
+| Campo | Obrigatório | Padrão | Descrição |
+| --- | --- | --- | --- |
+| `origem` | sim | — | Identificador da fonte (`^[a-z0-9][a-z0-9_.-]{0,62}$`), gravado em `sistema_origem`. |
+| `url` | sim | — | Endereço `http`/`https` da listagem de servidores, sem usuário, senha ou fragmento. |
+| `credencialArquivo` | não | — | Caminho absoluto, fora do repositório, de um arquivo com o token Bearer (8–4096 caracteres ASCII visíveis). Restrinja a leitura à conta do serviço. |
+| `avisoHoras` | não | 24 | Horas sem sincronização concluída até exibir o aviso de atraso. |
+| `timeoutMs` | não | 10000 | Tempo limite por requisição (100–60000). |
+| `limitePagina` | não | 50 | Itens por página (1–50). |
+| `intervaloMinutos` | não | — | Executa incremental periódica (5–1440). Sem o campo, só há execução manual. |
+| `pausaDisjuntorMinutos` | não | 15 | Pausa após abrir o disjuntor. |
+| `esperaRepeticaoMs` | não | 1000 | Espera inicial entre repetições (dobra a cada tentativa). |
+| `mapeamento` | não | — | Mapa de campo canônico → nome do campo na API (ex.: `{"nome": "nome_completo", "vinculo.matricula": "mat"}`). |
+
+O contrato esperado da API e um exemplo fictício estão em
+`referencias\api-simulada\`. Alterações na configuração exigem reiniciar o
+serviço. A variável de ambiente `SISDOC_SINCRONIZACAO_AGENDADA=desligado`
+desativa a execução periódica mesmo com `intervaloMinutos` configurado.
+
+### Execução
+
+O administrador técnico usa **Administração → Sincronização** (ou
+`POST /api/v1/admin/sincronizacoes` com `{"tipo": "completa"}` ou
+`{"tipo": "incremental"}`; a resposta 202 traz o lote em processamento). A
+tela lista os lotes (`GET /api/v1/admin/sincronizacoes`) com lidos,
+inseridos, atualizados, removidos e erros sanitizados. Todos os perfis
+consultam `GET /api/v1/sincronizacao/situacao`.
+
+- **Completa**: lê todas as páginas. Só depois de ler todas com sucesso faz a
+  reconciliação e marca `removido_na_fonte_em` em servidores e vínculos
+  ausentes. Nada é apagado. Falha numa página nunca prova remoção. A remoção
+  lógica não é aplicada (e o motivo fica no lote) quando a carga trouxe itens
+  sem identificador, nenhum servidor, ou mais de 10 ausências e mais de 20%
+  dos registros ativos; confirme a fonte e repita.
+- **Incremental**: envia `alterado_desde` com o instante da última página
+  concluída e não remove nada. Exige uma completa anterior.
+- Execute a primeira carga completa fora do horário de uso: cada servidor é
+  gravado numa transação curta que bloqueia momentaneamente a conferência.
+- Cada item fica cifrado em `nucleo.staging_api` antes da aplicação. Itens
+  inválidos viram erros com posição, referência opaca (hash) e motivo, sem CPF
+  ou nome, e não interrompem os demais. A fonte prevalece: conteúdo alterado
+  atualiza o modelo canônico; conteúdo igual (mesmo hash) não grava nada.
+- Um lote que falhou guarda o cursor e é retomado pela próxima execução do
+  mesmo tipo em até 24 h.
+- O staging é expurgado automaticamente após 30 dias, somente de lotes
+  concluídos.
+
+### Falhas, disjuntor e aviso offline
+
+O cliente repete até 3 vezes falhas temporárias (rede, tempo limite, 5xx e
+429) com espera crescente e respeita `Retry-After` de até 60 s. Credencial
+recusada (401/403), JSON inválido ou fora do contrato não são repetidos. As
+mensagens são fixas e nunca reproduzem respostas da API.
+
+Após 5 execuções consecutivas com falha o disjuntor abre: novas execuções são
+recusadas com 409 indicando o horário de liberação. Passada a pausa, uma
+tentativa é liberada; se falhar, o disjuntor reabre; sucesso zera o contador.
+Verifique a disponibilidade da API, o arquivo de token e a URL antes de tentar
+de novo.
+
+O cabeçalho dos perfis funcionais mostra a última sincronização concluída. Após
+`avisoHoras` (ou com o disjuntor aberto), os painéis de DOF/DTC exibem um aviso
+de dados possivelmente desatualizados. O
+aviso não bloqueia busca, cálculo, prévia, conferência ou emissão; confira os
+dados na fonte quando necessário.
+
+Limitações: afastamentos, incorporações, eventos funcionais e períodos IPAM
+não são sincronizados; não há sincronização de um único servidor; a mudança
+de matrícula de um vínculo existente ou de CPF de uma origem já associada é
+registrada como erro do item para revisão na fonte.
 
 ## Cálculo de referência da DOF
 
