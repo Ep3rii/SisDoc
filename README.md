@@ -19,12 +19,13 @@ Veja [decisão 028](docs/decisoes/028-legado-operacional-e-conferencia.md).
 
 **Autorizado para uso operacional local em 31/10/2026** ([decisão 021](docs/decisoes/021-autorizacao-operacional.md)),
 nas funções existentes: consulta de servidores, cálculo, rascunhos, prévia e
-conferência da DOF. A emissão da DOF e das DTCs IPAM, Comissionado e INSS
-(numeração, PDF, histórico, cópia e cancelamento) está **liberada desde
-31/10/2026**, após o registro da aprovação formal de cada tipo
-([decisão 022](docs/decisoes/022-aprovacao-formal-e-emissao.md)). O modelo
-INSS continua provisório e sai marcado como tal
-([decisão 023](docs/decisoes/023-dtc-ipam-comissionado-inss.md)). A
+conferência da DOF. As versões anteriores de emissão foram aprovadas em
+31/10/2026 ([decisão 022](docs/decisoes/022-aprovacao-formal-e-emissao.md)).
+Os novos formulários DOF/DTC seguem as referências oficiais locais, mas
+**emissões v2 aguardam aprovação formal própria por tipo**; aprovações
+anteriores e PDFs históricos foram preservados. Prévias novas estão
+disponíveis sem validade oficial
+([decisão 029](docs/decisoes/029-modelos-oficiais-versionados.md)). A
 importação de planilhas e da base legada está disponível ao administrador
 ([dados e importação](docs/DADOS_E_IMPORTACAO.md)); backup e serviço
 automático da aplicação ainda não estão implementados.
@@ -40,8 +41,9 @@ automático da aplicação ainda não estão implementados.
   50 vínculos por página, com CPF completo e busca por nome/CPF/matrícula.
 - Layout inspirado no [protótipo](Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg):
   menu lateral, busca global, abas, editor com prévia à direita e totais fixos.
-- Emissão da DOF e das DTCs aprovada formalmente por tipo (o INSS com
-  textos provisórios); sincronização opcional, configurada fora do Git;
+- Modelos de saída v2 cadastrados pela migração `023-modelos-oficiais`,
+  sem aprovação automática; renderizadores v1 e PDFs antigos preservados.
+- Sincronização opcional, configurada fora do Git;
   nenhuma fonte é alterada pela edição de rascunhos.
 
 ## Acesso à instalação desta máquina

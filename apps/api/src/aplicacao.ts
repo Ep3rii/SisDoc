@@ -14,7 +14,7 @@ import { FiltroProblemas } from './problemas';
 
 /** Autoriza apenas os estilos fixos dos templates; srcDoc herda esta política, sem liberar CSS arbitrário. */
 export const CSP_APLICACAO = `default-src 'self'; style-src 'self' ${[ESTILO_PREVIA_DOF, ESTILO_DOCUMENTO_DTC]
-  .map((estilo) => `'sha256-${createHash('sha256').update(estilo).digest('base64')}'`).join(' ')}; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'`;
+  .map((estilo) => `'sha256-${createHash('sha256').update(estilo).digest('base64')}'`).join(' ')}; img-src 'self' data:; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'`;
 
 /** Compõe a API HTTPS e os assets locais sem abrir outro pool ou iniciar migrações. */
 export async function criarAplicacao(configuracao: Configuracao, banco: Pool): Promise<NestExpressApplication> {

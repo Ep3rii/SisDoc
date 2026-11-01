@@ -5,6 +5,9 @@
   A aprovação é por tipo (DOF, DTC IPAM, DTC Comissionado, DTC INSS) e a de um
   tipo não libera outro; textos não extraídos da fonte oficial permanecem
   marcados como provisórios.
+- Layout de emissão é selecionado pela versão imutável do snapshot.
+  Modelos v2 da decisão 029 exigem aprovação própria; versões v1 e PDFs
+  existentes não são substituídos. Imagens-modelo completas não entram no Git.
 - O cálculo recebe suas entradas, inclusive data de referência, e não acessa
   relógio, banco ou rede. Ajustes pertencem ao documento, nunca à fonte.
 - Pessoas não são apagadas por ausência na API; remoção lógica só ocorre após

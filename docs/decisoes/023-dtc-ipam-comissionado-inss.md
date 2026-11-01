@@ -1,5 +1,8 @@
 # Decisão 023 — DTC IPAM, DTC Comissionado e DTC INSS
 
+> Registro histórico dos modelos v1. Layout/textos de saída v2 e aprovação
+> separada estão descritos na [decisão 029](029-modelos-oficiais-versionados.md).
+
 ## Contexto
 
 A fatia 6 (Anexo A do prompt de construção) exige as três DTCs de ponta a

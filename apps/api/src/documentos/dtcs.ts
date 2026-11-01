@@ -28,7 +28,7 @@ import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { transacao } from '../banco';
 import { calcularDtc } from '../calculos/calculo-dtc';
 import { dataEmSaoPaulo } from '../data';
-import { TEMPLATES_DTC } from '../migracoes/dtc';
+import { TEMPLATES_OFICIAIS } from '@sisdoc/templates';
 import { CHAVE_BLOQUEIO_FONTE_DOF } from '../migracoes/preconferencia-dof';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
@@ -151,7 +151,7 @@ export class DtcService {
       SELECT t.id AS template_id, r.id AS regra_id
       FROM documentos.template_versao t CROSS JOIN documentos.regra_versao r
       WHERE t.tipo = $1 AND t.versao = $2 AND r.codigo = $3 AND r.versao = $4 AND r.configuracao = $5::jsonb
-    `, [tipo, TEMPLATES_DTC[tipo], REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA)]);
+    `, [tipo, TEMPLATES_OFICIAIS[tipo], REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA)]);
     const versao = versoes.rows[0];
     if (!versao) throw new ServiceUnavailableException('As versões de cálculo e modelo da DTC não estão disponíveis.');
     return versao;
@@ -517,7 +517,7 @@ export class DtcService {
         JOIN documentos.template_versao t ON t.tipo = d.tipo AND t.versao = $2
         JOIN documentos.aprovacao_modelo a ON a.tipo = d.tipo AND a.regra_versao_id = r.id AND a.template_versao_id = t.id
         WHERE d.id = $1
-      `, [id, TEMPLATES_DTC[linha.tipo]]);
+      `, [id, TEMPLATES_OFICIAIS[linha.tipo]]);
       const aprovacao = aprovacoes.rows[0];
       if (!aprovacao) {
         await auditarConsultaFuncional(cliente, sessao, 'emissao_dtc_bloqueada_sem_aprovacao', 'documento', id, linha.pessoa_id, ip);

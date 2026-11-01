@@ -109,15 +109,15 @@ describe('PDF provisório de DOF sem emissão', () => {
       );
       expect(ocorrencias, `Ano ${linha.ano}`).toHaveLength(1);
       const { pagina, item } = ocorrencias[0];
-      expect(pagina.itens.some((elemento) => elemento.texto.trim() === 'Ano')).toBe(true);
+      expect(pagina.itens.some((elemento) => elemento.texto.trim() === 'ANO')).toBe(true);
       expect(item.y).toBeGreaterThan(44);
       expect(item.y + item.altura).toBeLessThan(pagina.altura - 44);
       const linhaImpressa = pagina.itens
         .filter((elemento) => Math.abs(elemento.y - item.y) < 1 && elemento.texto.trim())
         .flatMap((elemento) => elemento.texto.trim().split(/\s+/));
       expect(linhaImpressa, `Colunas de ${linha.ano}`).toEqual([
-        linha.ano, linha.diasBrutos, linha.faltas, linha.ts, linha.pf, linha.ip, linha.outros,
-        linha.contribuicao, linha.efetivoExercicio, linha.pb, linha.pv, linha.licencaPremio,
+        linha.ano, linha.faltas, linha.ts, linha.pf, linha.ip, linha.outros, linha.deducaoContribuicao,
+        linha.pb, linha.pv, linha.licencaPremio, linha.efetivoExercicio, linha.contribuicao,
       ].map(String));
     }
     expect(navegador.contexts()).toHaveLength(0);

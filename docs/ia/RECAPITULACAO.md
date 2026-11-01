@@ -1,7 +1,7 @@
 # Pontos de memória do projeto
 
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
-Atualizada em **01/11/2026**, após a etapa 7 de DOF/templates/recursos CLI.
+Atualizada em **01/11/2026**, após os modelos oficiais de saída versionados.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
 
 ## 1. Objetivo e permissões
@@ -29,6 +29,7 @@ e [decisão 028](../decisoes/028-legado-operacional-e-conferencia.md).
 | DOF | `documentos/rascunhos.ts` coordena; contexto, consultas, escrita e emissão/cópia separados em `*-dof.ts`. |
 | Editor DOF | `apps/web/src/dof/calculo-dof.tsx` apresenta; `use-editor-dof.ts` mantém estado e pendências. |
 | Templates | `packages/templates/src/index.ts` somente exporta; escape/data/campo compartilhados em `html.ts`. |
+| Modelos de saída v2 | `versoes.ts` centraliza versões/CSS; `modelo-dof.ts` compartilha prévia/emissão; `emissao-dtc.ts` inclui anexo; `*-v1.ts` preservam históricos. |
 | Importador | `importacao/importador.ts` coordena; estado, gravação, relatório, conferência e rollback separados. |
 | CLI de importação | `argumentos-cli.ts` e `recursos-cli.ts` compartilhados; conferência não importa outra CLI executável. |
 | Sincronização | `sincronizacao/sincronizacao.ts` coordena; mapeamento e persistência por item separados. |
@@ -43,15 +44,19 @@ Detalhes e invariantes de extração: [Arquitetura](../ARQUITETURA.md).
   adicionais continuam extras, sujeitos a autorização.
 - Modularização publicada por etapas: interface `8f25038`, DTC `a0e06e2`,
   cálculo/contratos `016bca6`, importador `44aa9c5`, sincronização `7a32252`.
-- Última regressão completa após DOF/templates: **230 testes em 30 arquivos**.
-  Recursos CLI validados posteriormente com typecheck e **29 testes em três
-  arquivos**; sua suíte final tem **nove novos testes aprovados**, incluindo
-  chaves inválidas antes de conectar. Não tratar validações combinadas como
-  execução completa de 239 testes; este registro não substitui validações posteriores.
+- DOF/templates/recursos CLI publicados na etapa 7 (`17bb1d3`).
+- Última regressão completa após modelos oficiais: **251/251 testes em 32
+  arquivos**, typecheck/build aprovados. Inclui 12 casos dedicados de
+  versionamento, escape, prévias e geometria/paginação A4.
 - Produção local verificada após a última publicação: página e
   `/api/v1/health` com HTTP 200; rota privada sem sessão com HTTP 401.
-- Nenhuma migração, carga real ou sincronização externa foi executada
-  nessas etapas de reorganização.
+- Migração autorizada `023-modelos-oficiais` cadastra quatro templates v2.
+  Aplicada sem novas aprovações, preservando históricos/documentos/jobs.
+  Nenhuma carga real ou sincronização externa executada.
+- **Emissões v2 aguardam aprovação formal específica por tipo.** Aprovação
+  antiga não autoriza v2; PDFs/snapshots antigos conservam seu renderer v1.
+  Prévia já usa os formulários novos, sem validade/número/data oficiais.
+  [Decisão 029](../decisoes/029-modelos-oficiais-versionados.md).
 
 Evidências cronológicas: [Progresso](../PROGRESSO.md).
 
@@ -104,6 +109,8 @@ Não executar setup, migração ou operação de dados apenas para recapitular.
 Configuração, chaves e certificados ficam fora do Git; nunca copiar seu
 conteúdo para memórias. A pasta `Modelos e Documentação/imagens modelo/`
 é material local ignorado, assim como os arquivos sensíveis já excluídos.
+Contém as referências oficiais de saída DOF/DTC; não copiar exemplos
+pessoais. Demonstrativos DTC são anexos; Classe DOF permanece sem fonte.
 Não registrar listas de pessoas ou valores importados nesta documentação.
 
 ## Como manter estes pontos

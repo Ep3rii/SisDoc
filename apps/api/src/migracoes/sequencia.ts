@@ -21,6 +21,7 @@ import { aplicarRascunhoDof } from './rascunho-dof';
 import { aplicarRevisaoFonteDof } from './revisao-fonte-dof';
 import { aplicarRevisaoPeriodosIpam } from './revisao-periodos-ipam';
 import { aplicarDestinatarioCoordenador } from './destinatario-coordenador';
+import { aplicarModelosOficiais, VERSAO_MODELOS_OFICIAIS } from './modelos-oficiais';
 
 type Migracao = { versao: string; aplicar: (cliente: Client, usuarioAplicacao: string) => Promise<boolean> };
 
@@ -47,6 +48,7 @@ export const SEQUENCIA_MIGRACOES: readonly Migracao[] = [
   { versao: '020-listagem-servidores', aplicar: aplicarListagemServidores },
   { versao: '021-revisao-periodos-ipam', aplicar: aplicarRevisaoPeriodosIpam },
   { versao: '022-destinatario-coordenador', aplicar: aplicarDestinatarioCoordenador },
+  { versao: VERSAO_MODELOS_OFICIAIS, aplicar: aplicarModelosOficiais },
 ];
 
 // Deve ser chamada dentro de uma transação aberta pelo papel de migração; devolve as versões aplicadas agora.

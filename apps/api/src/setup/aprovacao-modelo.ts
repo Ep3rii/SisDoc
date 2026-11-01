@@ -2,8 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { REGRAS_PLANILHA } from '@sisdoc/calculo';
 import type { Client } from 'pg';
 import { z } from 'zod';
-import { TEMPLATES_DTC } from '../migracoes/dtc';
-import { TEMPLATE_EMISSAO_DOF } from '../migracoes/emissao';
+import { TEMPLATES_OFICIAIS } from '@sisdoc/templates';
 
 const textoAprovacaoSchema = z.string().trim().min(3).max(200);
 
@@ -11,8 +10,7 @@ export const tipoAprovacaoSchema = z.enum(['DOF', 'DTC_IPAM', 'DTC_COMISSIONADO'
 export type TipoAprovacao = z.infer<typeof tipoAprovacaoSchema>;
 
 export const TEMPLATES_EMISSAO: Readonly<Record<TipoAprovacao, string>> = Object.freeze({
-  DOF: TEMPLATE_EMISSAO_DOF,
-  ...TEMPLATES_DTC,
+  ...TEMPLATES_OFICIAIS,
 });
 
 export const aprovacaoModeloSchema = z.strictObject({

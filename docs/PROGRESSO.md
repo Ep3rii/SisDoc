@@ -1,5 +1,46 @@
 # Progresso da construção
 
+## Modelos oficiais de saída — 01/11/2026
+
+DOF, DTC IPAM, Comissionado e INSS adaptados às referências locais indicadas
+pelo responsável. Cabeçalhos/brasão, grades de identificação, frequência,
+ocorrências, categorias e assinaturas usam dados do documento/fonte;
+exemplos individuais e imagens completas permanecem fora do Git.
+Demonstrativos DTC são anexos separados; o campo Classe da DOF não é
+inferido, pois não possui fonte contratada. Detalhes e limites:
+[decisão 029](decisoes/029-modelos-oficiais-versionados.md).
+
+Formulários e CSS fixo são compartilhados por emissão/prévia. Prévia
+continua sem validade oficial e não simula número/data. Modelos v1 usam
+renderizadores históricos; versões desconhecidas falham explicitamente.
+Aprovação antiga não autoriza a v2. Migração, setup novo, emissão e CLI
+de aprovação usam as mesmas quatro versões de template.
+
+Validação final:
+
+- Typecheck e build aprovados.
+- Suíte completa isolada: **251/251 testes em 32 arquivos**.
+- **12 testes de modelos oficiais**, incluindo compatibilidade v1, escape,
+  brasão sem rede, prévias sem número/data, cabeçalhos dentro das células e
+  geometria/paginação A4. DOF sintética de 45 anos: duas páginas;
+  IPAM/Comissionado: duas com anexo; INSS: três com anexo.
+- Antes da regressão completa final, **20/20 testes** de modelos e PDF DOF
+  no limite passaram. Não somar essa execução à suíte completa.
+- Prévia no limite (45 anos/200 blocos/20.000 caracteres): 99,9 ms;
+  delimitadores malformados: 170,1 ms. Aviso de bundle web acima de 500 KB
+  permanece como pendência de organização do carregamento.
+
+Cadastro de `023-modelos-oficiais` aplicado em produção com autorização
+específica e apenas essa migração pendente. Conferidos quatro templates v2
+com **zero aprovações novas**; templates/aprovações anteriores preservados,
+sem alteração na quantidade de documentos/jobs. Nenhuma carga ou seed.
+Produção reiniciada: página/health HTTP 200, documentos sem sessão HTTP 401
+e listener HTTPS somente em loopback.
+**Emissões novas aguardam aprovação formal por tipo.**
+
+Esta entrega não encerra a revisão integral/modularização dos demais
+serviços/helpers, telas, setup/ferramentas e funções das suítes restantes.
+
 ## Modularização — etapa 7: DOF, templates e recursos CLI — 01/11/2026
 
 DOF separada em contexto/helpers puros, consultas/validação, escrita de

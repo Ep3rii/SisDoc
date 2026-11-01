@@ -238,6 +238,23 @@ Não afirmar que “todo o código está comentado” até concluir essas etapas
 
 ## Sequência e validação
 
+### Modelos de saída versionados
+
+Os formulários de referência usam CSS fixo compartilhado em
+`packages/templates/src/versoes.ts`, brasão público incorporado em data URI
+e valores HTML escapados. `modelo-dof.ts` é compartilhado entre prévia e
+emissão v2; `emissao-dtc.ts` compõe os três formulários e o anexo de cálculo.
+Os arquivos `emissao-dof-v1.ts` e `emissao-dtc-v1.ts` preservam as saídas
+históricas; wrappers selecionam renderer pelo template do snapshot e
+recusam versões desconhecidas.
+
+`023-modelos-oficiais` cadastra versões novas, sem reaproveitar aprovação
+antiga nem editar documentos/PDFs. Emissão, setup novo, migração de
+instalação existente e CLI de aprovação compartilham `TEMPLATES_OFICIAIS`.
+Prévias utilizam o formulário v2 sem simular emissão; produção exige
+frontend/API/templates juntos por causa dos hashes CSP.
+Detalhes: [decisão 029](decisoes/029-modelos-oficiais-versionados.md).
+
 ### DOF, templates e recursos CLI — etapa 7
 
 ```text

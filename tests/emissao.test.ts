@@ -420,6 +420,16 @@ describe('emissão da DOF em recursos descartáveis', () => {
     try {
       const modelo = await consultarModeloVigente(banco());
       expect(modelo.aprovacaoExistente).toBeNull();
+      await banco().query(`
+        INSERT INTO documentos.aprovacao_modelo
+          (id, tipo, regra_versao_id, template_versao_id, aprovado_por, referencia_decisao)
+        SELECT $1, 'DOF', $2, t.id, 'Aprovador antigo fictício', 'Somente versão antiga'
+        FROM documentos.template_versao t WHERE t.tipo = 'DOF' AND t.versao = 'emissao-dof-1'
+      `, [randomUUID(), modelo.regra.id]);
+      const comAprovacaoAntiga = await emitir(alvo, randomUUID());
+      expect(comAprovacaoAntiga.status).toBe(409);
+      expect(JSON.parse(comAprovacaoAntiga.corpo).detail).toBe(MENSAGEM_SEM_APROVACAO);
+      expect((await consultarModeloVigente(banco())).aprovacaoExistente).toBeNull();
       await expect(aplicativo.query(`
         INSERT INTO documentos.aprovacao_modelo
           (id, tipo, regra_versao_id, template_versao_id, aprovado_por, referencia_decisao)
@@ -440,7 +450,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     const aprovacao = await registrarAprovacaoModelo(banco(), {
       tipo: 'DOF', aprovadoPor: 'Aprovador fictício de testes', referenciaDecisao: 'docs/decisoes/022 (sintética)',
     });
-    expect(aprovacao.modelo.template.versao).toBe('emissao-dof-1');
+    expect(aprovacao.modelo.template.versao).toBe('emissao-dof-2');
     await expect(registrarAprovacaoModelo(banco(), {
       tipo: 'DOF', aprovadoPor: 'Outro aprovador', referenciaDecisao: 'Repetida',
     })).rejects.toThrow();
@@ -499,7 +509,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
       classificacao: 'emissao', documentoId: alvo.documentoId, emissaoId: emitida.emissaoId, numero: 1,
       numeroFormatado: emitida.numero, processo: '1234/5678', nome: 'Pessoa Emissão Fictícia',
       aprovacao: { id: aprovacao.id, aprovadoPor: 'Aprovador fictício de testes' },
-      template: { versao: 'emissao-dof-1' },
+      template: { versao: 'emissao-dof-2' },
     });
     expect(snapshot.resultado.periodo.linhas).toHaveLength(45);
     expect(snapshot.resultado.totais.efetivoExercicio).toBeGreaterThan(41 * 365);
@@ -509,8 +519,8 @@ describe('emissão da DOF em recursos descartáveis', () => {
     expect(html).toContain('DECLARO');
     expect(html).toContain('São Luís - MA');
     expect(html).toContain('SEMAD');
-    expect(html).toContain('Coordenador(a) de Análise de Processos');
-    expect(html).toContain('Secretário(a) Adjunto(a)');
+    expect(html).toContain('Coordenador (a) de Análise de Processos');
+    expect(html).toContain('Secretário (a) Adjunto (a)');
     expect(html).not.toContain('PRÉVIA');
     await expect(banco().query('UPDATE documentos.documento SET status = $2 WHERE id = $1', [alvo.documentoId, 'conferido']))
       .rejects.toBeDefined();
@@ -764,7 +774,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
       aplicativo: { usuario: 'sisdoc_aplicativo', senha: senhaAplicativo },
     };
     const atualizado = await migrar(provisionamento);
-    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '022-destinatario-coordenador' });
+    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '023-modelos-oficiais' });
     expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total)
       .toBe(SEQUENCIA_MIGRACOES.length + 1);
 
@@ -807,11 +817,12 @@ describe('emissão da DOF em recursos descartáveis', () => {
           '013-emissao', '014-dtc', '015-importacao', '016-acesso-admin', '017-documentos-admin',
           '018-edicao-cadastro', '019-planilhas-legado', '020-listagem-servidores', '021-revisao-periodos-ipam',
           '022-destinatario-coordenador',
+          '023-modelos-oficiais',
         ],
-        versaoAtual: '022-destinatario-coordenador',
+        versaoAtual: '023-modelos-oficiais',
       });
       const segundaExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '022-destinatario-coordenador' });
+      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '023-modelos-oficiais' });
       const privilegios = await anterior.query<{ inserir: boolean; aprovar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.emissao', 'snapshot_cifrado', 'INSERT') AS inserir,
           has_table_privilege('sisdoc_aplicativo', 'documentos.aprovacao_modelo', 'INSERT') AS aprovar

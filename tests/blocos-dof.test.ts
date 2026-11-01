@@ -53,10 +53,13 @@ describe('blocos e prévia provisória de DOF', () => {
     expect(html).toContain('<mark>Variável não disponível: constructor</mark>');
     expect(html).toContain('01/01/1980');
     expect(html).not.toContain('<script>');
-    expect(html).not.toContain('<img');
+    expect(html.match(/<img\b[^>]*>/g)).toHaveLength(1);
+    expect(html).not.toContain('<img src=x');
     expect(html).not.toContain('INATIVO-SINTETICO');
     expect(html).not.toContain('Variável não disponível: ausente');
-    expect(html.match(/<tr>/g)).toHaveLength(46);
+    const frequencia = html.match(/<table class="frequencia">[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/)?.[1];
+    expect(frequencia).toBeDefined();
+    expect(frequencia?.match(/<tr>/g)).toHaveLength(46);
   });
 
   it('identifica expressões malformadas e variáveis ausentes somente em blocos ativos', () => {
@@ -113,7 +116,8 @@ describe('blocos e prévia provisória de DOF', () => {
     expect(html).toContain('Variável não disponível: nivel');
     expect(html).not.toContain('Nome anterior');
     expect(html).not.toContain('<script>');
-    expect(html).not.toContain('<img');
+    expect(html.match(/<img\b[^>]*>/g)).toHaveLength(1);
+    expect(html).not.toContain('<img src=x');
     expect(verificarVariaveisDof(dados)).toEqual({ indisponiveis: ['nivel'], malformadas: false });
     expect(verificarVariaveisDof({ ...dados, fonte: { ...fonte, cargo: '   ' } }))
       .toEqual({ indisponiveis: ['cargo', 'nivel'], malformadas: false });

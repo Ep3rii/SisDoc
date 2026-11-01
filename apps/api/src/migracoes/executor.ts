@@ -9,6 +9,7 @@ const versoesConhecidas = [
   '020-listagem-servidores',
   '021-revisao-periodos-ipam',
   '022-destinatario-coordenador',
+  '023-modelos-oficiais',
 ] as const;
 export type VersaoMigracao = typeof versoesConhecidas[number];
 

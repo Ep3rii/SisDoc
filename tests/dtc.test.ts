@@ -24,7 +24,7 @@ import {
   type SituacaoEmissao,
   type TipoDtc,
 } from '@sisdoc/contratos';
-import { CNPJ_SEMAD, MARCA_INSS_PROVISORIO, TEXTO_SEM_EMENDAS } from '@sisdoc/templates';
+import { CNPJ_SEMAD, TEXTO_SEM_EMENDAS } from '@sisdoc/templates';
 import EmbeddedPostgres from 'embedded-postgres';
 import forge from 'node-forge';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -724,9 +724,8 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     for (let ano = 1980; ano <= 2024; ano += 1) contem(textoDof, String(ano));
 
     const comuns = (texto: string, tipo: TipoDtc) => {
-      contem(texto, 'SECRETARIA MUNICIPAL DE ADMINISTRAÇÃO — SEMAD');
-      contem(texto, 'Portaria MPS nº 154/2008');
-      contem(texto, `DECLARAÇÃO ${emitidas.get(tipo)?.numero ?? ''}`);
+      contem(texto, 'SECRETARIA MUNICIPAL DE ADMINISTRAÇÃO - SEMAD');
+      contem(texto, emitidas.get(tipo)?.numero ?? '');
       for (const [indice, [inicio, fim]] of PERIODOS_MAXIMOS.entries()) {
         const formatar = (valor: string) => valor.split('-').reverse().join('/');
         contem(texto, `${indice + 1}º período`);
@@ -748,9 +747,9 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
 
     const textoComissionado = conferirSemCorte(await lerPaginas(await baixarPdf(emitidas.get('DTC_COMISSIONADO')?.emissaoId ?? '')));
     comuns(textoComissionado, 'DTC_COMISSIONADO');
-    contem(textoComissionado, `CNPJ ${CNPJ_SEMAD}`);
+    contem(textoComissionado, CNPJ_SEMAD);
     for (const [indice, cargo] of CARGOS_MAXIMOS.entries()) {
-      contem(textoComissionado, `${indice + 1}º cargo em comissão exercido`);
+      contem(textoComissionado, 'Cargo em Comissão Exercido');
       contem(textoComissionado, cargo.cargo);
       contem(textoComissionado, cargo.decretoNomeacao);
       if (cargo.decretoExoneracao) contem(textoComissionado, cargo.decretoExoneracao);
@@ -758,7 +757,8 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
 
     const textoInss = conferirSemCorte(await lerPaginas(await baixarPdf(emitidas.get('DTC_INSS')?.emissaoId ?? '')));
     comuns(textoInss, 'DTC_INSS');
-    contem(textoInss, MARCA_INSS_PROVISORIO);
+    contem(textoInss, 'DECLARAÇÃO DE TEMPO DE CONTRIBUIÇÃO AO RGPS');
+    expect(textoInss).not.toContain('TEXTOSOFICIAISDOINSSPENDENTESDEAPROVAÇÃO');
     contem(textoInss, OBSERVACAO_PADRAO_INSS);
     contem(textoInss, INSS_FICTICIO.licencas.descricao);
     contem(textoInss, 'Filiação paterna fictícia');
@@ -902,10 +902,11 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
           '014-dtc', '015-importacao', '016-acesso-admin', '017-documentos-admin',
           '018-edicao-cadastro', '019-planilhas-legado', '020-listagem-servidores', '021-revisao-periodos-ipam',
           '022-destinatario-coordenador',
+          '023-modelos-oficiais',
         ],
-        versaoAtual: '022-destinatario-coordenador',
+        versaoAtual: '023-modelos-oficiais',
       });
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '022-destinatario-coordenador' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '023-modelos-oficiais' });
       const privilegios = await anterior.query<{ conferencia: boolean; tabela: boolean; categoria: boolean; apagar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'conferido_por', 'INSERT') AS conferencia,
           has_table_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'INSERT') AS tabela,
@@ -914,12 +915,15 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       `);
       expect(privilegios.rows[0]).toEqual({ conferencia: true, tabela: false, categoria: true, apagar: false });
       const templates = await anterior.query<{ tipo: string; versao: string }>(`
-        SELECT tipo, versao FROM documentos.template_versao WHERE tipo LIKE 'DTC_%' AND versao LIKE 'emissao-%' ORDER BY tipo
+        SELECT tipo, versao FROM documentos.template_versao WHERE tipo LIKE 'DTC_%' AND versao LIKE 'emissao-%' ORDER BY tipo, versao
       `);
       expect(templates.rows).toEqual([
         { tipo: 'DTC_COMISSIONADO', versao: 'emissao-dtc-comissionado-1' },
+        { tipo: 'DTC_COMISSIONADO', versao: 'emissao-dtc-comissionado-2' },
+        { tipo: 'DTC_INSS', versao: 'emissao-dtc-inss-2' },
         { tipo: 'DTC_INSS', versao: 'emissao-dtc-inss-provisorio-1' },
         { tipo: 'DTC_IPAM', versao: 'emissao-dtc-ipam-1' },
+        { tipo: 'DTC_IPAM', versao: 'emissao-dtc-ipam-2' },
       ]);
     } finally {
       await anterior.end();

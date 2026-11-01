@@ -1,5 +1,22 @@
 # Operação local — uso operacional autorizado
 
+## Novos modelos de saída — versão 2
+
+Os formulários seguem as referências locais em
+`Modelos e Documentação/imagens modelo`, mantendo os exemplos completos
+fora do Git. DOF tem seções de frequência e ocorrências; IPAM/Comissionado
+usam formulário; INSS usa duas seções paginadas. Demonstrativos DTC ficam
+em anexo. Conteúdo extenso pode gerar páginas adicionais sem corte.
+Prévias seguem sem validade oficial e utilizam somente revisão salva.
+
+A migração `023-modelos-oficiais` registra quatro versões novas sem alterar
+documentos, PDFs ou aprovações anteriores. **A liberação histórica das
+versões 1 não libera a emissão dos novos modelos.** Emissões v2 aguardam
+aprovação formal própria por tipo via `npm run aprovar-modelo <TIPO>`.
+Consulta, edição autorizada, conferência e downloads antigos permanecem
+disponíveis. Não registrar aprovação apenas para remover o bloqueio.
+Referência e validações em [decisão 029](decisoes/029-modelos-oficiais-versionados.md).
+
 ## Prévias e densidade das tabelas
 
 Após salvar ou reabrir uma DOF, a prévia auditada carrega automaticamente
@@ -66,14 +83,16 @@ Há uma [instalação local inicializada](INSTALACAO_LOCAL.md), com banco
 permanente, HTTPS e administrador inicial, **autorizada para uso operacional**
 pelo responsável em 31/10/2026 ([decisão 021](decisoes/021-autorizacao-operacional.md)).
 Estão liberados consulta de servidores e cálculo, rascunho, blocos, prévia e
-conferência de DOF pela interface. A emissão da DOF e das DTCs IPAM,
+conferência de DOF pela interface. A emissão das versões v1 da DOF e das DTCs IPAM,
 Comissionado e INSS (numeração, snapshot, PDF, histórico, cópia e
 cancelamento) foi **liberada em 31/10/2026** pelo registro da aprovação
 formal de cada tipo, por Euzébio Pereira da Silva Filho (Desenvolvedor de
 Sistemas), referência "Autorização do responsável em 31/10/2026
 (docs/decisoes/022)" ([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)).
-O modelo INSS continua provisório e sai marcado como tal
-([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)).
+A marca INSS provisória permanece nas emissões históricas v1
+([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)); o formulário
+novo usa os textos da referência indicada, com aprovação v2 separada
+([decisão 029](decisoes/029-modelos-oficiais-versionados.md)).
 A importação de planilhas e da base legada está disponível ao administrador
 (ver [Importação de dados](#importação-de-dados) e
 [DADOS_E_IMPORTACAO.md](DADOS_E_IMPORTACAO.md)). **Backup e serviço Windows
@@ -210,8 +229,10 @@ coordenador; o coordenador pode devolver com motivo ou emitir. A numeração é
 própria por tipo (`N° n/AAAA`), o PDF segue o mesmo worker da DOF e o
 histórico mostra as cinco últimas DTCs emitidas, com cópia e cancelamento como
 na DOF. Os totais do Comissionado e do INSS e as linhas de incorporação são
-provisórios, e o PDF do INSS traz marca de modelo provisório
-([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)).
+provisórios. A marca de modelo INSS provisório é preservada nos PDFs v1
+([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)); os formulários v2
+exigem aprovação própria e mantêm os cálculos como anexo
+([decisão 029](decisoes/029-modelos-oficiais-versionados.md)).
 
 O limite é de cinco falhas por matrícula e 20 por IP em 15 minutos. O IP é o
 endereço da conexão, sem confiar em cabeçalhos encaminhados. A origem aceita
@@ -292,7 +313,8 @@ inserções e exclusões; mudanças exigem nova conferência antes da emissão.
 A migração `021-revisao-periodos-ipam` habilita o lock restrito necessário,
 sem conceder UPDATE amplo à aplicação. Após atualizar, reconfira DTCs
 conferidas com a prova antiga antes de emitir; emissões existentes não mudam.
-O modelo INSS permanece explicitamente provisório.
+O modelo INSS v1 permanece histórico/provisório; a v2 segue a referência
+local indicada, mas aguarda aprovação formal específica (decisão 029).
 
 ## Administrador: documentos e cadastro
 

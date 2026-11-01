@@ -137,7 +137,7 @@ describe('Editor DTC', () => {
         const quadro = pagina.frameLocator(`iframe[title="Prévia da ${ROTULOS_DTC[tipo]}"]`);
         await quadro.locator('body').waitFor();
         expect(await quadro.locator('body').evaluate((elemento) => getComputedStyle(elemento).fontFamily))
-          .toBe('"Times New Roman", Times, serif');
+          .toBe('Arial, sans-serif');
         expect(await quadro.locator('body').evaluate((elemento) => {
           const estilo = document.createElement('style');
           estilo.textContent = 'body{font-family:monospace!important}';
@@ -146,7 +146,7 @@ describe('Editor DTC', () => {
           script.textContent = 'document.body.dataset.executou = "sim"';
           document.body.append(script);
           return { fonte: getComputedStyle(elemento).fontFamily, executou: elemento.dataset.executou ?? null };
-        })).toEqual({ fonte: '"Times New Roman", Times, serif', executou: null });
+        })).toEqual({ fonte: 'Arial, sans-serif', executou: null });
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
         expect(await pagina.locator(`iframe[title="Prévia da ${ROTULOS_DTC[tipo]}"]`).isVisible()).toBe(true);
         await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();

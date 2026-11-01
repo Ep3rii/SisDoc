@@ -14,7 +14,7 @@ import { transacao } from '../banco';
 import { calcularDofNaTransacao } from '../calculos/calculos';
 import { dataEmSaoPaulo } from '../data';
 import { VERSAO_BLOCO_VAZIO } from '../migracoes/blocos-dof';
-import { TEMPLATE_EMISSAO_DOF } from '../migracoes/emissao';
+import { TEMPLATES_OFICIAIS } from '@sisdoc/templates';
 import { TEMPLATE_DOF_PROVISORIO } from '../migracoes/rascunho-dof';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
@@ -134,7 +134,7 @@ export class EmissaoDofService {
         JOIN documentos.template_versao t ON t.tipo = 'DOF' AND t.versao = $2
         JOIN documentos.aprovacao_modelo a ON a.tipo = 'DOF' AND a.regra_versao_id = r.id AND a.template_versao_id = t.id
         WHERE d.id = $1
-      `, [id, TEMPLATE_EMISSAO_DOF]);
+      `, [id, TEMPLATES_OFICIAIS.DOF]);
       const aprovacao = aprovacoes.rows[0];
       if (!aprovacao) {
         await auditarConsultaFuncional(cliente, sessao, 'emissao_dof_bloqueada_sem_aprovacao', 'documento', id, atual.pessoa_id, ip);

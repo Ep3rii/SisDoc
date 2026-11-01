@@ -4,3 +4,4 @@ export { CNPJ_SEMAD, MARCA_INSS_PROVISORIO, TEXTO_SEM_EMENDAS, ESTILO_DOCUMENTO_
 export type { DadosDocumentoDtc } from './emissao-dtc';
 export type { ParteTextoDof } from './variaveis-dof';
 export { ESTILO_PREVIA_DOF, renderizarPreviaDof } from './previa-dof';
+export { TEMPLATES_OFICIAIS } from './versoes';

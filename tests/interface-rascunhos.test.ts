@@ -554,7 +554,7 @@ describe('interface de rascunhos com API sintética', () => {
     await selecionarAba(pagina, 'Dados do servidor');
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     expect(await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').locator('body')
-      .evaluate((elemento) => getComputedStyle(elemento).color)).toBe('rgb(23, 43, 58)');
+      .evaluate((elemento) => getComputedStyle(elemento).color)).toBe('rgb(0, 0, 0)');
     await pagina.locator('.dados-servidor').getByText('Mãe fictícia <img src=x>', { exact: true }).waitFor();
     expect(await pagina.getByRole('tabpanel').count()).toBe(1);
     const editor = await pagina.locator('.editor-dof').boundingBox();
@@ -745,7 +745,10 @@ describe('interface de rascunhos com API sintética', () => {
     await quadro.getByText('Variável não disponível: desconhecida').waitFor();
     expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').getAttribute('sandbox')).toBe('');
     expect(await quadro.locator('script').count()).toBe(0);
-    expect(await quadro.locator('img').count()).toBe(0);
+    expect(await quadro.locator('img').count()).toBe(1);
+    expect(await quadro.locator('img[alt="Brasão de São Luís"]').evaluate((imagem: HTMLImageElement) =>
+      imagem.complete && imagem.naturalWidth > 0)).toBe(true);
+    expect(await quadro.locator('img[src="x"]').count()).toBe(0);
     expect(await quadro.getByText('Cargo fictício', { exact: false }).count()).toBeGreaterThan(0);
     expect(await quadro.getByText('Mãe fictícia <img src=x>', { exact: false }).count()).toBeGreaterThan(0);
     expect(await quadro.getByText('Pessoa Ficticia', { exact: false }).count()).toBeGreaterThan(0);
@@ -832,7 +835,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Processo salvo na revisão 2.', { exact: false }).waitFor();
     estado.adiarPrevia = false;
     estado.liberarPrevia?.();
-    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText('Processo: 1234/5678.', { exact: false }).waitFor();
+    await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText('1234/5678', { exact: true }).waitFor();
   });
 
   it('vincula a verificação à prévia aberta e rejeita alteração da fonte ou resposta antiga', async () => {
@@ -894,7 +897,7 @@ describe('interface de rascunhos com API sintética', () => {
     const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
     await quadro.getByText('BLOCO-200-', { exact: false }).waitFor();
     await selecionarAba(pagina, 'Blocos de texto');
-    expect(await quadro.locator('tbody tr').count()).toBe(45);
+    expect(await quadro.locator('.frequencia tbody tr').count()).toBe(46);
     const duracoes: number[] = [];
     for (let indice = 0; indice < 5; indice += 1) {
       const inicio = await pagina.evaluate(() => performance.now());

@@ -370,9 +370,9 @@ async function conferirSqlSintetico(cliente: Client, documentoId: string, usuari
 }
 
 describe('fundação em recursos descartáveis', () => {
-  it('mantém a sequência de migrações alinhada ao release listagem de servidores', () => {
-    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('022-destinatario-coordenador');
-    expect(SEQUENCIA_MIGRACOES.at(-6)?.versao).toBe('017-documentos-admin');
+  it('mantém a sequência de migrações alinhada ao release dos modelos oficiais', () => {
+    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('023-modelos-oficiais');
+    expect(SEQUENCIA_MIGRACOES.at(-7)?.versao).toBe('017-documentos-admin');
   });
 
   let temporario = '';
@@ -2567,7 +2567,9 @@ describe('fundação em recursos descartáveis', () => {
         expect(previa.corpo).not.toContain('Variável não disponível: cargo');
         expect(previa.corpo).not.toContain('<script>');
         expect(previa.corpo).not.toContain(primeiroBloco.texto);
-        expect(previa.corpo.match(/<tr>/g)).toHaveLength(46);
+        const frequencia = previa.corpo.match(/<table class="frequencia">[\s\S]*?<tbody>([\s\S]*?)<\/tbody>/)?.[1];
+        expect(frequencia).toBeDefined();
+        expect(frequencia?.match(/<tr>/g)).toHaveLength(46);
 
         const dadosPrevia = await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaDadosPrevia, cookie: analista.cookie,
@@ -2739,7 +2741,10 @@ describe('fundação em recursos descartáveis', () => {
         const previaComProcesso = await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaPrevia, cookie: analista.cookie,
         });
-        expect(previaComProcesso.corpo).toContain(`Processo: ${pedidoProcesso.processo}.`);
+        expect(previaComProcesso.status, previaComProcesso.corpo).toBe(200);
+        expect(previaComProcesso.corpo).toContain(
+          `<span class="rotulo">Processo nº</span><span class="valor">${pedidoProcesso.processo}</span>`,
+        );
         const alteracoesProcesso = await Promise.all(['1111/1111', '2222/2222'].map((processo) =>
           requisitarApi(portaHttps, caPem, {
             metodo: 'PATCH', rota: rotaProcesso, corpo: { revisao: 6, processo, motivo: pedidoProcesso.motivo }, ...analista,

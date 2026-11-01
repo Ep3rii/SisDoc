@@ -30,6 +30,7 @@ import { aplicarPlanilhasLegado } from '../migracoes/planilhas-legado';
 import { aplicarListagemServidores } from '../migracoes/listagem-servidores';
 import { aplicarRevisaoPeriodosIpam } from '../migracoes/revisao-periodos-ipam';
 import { aplicarDestinatarioCoordenador } from '../migracoes/destinatario-coordenador';
+import { aplicarModelosOficiais } from '../migracoes/modelos-oficiais';
 import { ErroPoliticaSenha, gerarHashSenha, verificarSenha } from '../seguranca/senhas';
 
 const execFile = promisify(execFileCallback);
@@ -432,6 +433,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarListagemServidores(cliente, opcoes.banco.usuario);
     await aplicarRevisaoPeriodosIpam(cliente, opcoes.banco.usuario);
     await aplicarDestinatarioCoordenador(cliente, opcoes.banco.usuario);
+    await aplicarModelosOficiais(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,
