@@ -28,7 +28,7 @@ async function executar(): Promise<void> {
     const mascarasProcesso = await perguntar('Máscaras de processo separadas por vírgula (vazio para não configurar): ');
     const matricula = await perguntar('Matrícula do administrador inicial: ');
     const nome = await perguntar('Nome do administrador inicial: ');
-    const senha = await segredo('Senha inicial do administrador (mínimo 12 caracteres): ');
+    const senha = await segredo('Senha inicial do administrador (mínimo 10 caracteres): ');
     const confirmacaoSenha = await segredo('Confirme a senha inicial: ');
     if (senha !== confirmacaoSenha) throw new Error('As senhas informadas não coincidem.');
     const confirmacao = await perguntar('Digite CRIAR para confirmar a inicialização do banco vazio e da nova raiz: ');

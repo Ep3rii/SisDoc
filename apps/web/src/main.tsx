@@ -70,10 +70,10 @@ function TrocaSenha({ sessao, onConcluir, onErro }: {
   return (
     <form className="painel login" onSubmit={trocar}>
       <h2>Troca obrigatória de senha</h2>
-      <p>Defina uma senha de pelo menos 12 caracteres. A sessão será encerrada após a troca.</p>
+      <p>Defina uma senha de pelo menos 10 caracteres. A sessão será encerrada após a troca.</p>
       <label>Senha atual<input name="senhaAtual" type="password" autoComplete="current-password" required /></label>
-      <label>Nova senha<input name="senhaNova" type="password" autoComplete="new-password" minLength={12} maxLength={1024} required /></label>
-      <label>Confirme a nova senha<input name="confirmacao" type="password" autoComplete="new-password" minLength={12} maxLength={1024} required /></label>
+      <label>Nova senha<input name="senhaNova" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required /></label>
+      <label>Confirme a nova senha<input name="confirmacao" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required /></label>
       <button type="submit" disabled={ocupado}>Alterar senha</button>
     </form>
   );
@@ -195,10 +195,24 @@ function App() {
             <button type="button" className="menu-toggle" aria-expanded={menuAberto} aria-controls="navegacao-principal"
               onClick={() => setMenuAberto((valor) => !valor)}>Menu</button>
             <nav id="navegacao-principal" aria-label="Navegação">
+              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <>
+                <p className="grupo-menu">{sessao.usuario.papel === 'admin' ? 'Administração' : 'Supervisão'}</p>
+                {sessao.usuario.papel === 'admin' && <>
+                  <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
+                    onClick={() => navegar('usuarios')}>Usuários</button>
+                  <button type="button" aria-current={tela === 'importacao' ? 'page' : undefined}
+                    onClick={() => navegar('importacao')}>Importação e exportação</button>
+                  <button type="button" aria-current={tela === 'sincronizacao' ? 'page' : undefined}
+                    onClick={() => navegar('sincronizacao')}>Sincronização</button>
+                </>}
+                <button type="button" aria-current={tela === 'auditoria' ? 'page' : undefined}
+                  onClick={() => navegar('auditoria')}>Auditoria</button>
+              </>}
               {funcional && <>
-                <p className="grupo-menu">DOFs</p>
+                <p className="grupo-menu">Cadastro de pessoas</p>
                 <button type="button" aria-label="Buscar servidores" aria-current={tela === 'busca' ? 'page' : undefined}
-                  onClick={() => navegar('busca')}>Buscar servidores<span>DOF · Ocorrências funcionais</span></button>
+                  onClick={() => navegar('busca')}>Buscar servidores<span>Dados de referência · DOF e DTC</span></button>
+                <p className="grupo-menu">DOFs</p>
                 {podeSalvar && <>
                   <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>{sessao.usuario.papel === 'admin' ? 'Todos os rascunhos' : 'Meus rascunhos'}</button>
                   <button type="button" aria-current={tela === 'conferidos' ? 'page' : undefined} onClick={() => navegar('conferidos')}>DOFs conferidas</button>
@@ -214,18 +228,10 @@ function App() {
                   <button type="button" aria-current={tela === 'DTC_INSS' ? 'page' : undefined}
                     onClick={() => navegar('DTC_INSS')}>DTC INSS<span>RGPS · modelo provisório</span></button>
                 </>}
+                <p className="grupo-menu">Documentos emitidos</p>
                 <div className="menu-separado"><button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
                   onClick={() => navegar('historico')}>Histórico<span>Emissões, PDF e cópias</span></button></div>
               </>}
-              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <p className="grupo-menu">Administração</p>}
-              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
-                onClick={() => navegar('usuarios')}>Usuários</button>}
-              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'sincronizacao' ? 'page' : undefined}
-                onClick={() => navegar('sincronizacao')}>Sincronização</button>}
-              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'importacao' ? 'page' : undefined}
-                onClick={() => navegar('importacao')}>Importação</button>}
-              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <button type="button"
-                aria-current={tela === 'auditoria' ? 'page' : undefined} onClick={() => navegar('auditoria')}>Auditoria</button>}
             </nav>
           </>
         )}

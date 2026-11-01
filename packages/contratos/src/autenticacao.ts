@@ -4,7 +4,7 @@ import { limitePaginaSchema } from './paginacao';
 
 const matricula = z.string().trim().min(1).max(100);
 const senhaInformada = z.string().min(1).max(1024);
-const senhaNova = z.string().min(12).max(1024);
+const senhaNova = z.string().min(10).max(1024);
 
 export const loginSchema = z.strictObject({
   matricula,

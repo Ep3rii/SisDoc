@@ -901,10 +901,11 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
         aplicadas: [
           '014-dtc', '015-importacao', '016-acesso-admin', '017-documentos-admin',
           '018-edicao-cadastro', '019-planilhas-legado', '020-listagem-servidores', '021-revisao-periodos-ipam',
+          '022-destinatario-coordenador',
         ],
-        versaoAtual: '021-revisao-periodos-ipam',
+        versaoAtual: '022-destinatario-coordenador',
       });
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '021-revisao-periodos-ipam' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '022-destinatario-coordenador' });
       const privilegios = await anterior.query<{ conferencia: boolean; tabela: boolean; categoria: boolean; apagar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'conferido_por', 'INSERT') AS conferencia,
           has_table_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'INSERT') AS tabela,

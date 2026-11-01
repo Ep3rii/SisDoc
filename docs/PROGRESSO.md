@@ -1,5 +1,24 @@
 # Progresso da construção
 
+## Senhas, destinatários e organização do menu — 01/11/2026
+
+Senhas de usuário exigem 10 caracteres em contratos, API, setup, CLI e
+interface; Argon2id, lista de senhas comuns e sessões permanecem.
+Coordenadores ativos são os únicos novos destinatários de encaminhamentos;
+administradores ficam fora da seleção e envios diretos são recusados na API
+e no banco, mantendo sua consulta global e revisão.
+
+Menu do administrador: Administração primeiro (Usuários, Importação e
+exportação, Sincronização, Auditoria), seguido de Cadastro de pessoas, DOFs,
+DTCs e Documentos emitidos. Dados completos continuam acessíveis aos perfis
+autenticados. Veja [operação](OPERACAO.md#senhas-encaminhamentos-e-menu).
+
+Build/typecheck aprovados; 34 testes focados passaram e verificações adicionais
+de migração/setup passaram (5 casos), além de 3 casos revalidados para setup
+com senha exatamente de 10 caracteres e recusa de envio por analista e
+coordenador. Backup confirmado; migração `022-destinatario-coordenador`
+aplicada e produção reiniciada com health/página 200 em loopback.
+
 Fontes ativas: [prompt](../Modelos%20e%20Documentação/PROMPT_CONSTRUCAO_APLICACAO_DOF_DTC.md)
 e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md),
 [guia descritivo](../Modelos%20e%20Documentação/guia_descritivo_declaracoes_funcionais_e_tempo_contribuicao.md)

@@ -218,7 +218,7 @@ export class RascunhosService {
   private async encaminhamento(cliente: PoolClient, documentoId: string): Promise<LinhaEncaminhamento | undefined> {
     const consulta = await cliente.query<LinhaEncaminhamento>(`
       SELECT e.id, e.destinatario_id, u.nome AS destinatario_nome,
-        (u.ativo AND u.papel IN ('coordenador', 'admin')) AS destinatario_disponivel, e.encaminhado_em
+        (u.ativo AND u.papel = 'coordenador') AS destinatario_disponivel, e.encaminhado_em
       FROM documentos.encaminhamento_dof e
       JOIN seguranca.usuario u ON u.id = e.destinatario_id
       WHERE e.documento_id = $1 AND e.recolhido_em IS NULL
@@ -378,7 +378,7 @@ export class RascunhosService {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
       const consulta = await cliente.query<{ id: string; nome: string; matricula: string }>(`
         SELECT id, nome, matricula FROM seguranca.usuario
-        WHERE ativo AND papel IN ('coordenador', 'admin') AND id <> $1
+        WHERE ativo AND papel = 'coordenador' AND id <> $1
           AND ($2::uuid IS NULL OR id > $2::uuid)
         ORDER BY id LIMIT $3
       `, [sessao.usuario.id, cursor ?? null, limite + 1]);
@@ -1118,13 +1118,13 @@ export class RascunhosService {
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
       }
       if (dados.destinatarioId === sessao.usuario.id) {
-        return { falha: { tipo: 'invalido', mensagem: 'Selecione outro coordenador ou administrador como destinatário.' } };
+        return { falha: { tipo: 'invalido', mensagem: 'Selecione outro coordenador como destinatário.' } };
       }
       await cliente.query('SAVEPOINT destinatario_encaminhamento');
       let destinatario: { id: string } | undefined;
       try {
         const consulta = await cliente.query<{ id: string }>(`
-          SELECT id FROM seguranca.usuario WHERE id = $1 AND ativo AND papel IN ('coordenador', 'admin') FOR UPDATE NOWAIT
+          SELECT id FROM seguranca.usuario WHERE id = $1 AND ativo AND papel = 'coordenador' FOR UPDATE NOWAIT
         `, [dados.destinatarioId]);
         destinatario = consulta.rows[0];
         await cliente.query('RELEASE SAVEPOINT destinatario_encaminhamento');
@@ -1137,7 +1137,7 @@ export class RascunhosService {
         throw erro;
       }
       if (!destinatario) {
-        return { falha: { tipo: 'invalido', mensagem: 'Selecione um coordenador ou administrador ativo para receber o rascunho.' } };
+        return { falha: { tipo: 'invalido', mensagem: 'Selecione um coordenador ativo para receber o rascunho.' } };
       }
       const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
       if (!linha) {

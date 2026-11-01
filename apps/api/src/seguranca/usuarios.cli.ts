@@ -94,7 +94,7 @@ async function executar(): Promise<void> {
     if (confirmacao !== 'CRIAR') throw new Error('Criação cancelada; nenhum usuário foi alterado.');
     const credenciais = loginSchema.safeParse({ matricula: matriculaAdmin, senha: senhaAdmin });
     const usuario = criarUsuarioSchema.safeParse({ matricula, nome, email: email || null, papel, senha });
-    if (!credenciais.success || !usuario.success) throw new Error('Confira os dados informados e a senha mínima de 12 caracteres.');
+    if (!credenciais.success || !usuario.success) throw new Error('Confira os dados informados e a senha mínima de 10 caracteres.');
 
     const login = await requisitar(configuracao, ca, 'auth/login', credenciais.data);
     const dadosSessao = respostaSessaoSchema.safeParse(login.dados);

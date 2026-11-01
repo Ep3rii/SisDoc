@@ -29,6 +29,7 @@ import { aplicarModelo } from '../migracoes/modelo';
 import { aplicarPlanilhasLegado } from '../migracoes/planilhas-legado';
 import { aplicarListagemServidores } from '../migracoes/listagem-servidores';
 import { aplicarRevisaoPeriodosIpam } from '../migracoes/revisao-periodos-ipam';
+import { aplicarDestinatarioCoordenador } from '../migracoes/destinatario-coordenador';
 import { ErroPoliticaSenha, gerarHashSenha, verificarSenha } from '../seguranca/senhas';
 
 const execFile = promisify(execFileCallback);
@@ -58,7 +59,7 @@ const opcoesSchema = z.strictObject({
   administrador: z.strictObject({
     matricula: z.string().trim().min(1).max(100),
     nome: z.string().trim().min(3).max(200),
-    senha: z.string().min(12),
+    senha: z.string().min(10).max(1024),
   }),
 });
 
@@ -430,6 +431,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarPlanilhasLegado(cliente, opcoes.banco.usuario);
     await aplicarListagemServidores(cliente, opcoes.banco.usuario);
     await aplicarRevisaoPeriodosIpam(cliente, opcoes.banco.usuario);
+    await aplicarDestinatarioCoordenador(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

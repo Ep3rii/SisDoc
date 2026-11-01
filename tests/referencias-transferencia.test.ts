@@ -137,6 +137,11 @@ it('separa sincronização de importação/exportação e baixa dados mediante c
   try {
     await simular(page, 'admin');
     await page.goto(origem);
+    const categorias = await page.locator('aside .grupo-menu').allTextContents();
+    expect(categorias).toEqual(['Administração', 'Cadastro de pessoas', 'DOFs', 'DTCs', 'Documentos emitidos']);
+    const menu = await page.locator('aside nav button').allTextContents();
+    expect(menu.findIndex((texto) => texto === 'Usuários')).toBeLessThan(menu.findIndex((texto) => texto.includes('Buscar servidores')));
+    expect(menu.filter((texto) => texto === 'Importação e exportação')).toHaveLength(1);
     await page.getByRole('button', { name: /^Sincronização/ }).click();
     await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor();
     expect(await page.getByRole('heading', { name: 'Exportação de dados' }).count()).toBe(0);

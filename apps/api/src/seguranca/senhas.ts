@@ -13,8 +13,8 @@ export function gerarHashSenha(senha: string): Promise<string> {
 }
 
 export async function verificarSenha(senha: string, arquivo: string): Promise<void> {
-  if (senha.length < 12 || senha.length > 1024) {
-    throw new ErroPoliticaSenha('A senha deve ter entre 12 e 1024 caracteres.', 'invalida');
+  if (senha.length < 10 || senha.length > 1024) {
+    throw new ErroPoliticaSenha('A senha deve ter entre 10 e 1024 caracteres.', 'invalida');
   }
   let quantidade = 0;
   let encontrada = false;

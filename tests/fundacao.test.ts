@@ -69,7 +69,7 @@ import { gerarPessoasSinteticas } from '../tools/anonimizar/fixtures.js';
 
 const senhaMigrador = 'MigracaoFicticia!12345';
 const senhaAplicativo = 'AplicativoFicticio!12345';
-const senhaAdmin = 'AdministradorFicticio!12345';
+const senhaAdmin = 'AdmFict!10';
 const senhaAdminNova = 'NovaSenhaFicticia!12345';
 const senhaComum = 'SenhaComumFicticia!12345';
 const nomeTls = 'sisdoc.local';
@@ -371,8 +371,8 @@ async function conferirSqlSintetico(cliente: Client, documentoId: string, usuari
 
 describe('fundação em recursos descartáveis', () => {
   it('mantém a sequência de migrações alinhada ao release listagem de servidores', () => {
-    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('021-revisao-periodos-ipam');
-    expect(SEQUENCIA_MIGRACOES.at(-5)?.versao).toBe('017-documentos-admin');
+    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('022-destinatario-coordenador');
+    expect(SEQUENCIA_MIGRACOES.at(-6)?.versao).toBe('017-documentos-admin');
   });
 
   let temporario = '';
@@ -557,7 +557,7 @@ describe('fundação em recursos descartáveis', () => {
       { texto: 'Máscaras de processo separadas por vírgula (vazio para não configurar): ', resposta: '####/####' },
       { texto: 'Matrícula do administrador inicial: ', resposta: opcoes.administrador.matricula },
       { texto: 'Nome do administrador inicial: ', resposta: opcoes.administrador.nome },
-      { texto: 'Senha inicial do administrador (mínimo 12 caracteres): ', resposta: senhaAdmin },
+      { texto: 'Senha inicial do administrador (mínimo 10 caracteres): ', resposta: senhaAdmin },
       { texto: 'Confirme a senha inicial: ', resposta: senhaAdmin },
       { texto: 'Digite CRIAR para confirmar a inicialização do banco vazio e da nova raiz: ', resposta: 'CRIAR' },
     ];

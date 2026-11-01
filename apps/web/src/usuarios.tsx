@@ -72,7 +72,7 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada }: Prop
         papel: texto(valores, 'papel'),
         senha: texto(valores, 'senha'),
       });
-      if (!resultado.success) throw new ErroApi(400, 'Confira os dados e informe uma senha de pelo menos 12 caracteres.');
+      if (!resultado.success) throw new ErroApi(400, 'Confira os dados e informe uma senha de pelo menos 10 caracteres.');
       setOcupado(true);
       await api.criarUsuario(sessao.csrf, resultado.data);
       formulario.reset();
@@ -151,7 +151,7 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada }: Prop
           <label>Nome<input name="nome" minLength={3} maxLength={200} required autoComplete="off" /></label>
           <label>E-mail (opcional)<input name="email" type="email" maxLength={254} autoComplete="off" /></label>
           <label>Perfil<Perfis /></label>
-          <label>Senha inicial<input name="senha" type="password" minLength={12} maxLength={1024} required autoComplete="new-password" /></label>
+          <label>Senha inicial<input name="senha" type="password" minLength={10} maxLength={1024} required autoComplete="new-password" /></label>
           <button type="submit" disabled={ocupado}>Criar usuário</button>
         </form>
 
@@ -171,8 +171,8 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada }: Prop
             <form className="separado" onSubmit={redefinir}>
               <h4>Redefinir senha</h4>
               <p>A redefinição encerra as sessões do usuário e exige troca no próximo acesso.</p>
-              <label>Nova senha<input name="senha" type="password" minLength={12} maxLength={1024} required autoComplete="new-password" /></label>
-              <label>Confirme a nova senha<input name="confirmacao" type="password" minLength={12} maxLength={1024} required autoComplete="new-password" /></label>
+              <label>Nova senha<input name="senha" type="password" minLength={10} maxLength={1024} required autoComplete="new-password" /></label>
+              <label>Confirme a nova senha<input name="confirmacao" type="password" minLength={10} maxLength={1024} required autoComplete="new-password" /></label>
               <button type="submit" disabled={ocupado}>Redefinir senha</button>
             </form>
           </div>

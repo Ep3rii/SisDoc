@@ -1,7 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
-import { VERSAO_REVISAO_PERIODOS_IPAM } from './migracoes/revisao-periodos-ipam';
+import { VERSAO_DESTINATARIO_COORDENADOR } from './migracoes/destinatario-coordenador';
 
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
@@ -18,7 +18,7 @@ async function iniciar(): Promise<void> {
   try {
     const resultado = await banco.query<{ atual: boolean }>(
       'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
-      [VERSAO_REVISAO_PERIODOS_IPAM],
+      [VERSAO_DESTINATARIO_COORDENADOR],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {

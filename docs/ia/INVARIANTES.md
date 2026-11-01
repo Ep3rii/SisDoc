@@ -18,7 +18,7 @@
 - CPF é normalizado, cifrado e pesquisado por HMAC; demais identificadores
   exigidos são cifrados. Snapshots, staging, relatórios e backups também devem
   ser protegidos. Chaves ficam fora do banco e do repositório.
-- Senhas usam Argon2id, mínimo de 12 caracteres e verificação local contra
+- Senhas usam Argon2id, mínimo de 10 caracteres e verificação local contra
   senhas comuns; cinco falhas bloqueiam por 15 minutos. Mensagem de falha é
   única. Sessões são mantidas no servidor, revogáveis, com cookie `__Host-`
   seguro e CSRF nas escritas autenticadas.

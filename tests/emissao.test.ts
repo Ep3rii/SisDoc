@@ -764,7 +764,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
       aplicativo: { usuario: 'sisdoc_aplicativo', senha: senhaAplicativo },
     };
     const atualizado = await migrar(provisionamento);
-    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '021-revisao-periodos-ipam' });
+    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '022-destinatario-coordenador' });
     expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total)
       .toBe(SEQUENCIA_MIGRACOES.length + 1);
 
@@ -806,11 +806,12 @@ describe('emissão da DOF em recursos descartáveis', () => {
         aplicadas: [
           '013-emissao', '014-dtc', '015-importacao', '016-acesso-admin', '017-documentos-admin',
           '018-edicao-cadastro', '019-planilhas-legado', '020-listagem-servidores', '021-revisao-periodos-ipam',
+          '022-destinatario-coordenador',
         ],
-        versaoAtual: '021-revisao-periodos-ipam',
+        versaoAtual: '022-destinatario-coordenador',
       });
       const segundaExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '021-revisao-periodos-ipam' });
+      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '022-destinatario-coordenador' });
       const privilegios = await anterior.query<{ inserir: boolean; aprovar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.emissao', 'snapshot_cifrado', 'INSERT') AS inserir,
           has_table_privilege('sisdoc_aplicativo', 'documentos.aprovacao_modelo', 'INSERT') AS aprovar
@@ -891,6 +892,50 @@ describe('emissão da DOF em recursos descartáveis', () => {
     });
     expect(recolhida.status, recolhida.corpo).toBe(201);
     expect(rascunhoDofSchema.parse(JSON.parse(recolhida.corpo)).encaminhamento).toBeNull();
+  });
+
+  it('não oferece admin como destinatário nem aceita envio direto, mas mantém sua consulta global', async () => {
+    const alvo = await prepararConferida('Pessoa Encaminhamento Coordenador Fictícia', 'analista2');
+    const devolvida = await requisitar({
+      metodo: 'POST', rota: `documentos/${alvo.documentoId}/devolver-conferido`, sessao: sessao('admin'),
+      corpo: { revisao: alvo.revisao, motivo: 'Reabrir para teste de destinatário fictício' },
+    });
+    expect(devolvida.status, devolvida.corpo).toBe(201);
+    const aberta = await requisitar({ metodo: 'GET', rota: `documentos/${alvo.documentoId}`, sessao: sessao('admin') });
+    const rascunho = rascunhoDofSchema.parse(JSON.parse(aberta.corpo));
+    const proprioCoordenador = await prepararConferida('Pessoa Autor Coordenador Fictícia', 'coordenador2', 'coordenador2');
+    const reaberta = await requisitar({
+      metodo: 'POST', rota: `documentos/${proprioCoordenador.documentoId}/devolver-conferido`, sessao: sessao('admin'),
+      corpo: { revisao: proprioCoordenador.revisao, motivo: 'Reabrir autoria coordenador para teste' },
+    });
+    expect(reaberta.status).toBe(201);
+    const detalheCoordenador = await requisitar({
+      metodo: 'GET', rota: `documentos/${proprioCoordenador.documentoId}`, sessao: sessao('coordenador2'),
+    });
+    const rascunhoCoordenador = rascunhoDofSchema.parse(JSON.parse(detalheCoordenador.corpo));
+    for (const remetente of ['analista2', 'coordenador2']) {
+      const lista = await requisitar({ metodo: 'GET', rota: 'documentos/coordenadores?limite=50', sessao: sessao(remetente) });
+      expect(lista.status).toBe(200);
+      const itens = JSON.parse(lista.corpo).itens as Array<{ id: string }>;
+      expect(itens.some((item) => item.id === idUsuario('admin'))).toBe(false);
+      expect(itens.some((item) => item.id === idUsuario('coordenador'))).toBe(true);
+      const envio = await requisitar({
+        metodo: 'POST', rota: `documentos/${remetente === 'analista2' ? rascunho.id : rascunhoCoordenador.id}/encaminhar`, sessao: sessao(remetente),
+        corpo: { revisao: remetente === 'analista2' ? rascunho.revisao : rascunhoCoordenador.revisao, destinatarioId: idUsuario('admin') },
+      });
+      expect(envio.status, envio.corpo).toBe(400);
+    }
+    await expect(banco().query(`INSERT INTO documentos.encaminhamento_dof
+      (id, documento_id, encaminhado_por, destinatario_id) VALUES ($1, $2, $3, $4)`,
+    [randomUUID(), rascunho.id, idUsuario('analista2'), idUsuario('admin')])).rejects.toMatchObject({ code: '23514' });
+    const enviada = await requisitar({
+      metodo: 'POST', rota: `documentos/${rascunho.id}/encaminhar`, sessao: sessao('analista2'),
+      corpo: { revisao: rascunho.revisao, destinatarioId: idUsuario('coordenador2') },
+    });
+    expect(enviada.status, enviada.corpo).toBe(201);
+    const consulta = await requisitar({ metodo: 'GET', rota: 'documentos/encaminhados?limite=50', sessao: sessao('admin') });
+    expect(consulta.status).toBe(200);
+    expect(JSON.parse(consulta.corpo).itens.some((item: { id: string }) => item.id === rascunho.id)).toBe(true);
   });
 
   it('apaga documento e PDF após confirmação ativa, mantém auditoria e nunca reutiliza o número', async () => {

@@ -1,5 +1,27 @@
 # Operação local — uso operacional autorizado
 
+## Senhas, encaminhamentos e menu
+
+Por alteração autorizada em 01/11/2026, novas senhas exigem no mínimo
+**10 caracteres** (máximo 1024), na criação, redefinição e troca. Argon2id,
+rejeição de senhas comuns, bloqueio de tentativas e controles de sessão
+permanecem. Senhas existentes continuam válidas; não há redefinição automática.
+Esta decisão substitui o mínimo de 12 das referências originais.
+As credenciais técnicas do PostgreSQL mantêm seu mínimo próprio de 12;
+não são as senhas das contas de usuário do SisDoc.
+
+Encaminhamentos DOF aceitam somente coordenadores ativos, diferentes do
+remetente. Administradores não aparecem na seleção e envios diretos para eles
+são recusados pela API e banco (migração `022-destinatario-coordenador`).
+O administrador mantém a consulta de todos os encaminhamentos e seus poderes
+de revisão existentes. Registros antigos não são apagados ou reatribuídos;
+se o destinatário deixar de ser coordenador, recolha e encaminhe novamente.
+
+No menu do administrador, **Administração** vem primeiro: Usuários,
+Importação e exportação, Sincronização e Auditoria. Depois: Cadastro de
+pessoas, DOFs, DTCs e Documentos emitidos. A busca de servidores é compartilhada
+por DOF/DTC e não fica mais rotulada exclusivamente como DOF. local — uso operacional autorizado
+
 Há uma [instalação local inicializada](INSTALACAO_LOCAL.md), com banco
 permanente, HTTPS e administrador inicial, **autorizada para uso operacional**
 pelo responsável em 31/10/2026 ([decisão 021](decisoes/021-autorizacao-operacional.md)).
