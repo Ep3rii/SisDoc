@@ -169,11 +169,37 @@ contagens, ocorrências, conferência por origem e os lotes anteriores. A rota
 é `POST /api/v1/admin/importacoes?tipo=&origem=&modo=validar|gravar` com corpo
 `application/octet-stream`; `GET /api/v1/admin/importacoes` e
 `GET /api/v1/admin/importacoes/conferencia` listam e conferem.
-Os mesmos controles de importação estão na tela **Sincronização**.
+Importação e exportação ficam na mesma tela **Importação**, separadas da
+Sincronização com a API.
+
+### Escolher Núcleo ou Legado
+
+O campo **Schema de destino** seleciona schemas do banco local:
+
+- **Núcleo:** formatos canônicos descritos neste guia; os servidores ficam
+  disponíveis para busca e documentos.
+- **Legado:** recepção de XLSX/CSV com cabeçalhos originais, em
+  `legado.planilha_lote` e `legado.planilha_linha`. As linhas são cifradas,
+  sem normalização ou conversão automática para o núcleo. Cabeçalhos vazios
+  ou repetidos e valores sem cabeçalho são erros.
+
+Use Legado para testar a leitura da planilha já pronta pela interface. A
+validação mostra colunas e linhas sem gravar. Depois de conferir, grave e
+exporte o lote para comparação. A carga no legado **não alimenta as
+declarações** até que os campos sejam mapeados para o núcleo.
+Veja o passo a passo na
+[decisão 027](decisoes/027-administracao-documentos-cadastro-legado.md).
+
+`POST /api/v1/admin/importacoes?destino=legado&origem=&modo=validar|gravar`
+recebe o arquivo bruto. `GET /api/v1/admin/importacoes/legado` lista os
+100 lotes mais recentes; `POST /api/v1/admin/importacoes/legado/exportar`
+recebe `{loteId, formato}`. Todas as rotas são administrativas e auditadas
+nas consultas/exportações e gravações. A carga respeita 64 MB, 100 mil linhas
+e 256 colunas.
 
 ### Exportação pela tela
 
-Na tela **Administração → Sincronização**, selecione **Exportação de dados**:
+Na tela **Administração → Importação**, selecione **Exportação de dados**:
 tipo, origem e formato CSV UTF-8/XLSX. O administrador confirma o download
 com dados pessoais completos. `POST /api/v1/admin/importacoes/exportar`
 recebe JSON `{tipo, origem, formato, afastamentos}` com CSRF; `afastamentos`

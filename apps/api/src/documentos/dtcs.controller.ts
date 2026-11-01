@@ -28,7 +28,7 @@ function mensagemValidacao(erro: z.ZodError, padrao: string): string {
 export class DtcController {
   constructor(private readonly dtc: DtcService) {}
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get()
   listar(@Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
     const dados = consultaDtcSchema.safeParse(consulta);
@@ -46,7 +46,7 @@ export class DtcController {
     return this.dtc.criar(exigirSessao(req), ipRequisicao(req), dados.data);
   }
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get(':id')
   obter(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
     return this.dtc.obter(exigirSessao(req), ipRequisicao(req), identificador(id));
@@ -63,7 +63,7 @@ export class DtcController {
     return this.dtc.atualizar(exigirSessao(req), ipRequisicao(req), documentoId, dados.data);
   }
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get(':id/previa')
   previa(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
     return this.dtc.previa(exigirSessao(req), ipRequisicao(req), identificador(id));

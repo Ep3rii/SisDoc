@@ -489,7 +489,7 @@ export class DtcService {
 
   async listar(sessao: SessaoAutenticada, ip: string, consulta: ConsultaDtc): Promise<PaginaDtc> {
     return transacao(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
       const linhas = await cliente.query<{
         id: string; tipo: TipoDtc; nome: string; matricula: string; status: 'rascunho' | 'conferido';
         revisao: number; atualizado_em: Date; autor_nome: string;
@@ -500,6 +500,8 @@ export class DtcService {
         JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
         JOIN seguranca.usuario autor ON autor.id = d.criado_por
         WHERE d.tipo = ANY($1::text[]) AND d.status = $2 AND (d.criado_por = $3 OR $4::boolean)
+          AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x
+            WHERE x.documento_id = d.id AND x.status = 'pendente')
         ORDER BY d.atualizado_em DESC, d.id LIMIT 50
       `, [consulta.tipo ? [consulta.tipo] : TIPOS_DTC, consulta.estado, sessao.usuario.id,
         sessao.usuario.papel === 'coordenador' || sessao.usuario.papel === 'admin']);
@@ -515,7 +517,7 @@ export class DtcService {
 
   async obter(sessao: SessaoAutenticada, ip: string, id: string): Promise<DocumentoDtc> {
     const tentativa = await transacao<Tentativa<DocumentoDtc>>(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
       const linha = await this.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'] });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);
@@ -609,7 +611,7 @@ export class DtcService {
 
   async previa(sessao: SessaoAutenticada, ip: string, id: string): Promise<PreviaDtc> {
     const tentativa = await transacao<Tentativa<PreviaDtc>>(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
       const linha = await this.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'], bloquear: 'leitura' });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);

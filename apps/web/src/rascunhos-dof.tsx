@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { PaginaEncaminhamentosDof, PaginaRascunhosDof, RascunhoDof } from '@sisdoc/contratos';
 import { api } from './api';
 import { CalculoDof } from './calculo-dof';
+import { ExclusaoDocumento } from './exclusao-documento';
 
 type Props = {
   csrf: string;
@@ -84,7 +85,7 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
         <>
           {pagina.itens.length === 0 ? <p>Nenhum rascunho encontrado.</p> : (
             <div className="tabela"><table>
-              <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th>{recebidos && <th scope="col">Autor</th>}<th scope="col">Revisão</th><th scope="col">Atualizado</th><th scope="col">Rascunho</th></tr></thead>
+              <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th>{recebidos && <th scope="col">Autor</th>}<th scope="col">Revisão</th><th scope="col">Atualizado</th><th scope="col">Ações</th></tr></thead>
               <tbody>{pagina.itens.map((item) => {
                 if (recebidos && !('autorNome' in item)) throw new Error('O encaminhamento não identifica o autor.');
                 return (
@@ -92,9 +93,19 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
                   <td>{item.nome}</td><td>{item.matricula}</td>
                   {recebidos && <td>{'autorNome' in item ? item.autorNome : null}</td>}<td>{item.revisao}</td>
                   <td>{new Date(item.atualizadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
-                  <td><button type="button" className="secundario" disabled={Boolean(abrindo)} onClick={() => void abrir(item.id)}>
-                    {abrindo === item.id ? 'Abrindo...' : 'Abrir'} <span className="sr-only">rascunho de {item.nome}, matrícula {item.matricula}</span>
-                  </button></td>
+                  <td><div className="acoes">
+                    <button type="button" className="secundario" disabled={Boolean(abrindo)} onClick={() => void abrir(item.id)}>
+                      {abrindo === item.id ? 'Abrindo...' : 'Abrir'} <span className="sr-only">rascunho de {item.nome}, matrícula {item.matricula}</span>
+                    </button>
+                    {administrador && <ExclusaoDocumento csrf={csrf} documentoId={item.id} revisao={item.revisao}
+                      descricao={`rascunho de ${item.nome}`} onErro={onErro} onPendente={onPendente}
+                      onConcluido={(resultado) => {
+                        setMensagem(resultado.estado === 'concluido'
+                          ? 'Documento apagado fisicamente; registros de auditoria foram preservados.'
+                          : 'Solicitação registrada. A exclusão segue pendente de remoção segura do PDF ou liberação de dependências.');
+                        setVersao((atual) => atual + 1);
+                      }} />}
+                  </div></td>
                 </tr>
                 );
               })}</tbody>

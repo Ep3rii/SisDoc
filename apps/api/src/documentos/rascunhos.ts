@@ -348,13 +348,15 @@ export class RascunhosService {
 
   async listar(sessao: SessaoAutenticada, ip: string, limite: number, cursor?: string): Promise<PaginaRascunhosDof> {
     return transacao(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
       const consulta = await cliente.query<Pick<LinhaRascunho, 'id' | 'pessoa_id' | 'vinculo_id' | 'nome' | 'matricula' | 'revisao' | 'atualizado_em'>>(`
         SELECT d.id, d.pessoa_id, d.vinculo_id, p.nome, v.matricula, d.revisao, d.atualizado_em
         FROM documentos.documento d
         JOIN nucleo.pessoa p ON p.id = d.pessoa_id
         JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
         WHERE (d.criado_por = $1 OR $4::boolean) AND d.tipo = 'DOF' AND d.status = 'rascunho'
+          AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x
+            WHERE x.documento_id = d.id AND x.status = 'pendente')
           AND ($2::uuid IS NULL OR d.id > $2::uuid)
         ORDER BY d.id LIMIT $3
       `, [sessao.usuario.id, cursor ?? null, limite + 1, sessao.usuario.papel === 'admin']);
@@ -405,6 +407,8 @@ export class RascunhosService {
         JOIN seguranca.usuario u ON u.id = d.criado_por
         WHERE (e.destinatario_id = $1 OR $4::boolean) AND e.recolhido_em IS NULL
           AND d.tipo = 'DOF' AND d.status = 'rascunho'
+          AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x
+            WHERE x.documento_id = d.id AND x.status = 'pendente')
           AND ($2::uuid IS NULL OR d.id > $2::uuid)
         ORDER BY d.id LIMIT $3
       `, [sessao.usuario.id, cursor ?? null, limite + 1, sessao.usuario.papel === 'admin']);
@@ -439,6 +443,8 @@ export class RascunhosService {
         JOIN seguranca.usuario autor ON autor.id = d.criado_por
         JOIN seguranca.usuario conferente ON conferente.id = c.conferido_por
         WHERE d.tipo = 'DOF' AND d.status = 'conferido'
+          AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x
+            WHERE x.documento_id = d.id AND x.status = 'pendente')
           AND (d.criado_por = $1 OR $4::boolean OR EXISTS (
             SELECT 1 FROM documentos.encaminhamento_dof e
             JOIN seguranca.usuario u ON u.id = e.destinatario_id
@@ -465,7 +471,7 @@ export class RascunhosService {
     sessao: SessaoAutenticada, ip: string, id: string,
   ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
       const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true);
       await auditarConsultaFuncional(cliente, sessao, linha ? 'rascunho_aberto' : 'rascunho_nao_encontrado',
         'documento', id, linha?.pessoa_id ?? null, ip);
@@ -481,7 +487,7 @@ export class RascunhosService {
 
   async ultimaDevolucao(sessao: SessaoAutenticada, ip: string, id: string): Promise<UltimaDevolucaoDof> {
     const tentativa = await transacao<Tentativa<UltimaDevolucaoDof>>(this.banco, async (cliente) => {
-      await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
       const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura');
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
@@ -542,7 +548,7 @@ export class RascunhosService {
   ): Promise<DadosPrevia> {
     const tentativa = await transacao<Tentativa<DadosPrevia>>(
       this.banco, async (cliente) => {
-        await confirmarSessao(cliente, sessao, papeisPermitidos('criar_rascunho'));
+        await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
         const linha = await this.linha(cliente, id, sessao.usuario.id, 'leitura', true, estado);
         if (!linha) {
           await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
@@ -1471,12 +1477,12 @@ export class RascunhosService {
       await cliente.query(`
         INSERT INTO documentos.documento (
           id, tipo, pessoa_id, vinculo_id, entrada_cifrada, resultado_calculo_cifrado,
-          template_versao_id, regra_versao_id, criado_por, atualizado_por
-        ) VALUES ($1, 'DOF', $2, $3, $4, $5, $6, $7, $8, $8)
+          template_versao_id, regra_versao_id, substitui_id, criado_por, atualizado_por
+        ) VALUES ($1, 'DOF', $2, $3, $4, $5, $6, $7, $8, $9, $9)
       `, [
         id, entrada.pessoaId, entrada.vinculoId, this.cifrar('documento', id, 'entrada_cifrada', entrada),
         this.cifrar('documento', id, 'resultado_calculo_cifrado', calculo.resultado),
-        versao.template_id, versao.regra_id, sessao.usuario.id,
+        versao.template_id, versao.regra_id, documentoId, sessao.usuario.id,
       ]);
       await cliente.query(`
         INSERT INTO documentos.documento_periodo (id, documento_id, ordem, inicio, fim)

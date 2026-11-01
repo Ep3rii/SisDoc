@@ -103,9 +103,11 @@ export const situacaoEmissaoSchema = z.strictObject({
 export const itemHistoricoSchema = situacaoEmissaoSchema.extend({
   nome: z.string().nullable(),
   matricula: z.string().nullable(),
+  revisao: revisaoSchema,
   podeCopiar: z.boolean(),
   podeCancelar: z.boolean(),
   podeBaixar: z.boolean(),
+  podeExcluir: z.boolean(),
 });
 
 export const historicoEmissoesSchema = z.strictObject({
@@ -120,6 +122,20 @@ export const resultadoCopiaEmitidoSchema = z.strictObject({
   origemEmissaoId: z.uuid(),
 });
 
+export const excluirDocumentoSchema = z.strictObject({
+  revisao: revisaoSchema,
+  motivo: z.string().trim().min(15).max(2000),
+  confirmacao: z.string().min(1).max(100),
+});
+
+export const resultadoExclusaoDocumentoSchema = z.strictObject({
+  solicitacaoId: z.uuid(),
+  estado: z.enum(['pendente', 'concluido']),
+  numero: z.string().nullable(),
+});
+
+export type ExcluirDocumento = z.infer<typeof excluirDocumentoSchema>;
+export type ResultadoExclusaoDocumento = z.infer<typeof resultadoExclusaoDocumentoSchema>;
 export type EmitirDof = z.infer<typeof emitirDofSchema>;
 export type CancelarEmitido = z.infer<typeof cancelarEmitidoSchema>;
 export type CopiarEmitido = z.infer<typeof copiarEmitidoSchema>;

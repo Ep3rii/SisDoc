@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ROTULOS_DTC, type GrupoHistorico, type HistoricoEmissoes, type ItemHistorico } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
 import { baixarPdfEmissao, rotuloPdf } from './emissao';
+import { ExclusaoDocumento } from './exclusao-documento';
 
 type Props = {
   csrf: string;
@@ -179,6 +180,14 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
                 {item.podeCancelar && item.status === 'emitido' && <button type="button" className="secundario" disabled={ocupado}
                   onClick={() => { onLimpar(); setMensagem(''); setCancelando(item); }}>
                   Cancelar <span className="sr-only">emissão {item.numero}</span></button>}
+                {item.podeExcluir && <ExclusaoDocumento csrf={csrf} documentoId={item.documentoId} revisao={item.revisao}
+                  descricao={`${item.tipo} ${item.numero} de ${item.nome ?? 'servidor'}`} onErro={onErro} onPendente={onPendente}
+                  onConcluido={(resultado) => {
+                    setMensagem(resultado.estado === 'concluido'
+                      ? `Documento ${item.numero} apagado fisicamente; número preservado e auditoria registrada.`
+                      : `Exclusão de ${item.numero} solicitada; a remoção segura do PDF ainda está pendente.`);
+                    setVersao((atual) => atual + 1);
+                  }} />}
               </div></td>
             </tr>
           ))}</tbody>

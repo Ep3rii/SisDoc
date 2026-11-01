@@ -1,8 +1,9 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
   cpfSchema,
   normalizarMatricula,
   normalizarNomeBusca,
+  type AtualizarServidor,
   type BuscarServidoresQuery,
   type DetalheServidor,
   type PaginaBuscaServidores,
@@ -10,8 +11,10 @@ import {
   type Configuracao,
   type ReferenciaServidor,
   type ReferenciaServidorQuery,
+  type ResultadoEdicaoServidor,
 } from '@sisdoc/contratos';
-import type { Pool } from 'pg';
+import { DatabaseError, type Pool } from 'pg';
+import { randomUUID } from 'node:crypto';
 import { transacao } from '../banco';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
@@ -58,18 +61,50 @@ export class ServidoresService {
     return transacao(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_pessoa'));
       const pessoal = await cliente.query<{
-        id: string; nome: string; nascimento: string | null; rg_orgao: string | null; rg_expedicao: string | null;
+        id: string; revisao_pessoa: string; revisao_vinculo: string; nome: string; nascimento: string | null;
+        rg_orgao: string | null; rg_expedicao: string | null; matricula: string; regime_juridico: string | null;
+        cargo: string | null; classe: string | null; nivel: string | null; referencia: string | null;
+        setor: string | null; orgao_codigo: string | null; orgao_nome: string | null;
+        admissao: string | null; desligamento: string | null;
         cpf_cifrado: Buffer; nome_mae_cifrado: Buffer | null; nome_pai_cifrado: Buffer | null;
         pis_pasep_cifrado: Buffer | null; rg_numero_cifrado: Buffer | null;
         titulo_eleitor_cifrado: Buffer | null; endereco_cifrado: Buffer | null;
-      }>(`SELECT p.id, p.nome, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
+      }>(`SELECT p.id, p.revisao_fonte::text AS revisao_pessoa, v.revisao_fonte::text AS revisao_vinculo,
+        p.nome, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
         p.rg_orgao, to_char(p.rg_expedicao, 'YYYY-MM-DD') AS rg_expedicao,
         p.cpf_cifrado, p.nome_mae_cifrado, p.nome_pai_cifrado, p.pis_pasep_cifrado,
-        p.rg_numero_cifrado, p.titulo_eleitor_cifrado, p.endereco_cifrado
+        p.rg_numero_cifrado, p.titulo_eleitor_cifrado, p.endereco_cifrado,
+        v.matricula, v.regime_juridico, v.cargo, v.classe, v.nivel, v.referencia, v.setor,
+        v.orgao_codigo, v.orgao_nome, to_char(v.admissao, 'YYYY-MM-DD') AS admissao,
+        to_char(v.desligamento, 'YYYY-MM-DD') AS desligamento
         FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id WHERE p.id = $1 AND v.id = $2`,
       [pessoaId, consulta.vinculoId]);
       const p = pessoal.rows[0];
       if (!p) throw new NotFoundException('Vínculo não encontrado para esta pessoa.');
+      const cadastro: ReferenciaServidor['cadastro'] = {
+        nome: p.nome,
+        cpf: decifrarTexto(this.protetor, p.id, 'pessoa', 'cpf_cifrado', p.cpf_cifrado) ?? '',
+        nascimento: p.nascimento,
+        nomeMae: decifrarTexto(this.protetor, p.id, 'pessoa', 'nome_mae_cifrado', p.nome_mae_cifrado),
+        nomePai: decifrarTexto(this.protetor, p.id, 'pessoa', 'nome_pai_cifrado', p.nome_pai_cifrado),
+        pisPasep: decifrarTexto(this.protetor, p.id, 'pessoa', 'pis_pasep_cifrado', p.pis_pasep_cifrado),
+        rgNumero: decifrarTexto(this.protetor, p.id, 'pessoa', 'rg_numero_cifrado', p.rg_numero_cifrado),
+        rgOrgao: p.rg_orgao,
+        rgExpedicao: p.rg_expedicao,
+        tituloEleitor: decifrarTexto(this.protetor, p.id, 'pessoa', 'titulo_eleitor_cifrado', p.titulo_eleitor_cifrado),
+        endereco: decifrarTexto(this.protetor, p.id, 'pessoa', 'endereco_cifrado', p.endereco_cifrado),
+        matricula: p.matricula,
+        regimeJuridico: p.regime_juridico,
+        cargo: p.cargo,
+        classe: p.classe,
+        nivel: p.nivel,
+        referencia: p.referencia,
+        setor: p.setor,
+        orgaoCodigo: p.orgao_codigo,
+        orgao: p.orgao_nome,
+        admissao: p.admissao,
+        desligamento: p.desligamento,
+      };
       const pessoa: ReferenciaServidor['pessoa'] = {
         Nome: p.nome, Nascimento: p.nascimento, 'Órgão expedidor': p.rg_orgao, 'Expedição RG': p.rg_expedicao,
       };
@@ -115,8 +150,199 @@ export class ServidoresService {
         return { id, campos };
       });
       await auditarConsultaFuncional(cliente, sessao, 'referencias_consultadas', consulta.tipo, consulta.vinculoId, pessoaId, ip);
-      return { pessoa, registros, proximoCursor: resultado.rows.length > consulta.limite ? registros[registros.length - 1].id : null };
+      return {
+        pessoaId: p.id,
+        vinculoId: consulta.vinculoId,
+        revisaoPessoa: p.revisao_pessoa,
+        revisaoVinculo: p.revisao_vinculo,
+        cadastro,
+        pessoa,
+        registros,
+        proximoCursor: resultado.rows.length > consulta.limite ? registros[registros.length - 1].id : null,
+      };
     });
+  }
+
+  async atualizar(
+    sessao: SessaoAutenticada,
+    ip: string,
+    dados: AtualizarServidor,
+  ): Promise<ResultadoEdicaoServidor> {
+    try {
+      return await transacao(this.banco, async (cliente) => {
+        await confirmarSessao(cliente, sessao, papeisPermitidos('editar_servidor'));
+        const consulta = await cliente.query<{
+          pessoa_id: string; vinculo_id: string; revisao_pessoa: string; revisao_vinculo: string;
+        }>(`
+          SELECT p.id AS pessoa_id, v.id AS vinculo_id,
+            p.revisao_fonte::text AS revisao_pessoa, v.revisao_fonte::text AS revisao_vinculo
+          FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
+          WHERE p.id = $1 AND v.id = $2 FOR UPDATE OF p, v
+        `, [dados.pessoaId, dados.vinculoId]);
+        const atual = consulta.rows[0];
+        if (!atual) throw new NotFoundException('Vínculo não encontrado para esta pessoa.');
+        if (atual.revisao_pessoa !== dados.revisaoPessoa || atual.revisao_vinculo !== dados.revisaoVinculo) {
+          throw new ConflictException('O cadastro foi alterado desde a consulta. Atualize os dados antes de editar novamente.');
+        }
+
+        const estado = await cliente.query<{
+          nome: string; cpf_cifrado: Buffer; nascimento: string | null; nome_mae_cifrado: Buffer | null;
+          nome_pai_cifrado: Buffer | null; pis_pasep_cifrado: Buffer | null; rg_numero_cifrado: Buffer | null;
+          rg_orgao: string | null; rg_expedicao: string | null; titulo_eleitor_cifrado: Buffer | null;
+          endereco_cifrado: Buffer | null; matricula: string; regime_juridico: string | null; cargo: string | null;
+          classe: string | null; nivel: string | null; referencia: string | null; setor: string | null;
+          orgao_codigo: string | null; orgao_nome: string | null; admissao: string | null; desligamento: string | null;
+        }>(`
+          SELECT p.nome, p.cpf_cifrado, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
+            p.nome_mae_cifrado, p.nome_pai_cifrado, p.pis_pasep_cifrado, p.rg_numero_cifrado,
+            p.rg_orgao, to_char(p.rg_expedicao, 'YYYY-MM-DD') AS rg_expedicao,
+            p.titulo_eleitor_cifrado, p.endereco_cifrado, v.matricula, v.regime_juridico, v.cargo,
+            v.classe, v.nivel, v.referencia, v.setor, v.orgao_codigo, v.orgao_nome,
+            to_char(v.admissao, 'YYYY-MM-DD') AS admissao,
+            to_char(v.desligamento, 'YYYY-MM-DD') AS desligamento
+          FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id
+          WHERE p.id = $1 AND v.id = $2
+        `, [dados.pessoaId, dados.vinculoId]);
+        const linha = estado.rows[0];
+        const cadastroAtual: ReferenciaServidor['cadastro'] = {
+          nome: linha.nome,
+          cpf: decifrarTexto(this.protetor, dados.pessoaId, 'pessoa', 'cpf_cifrado', linha.cpf_cifrado) ?? '',
+          nascimento: linha.nascimento,
+          nomeMae: decifrarTexto(this.protetor, dados.pessoaId, 'pessoa', 'nome_mae_cifrado', linha.nome_mae_cifrado),
+          nomePai: decifrarTexto(this.protetor, dados.pessoaId, 'pessoa', 'nome_pai_cifrado', linha.nome_pai_cifrado),
+          pisPasep: decifrarTexto(this.protetor, dados.pessoaId, 'pessoa', 'pis_pasep_cifrado', linha.pis_pasep_cifrado),
+          rgNumero: decifrarTexto(this.protetor, dados.pessoaId, 'pessoa', 'rg_numero_cifrado', linha.rg_numero_cifrado),
+          rgOrgao: linha.rg_orgao,
+          rgExpedicao: linha.rg_expedicao,
+          tituloEleitor: decifrarTexto(this.protetor, dados.pessoaId, 'pessoa', 'titulo_eleitor_cifrado', linha.titulo_eleitor_cifrado),
+          endereco: decifrarTexto(this.protetor, dados.pessoaId, 'pessoa', 'endereco_cifrado', linha.endereco_cifrado),
+          matricula: linha.matricula,
+          regimeJuridico: linha.regime_juridico,
+          cargo: linha.cargo,
+          classe: linha.classe,
+          nivel: linha.nivel,
+          referencia: linha.referencia,
+          setor: linha.setor,
+          orgaoCodigo: linha.orgao_codigo,
+          orgao: linha.orgao_nome,
+          admissao: linha.admissao,
+          desligamento: linha.desligamento,
+        };
+        const camposAlterados = (Object.keys(dados.cadastro) as (keyof AtualizarServidor['cadastro'])[])
+          .filter((campo) => dados.cadastro[campo] !== cadastroAtual[campo]);
+        if (camposAlterados.length === 0) {
+          throw new UnprocessableEntityException('Nenhuma alteração foi informada no cadastro.');
+        }
+
+        const pessoaColunas: Partial<Record<keyof AtualizarServidor['cadastro'], { coluna: string; valor: unknown; cifrado?: string }>> = {
+          nome: { coluna: 'nome', valor: dados.cadastro.nome },
+          cpf: { coluna: 'cpf_cifrado', valor: dados.cadastro.cpf, cifrado: 'cpf_cifrado' },
+          nascimento: { coluna: 'nascimento', valor: dados.cadastro.nascimento },
+          nomeMae: { coluna: 'nome_mae_cifrado', valor: dados.cadastro.nomeMae, cifrado: 'nome_mae_cifrado' },
+          nomePai: { coluna: 'nome_pai_cifrado', valor: dados.cadastro.nomePai, cifrado: 'nome_pai_cifrado' },
+          pisPasep: { coluna: 'pis_pasep_cifrado', valor: dados.cadastro.pisPasep, cifrado: 'pis_pasep_cifrado' },
+          rgNumero: { coluna: 'rg_numero_cifrado', valor: dados.cadastro.rgNumero, cifrado: 'rg_numero_cifrado' },
+          rgOrgao: { coluna: 'rg_orgao', valor: dados.cadastro.rgOrgao },
+          rgExpedicao: { coluna: 'rg_expedicao', valor: dados.cadastro.rgExpedicao },
+          tituloEleitor: { coluna: 'titulo_eleitor_cifrado', valor: dados.cadastro.tituloEleitor, cifrado: 'titulo_eleitor_cifrado' },
+          endereco: { coluna: 'endereco_cifrado', valor: dados.cadastro.endereco, cifrado: 'endereco_cifrado' },
+        };
+        const vinculoColunas: Partial<Record<keyof AtualizarServidor['cadastro'], { coluna: string; valor: unknown }>> = {
+          matricula: { coluna: 'matricula', valor: dados.cadastro.matricula },
+          regimeJuridico: { coluna: 'regime_juridico', valor: dados.cadastro.regimeJuridico },
+          cargo: { coluna: 'cargo', valor: dados.cadastro.cargo },
+          classe: { coluna: 'classe', valor: dados.cadastro.classe },
+          nivel: { coluna: 'nivel', valor: dados.cadastro.nivel },
+          referencia: { coluna: 'referencia', valor: dados.cadastro.referencia },
+          setor: { coluna: 'setor', valor: dados.cadastro.setor },
+          orgaoCodigo: { coluna: 'orgao_codigo', valor: dados.cadastro.orgaoCodigo },
+          orgao: { coluna: 'orgao_nome', valor: dados.cadastro.orgao },
+          admissao: { coluna: 'admissao', valor: dados.cadastro.admissao },
+          desligamento: { coluna: 'desligamento', valor: dados.cadastro.desligamento },
+        };
+        const edicaoId = randomUUID();
+        const atualizarTabela = async (
+          tabela: 'pessoa' | 'vinculo',
+          campos: readonly (keyof AtualizarServidor['cadastro'])[],
+          colunas: typeof pessoaColunas | typeof vinculoColunas,
+          id: string,
+        ): Promise<string | undefined> => {
+          const selecionados = campos.filter((campo) => campo in colunas);
+          if (selecionados.length === 0) return undefined;
+          const valores: unknown[] = [id];
+          const atribuicoes = selecionados.map((campo) => {
+            const definicao = colunas[campo];
+            if (!definicao) throw new Error('Campo editável sem mapeamento de persistência.');
+            let valor = definicao.valor;
+            if ('cifrado' in definicao && definicao.cifrado) {
+              const texto = valor;
+              if (texto === null) {
+                valores.push(null);
+              } else {
+                if (typeof texto !== 'string') throw new Error('Campo protegido inválido.');
+                if (definicao.cifrado === 'cpf_cifrado') {
+                  const cpf = cpfSchema.parse(texto);
+                  valores.push(this.protetor.cifrar(Buffer.from(cpf, 'ascii'), {
+                    schema: 'nucleo', tabela: 'pessoa', registroId: id, campo: 'cpf_cifrado',
+                  }));
+                  return `${definicao.coluna} = $${valores.length}`;
+                }
+                valores.push(this.protetor.cifrar(Buffer.from(texto, 'utf8'), {
+                  schema: 'nucleo', tabela: 'pessoa', registroId: id, campo: definicao.cifrado,
+                }));
+              }
+            } else {
+              valores.push(valor);
+            }
+            if (campo === 'matricula') {
+              valores.push(normalizarMatricula(dados.cadastro.matricula));
+              return `${definicao.coluna} = $${valores.length - 1}, matricula_norm = $${valores.length}`;
+            }
+            return `${definicao.coluna} = $${valores.length}`;
+          });
+          if (tabela === 'pessoa') {
+            if (selecionados.includes('nome')) {
+              valores.push(normalizarNomeBusca(dados.cadastro.nome));
+              atribuicoes.push(`nome_busca = $${valores.length}`);
+            }
+            if (selecionados.includes('cpf')) {
+              const cpf = cpfSchema.parse(dados.cadastro.cpf);
+              valores.push(this.protetor.hashCpf(cpf));
+              atribuicoes.push(`cpf_hash = $${valores.length}`);
+            }
+            atribuicoes.push('atualizado_em = now()');
+          }
+          const retorno = await cliente.query<{ revisao_fonte: string }>(
+            `UPDATE nucleo.${tabela} SET ${atribuicoes.join(', ')} WHERE id = $1 RETURNING revisao_fonte::text`,
+            valores,
+          );
+          return retorno.rows[0]?.revisao_fonte;
+        };
+
+        const revisaoPessoa = await atualizarTabela('pessoa', camposAlterados, pessoaColunas, dados.pessoaId)
+          ?? atual.revisao_pessoa;
+        const revisaoVinculo = await atualizarTabela('vinculo', camposAlterados, vinculoColunas, dados.vinculoId)
+          ?? atual.revisao_vinculo;
+        const motivoCifrado = this.protetor.cifrar(Buffer.from(dados.motivo, 'utf8'), {
+          schema: 'nucleo', tabela: 'edicao_servidor_auditoria', registroId: edicaoId, campo: 'motivo_cifrado',
+        });
+        await cliente.query(`
+          INSERT INTO nucleo.edicao_servidor_auditoria
+            (id, usuario_id, pessoa_id, vinculo_id, campos, motivo_cifrado)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [edicaoId, sessao.usuario.id, dados.pessoaId, dados.vinculoId, camposAlterados, motivoCifrado]);
+        await cliente.query(`
+          INSERT INTO seguranca.auditoria (usuario_id, acao, entidade, entidade_id, pessoa_id, ip, detalhes)
+          VALUES ($1, 'cadastro_servidor_editado', 'servidor', $2, $3, $4, jsonb_build_object('campos', $5::text[]))
+        `, [sessao.usuario.id, dados.vinculoId, dados.pessoaId, ip, camposAlterados]);
+        return { atualizado: true, revisaoPessoa, revisaoVinculo };
+      });
+    } catch (erro) {
+      if (erro instanceof DatabaseError && erro.code === '23505') {
+        throw new ConflictException('O CPF ou a matrícula informados já estão cadastrados para outro servidor.');
+      }
+      throw erro;
+    }
   }
 
   async buscar(sessao: SessaoAutenticada, ip: string, consulta: BuscarServidoresQuery): Promise<PaginaBuscaServidores> {

@@ -54,6 +54,18 @@ describe('armazenamento isolado de PDF', () => {
     expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
   });
 
+  it('remove somente o PDF regular que corresponde ao hash e permite repetição segura', async () => {
+    const armazenamento = new ArmazenamentoPdf(diretorio);
+    const artefatoId = randomUUID();
+    const sha256 = createHash('sha256').update(pdf).digest('hex');
+    await armazenamento.gravar(artefatoId, pdf);
+    await expect(armazenamento.remover(artefatoId, 'a'.repeat(64))).rejects.toThrow('não corresponde ao hash');
+    expect(await fs.readdir(diretorio)).toEqual([`${artefatoId}.pdf`]);
+    expect(await armazenamento.remover(artefatoId, sha256)).toBe('removido');
+    expect(await armazenamento.remover(artefatoId, sha256)).toBe('ausente');
+    expect(await fs.readdir(diretorio)).toEqual([]);
+  });
+
   it('publica um único arquivo em gravações simultâneas iguais', async () => {
     const armazenamento = new ArmazenamentoPdf(diretorio);
     const artefatoId = randomUUID();

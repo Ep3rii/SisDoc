@@ -178,6 +178,13 @@ parâmetros sensíveis em seus logs. A consulta é local e não faz sincronizaç
 
 ## Importação de dados
 
+Selecione **Schema de destino**: **Núcleo** para dados canônicos usados nas
+declarações ou **Legado** para preservar os cabeçalhos da planilha pronta.
+No legado, valide o XLSX, confira colunas/linhas e só depois grave.
+O lote fica armazenado e cifrado; exporte-o na mesma tela para conferência.
+Essa carga não alimenta automaticamente o núcleo. Veja o procedimento na
+[decisão 027](decisoes/027-administracao-documentos-cadastro-legado.md).
+
 O administrador importa os dados funcionais e, depois, eventos,
 afastamentos, incorporações e períodos IPAM, pela tela **Importação** ou por
 `npm run importacao`. Formatos, regras e exemplos estão em
@@ -199,10 +206,33 @@ afastamentos, incorporações e períodos IPAM, pela tela **Importação** ou po
 Repetir o mesmo arquivo não altera nada. Documentos emitidos mantêm seu
 snapshot e não mudam com novas importações.
 
+## Administrador: documentos e cadastro
+
+O administrador não cria DOF/DTC nem cópias. Pode visualizar, editar,
+conferir e emitir documentos existentes. Nos detalhes de um vínculo,
+**Editar cadastro** altera a pessoa e o vínculo no núcleo local com motivo
+obrigatório e revisão; CPF é validado/cifrado e a alteração é auditada.
+Isso não modifica a fonte externa nem os snapshots já emitidos.
+
+Para exclusão física, use **Excluir** na lista de rascunhos, conferidos,
+DTC ou **Histórico → Ações**. Informe motivo com ao menos 15 caracteres e
+digite exatamente `EXCLUIR DOCUMENTO <UUID>`. A revisão precisa continuar
+atual. Documentos com cópias dependentes são recusados; exclua as cópias antes.
+
+O serviço tenta remover o PDF protegido e depois os registros do documento,
+mantendo auditoria e numeração reservada. Se a resposta for **pendente**, o
+worker tenta novamente automaticamente a cada ciclo (cerca de 1,5 segundo,
+até cinco solicitações elegíveis; falhas são elegíveis após cinco segundos).
+Não há tela da fila ou retentativa manual; detalhes técnicos saneados ficam
+na outbox. `SISDOC_WORKER_EXCLUSAO=desligado` desativa esse worker.
+Downloads, impressões e backups não são apagados. Veja a
+[decisão 027](decisoes/027-administracao-documentos-cadastro-legado.md).
+
 ## Sincronização
 
-A tela **Administração → Sincronização** também reúne **Importação** e
-**Exportação de dados**. Para exportar, selecione tipo, origem, CSV/XLSX e,
+A tela **Administração → Importação** reúne **Importação** e
+**Exportação de dados**, separadas da Sincronização da API. Para exportar
+o núcleo, selecione tipo, origem, CSV/XLSX e,
 para afastamentos, a modalidade anual ou por intervalo. Confirme o download
 de dados pessoais completos e proteja o arquivo. Só administradores exportam;
 a ação é auditada. Veja limites e regras em

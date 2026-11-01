@@ -15,6 +15,7 @@ import {
   respostaSessaoSchema,
   resultadoConferenciaDofSchema,
   resultadoCopiaEmitidoSchema,
+  resultadoExclusaoDocumentoSchema,
   situacaoEmissaoSchema,
   snapshotEmissaoDofSchema,
   type Configuracao,
@@ -653,7 +654,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     const admin = historicoEmissoesSchema.parse(JSON.parse((await historico('admin', 'todos')).corpo));
     expect(admin.itens).toHaveLength(7);
     expect(admin.itens.every((item) => item.nome !== null && item.matricula !== null && item.podeBaixar
-      && item.podeCopiar && item.podeCancelar)).toBe(true);
+      && !item.podeCopiar && item.podeCancelar && item.podeExcluir)).toBe(true);
     expect((await historico('admin', 'proprio')).status).toBe(200);
     expect(historicoEmissoesSchema.parse(JSON.parse((await historico('analista', 'proprio', 'DTC')).corpo)).itens).toHaveLength(0);
     expect((await historico('analista', 'proprio', 'XYZ')).status).toBe(400);
@@ -691,6 +692,17 @@ describe('emissão da DOF em recursos descartáveis', () => {
     const original = await banco().query('SELECT status FROM documentos.documento WHERE id = $1', [origem.documentoId]);
     expect(original.rows[0].status).toBe('emitido');
     expect(await auditorias('rascunho_copiado_de_emissao', resultado.documentoId)).toBe(1);
+    const revisaoOrigem = (await banco().query<{ revisao: number }>(
+      'SELECT revisao FROM documentos.documento WHERE id = $1', [origem.documentoId],
+    )).rows[0].revisao;
+    const exclusaoComCopia = await requisitar({
+      metodo: 'POST', rota: `admin/documentos/${origem.documentoId}/excluir`, sessao: sessao('admin'),
+      corpo: {
+        revisao: revisaoOrigem, motivo: 'Limpeza fictícia após conferência do arquivo',
+        confirmacao: `EXCLUIR DOCUMENTO ${origem.documentoId}`,
+      },
+    });
+    expect(exclusaoComCopia.status, exclusaoComCopia.corpo).toBe(409);
     const coordenador = await requisitar({
       metodo: 'POST', rota: `documentos/${origem.documentoId}/copia`, sessao: sessao('coordenador2'), corpo: { confirmar: true },
     });
@@ -752,8 +764,8 @@ describe('emissão da DOF em recursos descartáveis', () => {
       aplicativo: { usuario: 'sisdoc_aplicativo', senha: senhaAplicativo },
     };
     const atualizado = await migrar(provisionamento);
-    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '016-acesso-admin' });
-    expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total).toBe(17);
+    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '019-planilhas-legado' });
+    expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total).toBe(20);
 
     const anterior = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_migrar', user: 'sisdoc_migrador', password: senhaMigrador,
@@ -789,9 +801,15 @@ describe('emissão da DOF em recursos descartáveis', () => {
       const semEmissao = await anterior.query("SELECT to_regclass('documentos.aprovacao_modelo') IS NULL AS ausente");
       expect(semEmissao.rows[0].ausente).toBe(true);
       const primeiraExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(primeiraExecucao).toEqual({ aplicadas: ['013-emissao', '014-dtc', '015-importacao', '016-acesso-admin'], versaoAtual: '016-acesso-admin' });
+      expect(primeiraExecucao).toEqual({
+        aplicadas: [
+          '013-emissao', '014-dtc', '015-importacao', '016-acesso-admin', '017-documentos-admin',
+          '018-edicao-cadastro', '019-planilhas-legado',
+        ],
+        versaoAtual: '019-planilhas-legado',
+      });
       const segundaExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '016-acesso-admin' });
+      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '019-planilhas-legado' });
       const privilegios = await anterior.query<{ inserir: boolean; aprovar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.emissao', 'snapshot_cifrado', 'INSERT') AS inserir,
           has_table_privilege('sisdoc_aplicativo', 'documentos.aprovacao_modelo', 'INSERT') AS aprovar
@@ -826,11 +844,19 @@ describe('emissão da DOF em recursos descartáveis', () => {
       'SELECT snapshot_cifrado, emitido_por FROM documentos.emissao WHERE id = $1', [emitida.emissaoId],
     );
     expect(snapshot.rows[0].emitido_por).toBe(idUsuario('admin'));
-    const copia = await requisitar({
+    const copiarComoAdmin = await requisitar({
       metodo: 'POST', rota: `documentos/${alvo.documentoId}/copia`, sessao: sessao('admin'), corpo: { confirmar: true },
     });
-    expect(copia.status, copia.corpo).toBe(201);
-    expect(resultadoCopiaEmitidoSchema.parse(JSON.parse(copia.corpo)).documentoId).not.toBe(alvo.documentoId);
+    expect(copiarComoAdmin.status, copiarComoAdmin.corpo).toBe(403);
+    expect((await requisitar({
+      metodo: 'POST', rota: 'documentos', sessao: sessao('admin'), corpo: {},
+    })).status).toBe(403);
+    expect((await requisitar({
+      metodo: 'POST', rota: 'dtc', sessao: sessao('admin'), corpo: {},
+    })).status).toBe(403);
+    expect((await requisitar({
+      metodo: 'POST', rota: `dtc/${alvo.documentoId}/copia`, sessao: sessao('admin'), corpo: { confirmar: true },
+    })).status).toBe(403);
     const cancelada = await requisitar({
       metodo: 'POST', rota: `documentos/${alvo.documentoId}/cancelar`, sessao: sessao('admin'),
       corpo: { motivo: 'Cancelamento administrativo fictício', confirmar: true },
@@ -864,5 +890,55 @@ describe('emissão da DOF em recursos descartáveis', () => {
     });
     expect(recolhida.status, recolhida.corpo).toBe(201);
     expect(rascunhoDofSchema.parse(JSON.parse(recolhida.corpo)).encaminhamento).toBeNull();
+  });
+
+  it('apaga documento e PDF após confirmação ativa, mantém auditoria e nunca reutiliza o número', async () => {
+    const alvo = await prepararConferida('Pessoa Exclusão Física Fictícia', 'analista2', 'admin');
+    const emitidaResposta = await emitir(alvo, randomUUID(), 'admin');
+    expect(emitidaResposta.status, emitidaResposta.corpo).toBe(200);
+    const emitida = situacaoEmissaoSchema.parse(JSON.parse(emitidaResposta.corpo));
+    await worker.ciclo();
+    const artefato = await banco().query<{ id: string; caminho_relativo: string; numero: string }>(`
+      SELECT a.id, a.caminho_relativo, e.numero::text AS numero FROM documentos.artefato_pdf a
+      JOIN documentos.emissao e ON e.id = a.emissao_id WHERE e.documento_id = $1
+    `, [alvo.documentoId]);
+    expect(artefato.rows).toHaveLength(1);
+    const arquivosAntes = await readdir(path.join(raiz, 'pdf'));
+    expect(arquivosAntes).toContain(artefato.rows[0].caminho_relativo);
+    const motivo = 'Exclusão administrativa sintética solicitada para teste';
+    const rota = `admin/documentos/${alvo.documentoId}/excluir`;
+    const corpo = { revisao: alvo.revisao, motivo, confirmacao: `EXCLUIR DOCUMENTO ${alvo.documentoId}` };
+    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('analista'), corpo })).status).toBe(403);
+    expect((await requisitar({
+      metodo: 'POST', rota, sessao: sessao('admin'), corpo: { ...corpo, revisao: alvo.revisao - 1 },
+    })).status).toBe(409);
+    expect((await requisitar({
+      metodo: 'POST', rota, sessao: sessao('admin'), corpo: { ...corpo, confirmacao: 'EXCLUIR' },
+    })).status).toBe(400);
+    const excluida = await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo });
+    expect(excluida.status, excluida.corpo).toBe(200);
+    expect(resultadoExclusaoDocumentoSchema.parse(JSON.parse(excluida.corpo))).toMatchObject({
+      estado: 'concluido', numero: emitida.numero,
+    });
+    expect((await banco().query('SELECT 1 FROM documentos.documento WHERE id = $1', [alvo.documentoId])).rows).toHaveLength(0);
+    expect((await banco().query('SELECT 1 FROM documentos.emissao WHERE documento_id = $1', [alvo.documentoId])).rows).toHaveLength(0);
+    expect(await readdir(path.join(raiz, 'pdf'))).not.toContain(artefato.rows[0].caminho_relativo);
+    const auditoria = await banco().query<{ detalhes: { motivo: string; numero: string; revisao: number } }>(`
+      SELECT detalhes FROM seguranca.auditoria
+      WHERE acao = 'documento_excluido_fisicamente' AND entidade_id = $1
+    `, [alvo.documentoId]);
+    expect(auditoria.rows).toHaveLength(1);
+    expect(auditoria.rows[0].detalhes).toMatchObject({ motivo, numero: emitida.numero, revisao: alvo.revisao });
+    const emissaoSeguinte = await prepararConferida('Pessoa Número Seguinte Fictícia', 'analista', 'coordenador');
+    const seguinte = await emitir(emissaoSeguinte, randomUUID());
+    expect(seguinte.status, seguinte.corpo).toBe(200);
+    const numero = (await banco().query<{ numero: string }>(
+      'SELECT numero::text FROM documentos.emissao WHERE documento_id = $1', [emissaoSeguinte.documentoId],
+    )).rows[0].numero;
+    const anterior = (await banco().query<{ numero_formatado: string }>(
+      'SELECT numero_formatado FROM documentos.exclusao_documento WHERE documento_id = $1', [alvo.documentoId],
+    )).rows[0]?.numero_formatado;
+    expect(anterior).toBe(emitida.numero);
+    expect(Number(numero)).toBeGreaterThan(Number(artefato.rows[0].numero));
   });
 });

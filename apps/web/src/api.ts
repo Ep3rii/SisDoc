@@ -14,6 +14,9 @@ import {
   type ResultadoTransicaoDtc,
   type TipoDtc,
   historicoEmissoesSchema,
+  resultadoExclusaoDocumentoSchema,
+  type ExcluirDocumento,
+  type ResultadoExclusaoDocumento,
   resultadoCopiaEmitidoSchema,
   situacaoEmissaoSchema,
   type CancelarEmitido,
@@ -43,6 +46,7 @@ import {
   ultimaDevolucaoDofSchema,
   usuarioAdministrativoSchema,
   type AtualizarUsuario,
+  type AtualizarServidor,
   type AtualizarBlocosDof,
   type AtualizarProcessoDof,
   type AtualizarRascunhoDof,
@@ -74,6 +78,8 @@ import {
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
   type TipoBuscaServidor,
+  resultadoEdicaoServidorSchema,
+  type ResultadoEdicaoServidor,
   type UsuarioAdministrativo,
   type UltimaDevolucaoDof,
 } from '@sisdoc/contratos';
@@ -200,6 +206,9 @@ export const api = {
   async servidor(id: string, cursor?: string): Promise<DetalheServidor> {
     return validar(detalheServidorSchema, await requisitar(`servidores/${id}?${parametros(cursor)}`));
   },
+  async atualizarServidor(csrf: string, pessoaId: string, dados: AtualizarServidor): Promise<ResultadoEdicaoServidor> {
+    return validar(resultadoEdicaoServidorSchema, await requisitar(`servidores/${pessoaId}`, 'PATCH', dados, csrf));
+  },
   async eventosServidor(id: string, vinculoId: string, cursor?: string): Promise<PaginaEventosServidor> {
     const consulta = new URLSearchParams({ vinculoId, limite: '25' });
     if (cursor) consulta.set('cursor', cursor);
@@ -285,6 +294,13 @@ export const api = {
   async copiarEmitido(csrf: string, documentoId: string, tipo: 'DOF' | TipoDtc = 'DOF'): Promise<ResultadoCopiaEmitido> {
     return validar(resultadoCopiaEmitidoSchema, await requisitar(
       `${tipo === 'DOF' ? 'documentos' : 'dtc'}/${documentoId}/copia`, 'POST', { confirmar: true }, csrf,
+    ));
+  },
+  async excluirDocumento(
+    csrf: string, documentoId: string, dados: ExcluirDocumento,
+  ): Promise<ResultadoExclusaoDocumento> {
+    return validar(resultadoExclusaoDocumentoSchema, await requisitar(
+      `admin/documentos/${documentoId}/excluir`, 'POST', dados, csrf,
     ));
   },
   async listarDtc(estado: 'rascunho' | 'conferido', tipo?: TipoDtc): Promise<PaginaDtc> {

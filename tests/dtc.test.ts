@@ -526,7 +526,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     expect((await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao('analista'), corpo: sobrepostos })).status).toBe(400);
     const processoInvalido = { ...corpoDtc('DTC_IPAM', fonte), processo: '12/34' };
     expect((await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao('analista'), corpo: processoInvalido })).status).toBe(400);
-    for (const quem of ['secretario']) {
+    for (const quem of ['secretario', 'admin']) {
       expect((await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao(quem), corpo: corpoDtc('DTC_IPAM', fonte) })).status)
         .toBe(403);
     }
@@ -882,8 +882,14 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       await anterior.query('COMMIT');
       const semDtc = await anterior.query("SELECT to_regclass('documentos.conferencia_dtc') IS NULL AS ausente");
       expect(semDtc.rows[0].ausente).toBe(true);
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: ['014-dtc', '015-importacao', '016-acesso-admin'], versaoAtual: '016-acesso-admin' });
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '016-acesso-admin' });
+      expect(await migrar(provisionamento)).toEqual({
+        aplicadas: [
+          '014-dtc', '015-importacao', '016-acesso-admin', '017-documentos-admin',
+          '018-edicao-cadastro', '019-planilhas-legado',
+        ],
+        versaoAtual: '019-planilhas-legado',
+      });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '019-planilhas-legado' });
       const privilegios = await anterior.query<{ conferencia: boolean; tabela: boolean; categoria: boolean; apagar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'conferido_por', 'INSERT') AS conferencia,
           has_table_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'INSERT') AS tabela,
@@ -942,10 +948,10 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       expect(atores.rows[0]).toEqual({
         criado_por: idUsuario('analista2'), conferido_por: idUsuario('admin'), emitido_por: idUsuario('admin'),
       });
-      const copia = await requisitar({
+      const copiaAdmin = await requisitar({
         metodo: 'POST', rota: `dtc/${criado.id}/copia`, sessao: sessao('admin'), corpo: { confirmar: true },
       });
-      expect(copia.status, copia.corpo).toBe(201);
+      expect(copiaAdmin.status, copiaAdmin.corpo).toBe(403);
       const cancelada = await requisitar({
         metodo: 'POST', rota: `documentos/${criado.id}/cancelar`, sessao: sessao('admin'),
         corpo: { motivo: 'Cancelamento administrativo fictício', confirmar: true },

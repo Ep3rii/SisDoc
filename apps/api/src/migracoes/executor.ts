@@ -5,7 +5,7 @@ const versoesConhecidas = [
   '006-processo-dof', '007-encaminhamento-dof', '008-preconferencia-dof', '009-confirmacao-inicio-dof',
   '010-devolucao-dof',
   '011-revisao-fonte-dof', '012-conferencia-dof', '013-emissao', '014-dtc', '015-importacao',
-  '016-acesso-admin',
+  '016-acesso-admin', '017-documentos-admin', '018-edicao-cadastro', '019-planilhas-legado',
 ] as const;
 export type VersaoMigracao = typeof versoesConhecidas[number];
 

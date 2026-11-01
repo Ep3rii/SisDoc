@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { LoteSincronizacao, PaginaSincronizacoes, SituacaoSincronizacao } from '@sisdoc/contratos';
 import { api } from './api';
-import { ExportacaoAdmin, ImportacaoAdmin } from './importacao';
 
 const nomesStatus: Record<LoteSincronizacao['status'], string> = {
   processando: 'Em processamento',
@@ -107,8 +106,6 @@ export function SincronizacaoAdmin({ csrf, onErro, onMensagem }: {
   return (
     <section aria-labelledby="sincronizacao-titulo">
       <h2 id="sincronizacao-titulo">Sincronização</h2>
-      <ImportacaoAdmin csrf={csrf} onErro={onErro} onMensagem={onMensagem} />
-      <ExportacaoAdmin csrf={csrf} onErro={onErro} onMensagem={onMensagem} />
       <p>Lotes de sincronização com a API externa. Os erros mostram apenas posição, referência técnica e motivo, sem dados pessoais.</p>
       {situacao && (
         <div className="painel">

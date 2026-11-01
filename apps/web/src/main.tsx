@@ -264,7 +264,9 @@ function App() {
             {sessao.usuario.papel === 'admin' && tela === 'importacao' && (
               <ImportacaoAdmin key={chaveTela} csrf={sessao.csrf} onErro={tratarErro} onMensagem={informar} />
             )}
-            {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf} podeSalvar={podeSalvar}
+            {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf}
+              podeSalvar={podeSalvar && sessao.usuario.papel !== 'admin'}
+              podeEditarCadastro={sessao.usuario.papel === 'admin'}
               consulta={consulta}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf} administrador={sessao.usuario.papel === 'admin'}

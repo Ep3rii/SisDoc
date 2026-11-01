@@ -53,7 +53,15 @@ async function simular(page: Page, papel: 'admin' | 'analista') {
       vinculos: [{ id: vinculoId, matricula: 'F-1', sistemaOrigem: 'planilha', matriculaAnteriorId: null, regimeJuridico: 'ESTATUTARIO',
         cargo: 'Cargo fictício', classe: null, nivel: null, referencia: 'A-1', setor: null, orgao: null, admissao: '2000-01-01',
         desligamento: null, removidoNaFonte: false }], proximoCursor: null };
-    else if (endpoint === `servidores/${pessoaId}/referencias`) dados = { pessoa: { Nome: 'Pessoa fictícia', CPF: 'CPF fictício completo', RG: 'RG fictício' },
+    else if (endpoint === `servidores/${pessoaId}/referencias`) dados = {
+      pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1',
+      cadastro: {
+        nome: 'Pessoa fictícia', cpf: '52998224725', nascimento: null, nomeMae: null, nomePai: null,
+        pisPasep: null, rgNumero: null, rgOrgao: null, rgExpedicao: null, tituloEleitor: null, endereco: null,
+        matricula: 'F-1', regimeJuridico: null, cargo: null, classe: null, nivel: null, referencia: null,
+        setor: null, orgaoCodigo: null, orgao: null, admissao: null, desligamento: null,
+      },
+      pessoa: { Nome: 'Pessoa fictícia', CPF: 'CPF fictício completo', RG: 'RG fictício' },
       registros: [{ id: randomUUID(), campos: { tipo: url.searchParams.get('tipo'), descricao: 'Referência fictícia' } }], proximoCursor: null };
     else {
       await rota.fulfill({ status: 404, contentType: 'application/json', body: JSON.stringify({ detail: `Mock ausente: ${endpoint}` }) });
@@ -63,13 +71,16 @@ async function simular(page: Page, papel: 'admin' | 'analista') {
   });
 }
 
-it('reúne importação e exportação na sincronização e baixa dados mediante confirmação', async () => {
+it('separa sincronização de importação/exportação e baixa dados mediante confirmação', async () => {
   const page = await browser.newPage({ acceptDownloads: true });
   try {
     await simular(page, 'admin');
     await page.goto(origem);
     await page.getByRole('button', { name: /^Sincronização/ }).click();
-    await page.getByRole('heading', { name: 'Exportação de dados' }).waitFor();
+    await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor();
+    expect(await page.getByRole('heading', { name: 'Exportação de dados' }).count()).toBe(0);
+    await page.getByRole('button', { name: /^Importação/ }).click();
+    await page.getByRole('heading', { name: 'Exportação de dados', exact: true }).waitFor();
     expect(await page.getByRole('button', { name: 'Validar arquivo' }).count()).toBe(1);
     let exportados: unknown;
     await page.route('**/api/v1/admin/importacoes/exportar', async (rota) => {
@@ -77,12 +88,56 @@ it('reúne importação e exportação na sincronização e baixa dados mediante
       expect(rota.request().headers()['x-csrf-token']).toBe('A'.repeat(43));
       await rota.fulfill({ status: 200, contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', body: Buffer.from('arquivo fictício') });
     });
+
     page.once('dialog', (dialog) => void dialog.accept());
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Exportar dados completos' }).click();
     expect((await download).suggestedFilename()).toBe('dados_funcionais-planilha.xlsx');
     expect(exportados).toEqual({ tipo: 'dados_funcionais', origem: 'planilha', formato: 'xlsx', afastamentos: 'anual' });
   } finally { await page.close(); }
+});
+
+it('seleciona legado na interface e valida/grava XLSX com cabeçalhos originais', async () => {
+      const page = await browser.newPage();
+      try {
+        await simular(page, 'admin');
+        await page.route('**/api/v1/admin/importacoes/legado', async (rota) => {
+          await rota.fulfill({ contentType: 'application/json', body: '[]' });
+        });
+        const { escreverXlsx } = await import('../apps/api/dist/importacao/planilhas.js');
+        const buffer = escreverXlsx([['Cabeçalho original', 'Código'], ['Pessoa fictícia', '0001']]);
+        const modos: string[] = [];
+        await page.route('**/api/v1/admin/importacoes?**', async (rota) => {
+          if (rota.request().method() === 'GET') {
+            await rota.fulfill({ contentType: 'application/json', body: JSON.stringify({ itens: [], proximoCursor: null }) });
+            return;
+          }
+          const url = new URL(rota.request().url());
+          expect(url.searchParams.get('destino')).toBe('legado');
+          const modo = url.searchParams.get('modo');
+          expect(rota.request().postDataBuffer()).toEqual(buffer);
+          modos.push(modo ?? '');
+          await rota.fulfill({ contentType: 'application/json', body: JSON.stringify({
+            destino: 'legado', modo, cabecalhos: ['Cabeçalho original', 'Código'], linhas: 1,
+            loteId: modo === 'gravar' ? randomUUID() : null, loteExistente: null,
+          }) });
+        });
+        await page.goto(origem);
+        await page.getByRole('button', { name: /^Importação/ }).click();
+        await page.getByLabel('Schema de destino').selectOption('legado');
+        expect(await page.getByLabel('Tipo de dado', { exact: true }).count()).toBe(0);
+        await page.getByLabel('Arquivo', { exact: true }).setInputFiles({ name: 'dados-ficticios.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer });
+        expect(await page.getByRole('button', { name: 'Gravar importação' }).isDisabled()).toBe(true);
+        await page.getByRole('button', { name: 'Validar arquivo' }).click();
+        await page.getByRole('heading', { name: 'Legado validado — nada foi gravado' }).waitFor();
+        await page.getByText(/Cabeçalhos preservados: Cabeçalho original/).waitFor();
+        page.once('dialog', (dialog) => void dialog.accept());
+        await page.getByRole('button', { name: 'Gravar importação' }).click();
+        await page.getByRole('heading', { name: 'Planilha no legado' }).waitFor();
+        expect(modos).toEqual(['validar', 'gravar']);
+        await page.getByLabel('Schema de destino').selectOption('nucleo');
+        expect(await page.getByRole('button', { name: 'Gravar importação' }).isDisabled()).toBe(true);
+      } finally { await page.close(); }
 });
 
 it('permite ao Cadastro consultar os dados completos e alternar as referências', async () => {

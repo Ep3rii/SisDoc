@@ -10,6 +10,8 @@ import { configuracaoProcessosSchema, configuracaoSchema, type Configuracao } fr
 import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
 import { aplicarAutenticacao } from '../migracoes/autenticacao';
 import { aplicarAcessoAdmin } from '../migracoes/acesso-admin';
+import { aplicarDocumentosAdmin } from '../migracoes/documentos-admin';
+import { aplicarEdicaoCadastro } from '../migracoes/edicao-cadastro';
 import { aplicarBlocosDof } from '../migracoes/blocos-dof';
 import { aplicarConfirmacaoInicioDof } from '../migracoes/confirmacao-inicio-dof';
 import { aplicarConferenciaDof } from '../migracoes/conferencia-dof';
@@ -24,6 +26,7 @@ import { aplicarProcessoDof } from '../migracoes/processo-dof';
 import { aplicarConsulta } from '../migracoes/consulta';
 import { aplicarRascunhoDof } from '../migracoes/rascunho-dof';
 import { aplicarModelo } from '../migracoes/modelo';
+import { aplicarPlanilhasLegado } from '../migracoes/planilhas-legado';
 import { ErroPoliticaSenha, gerarHashSenha, verificarSenha } from '../seguranca/senhas';
 
 const execFile = promisify(execFileCallback);
@@ -420,6 +423,9 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarDtc(cliente, opcoes.banco.usuario);
     await aplicarImportacao(cliente, opcoes.banco.usuario);
     await aplicarAcessoAdmin(cliente, opcoes.banco.usuario);
+    await aplicarDocumentosAdmin(cliente, opcoes.banco.usuario);
+    await aplicarEdicaoCadastro(cliente, opcoes.banco.usuario);
+    await aplicarPlanilhasLegado(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

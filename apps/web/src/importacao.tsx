@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   conferenciaImportacaoSchema, paginaLotesImportacaoSchema, relatorioImportacaoSchema, exportarDadosSchema,
+  planilhasLegadoSchema, relatorioPlanilhaLegadoSchema,
+  type LotePlanilhaLegado, type RelatorioPlanilhaLegado,
   type ConferenciaImportacao, type LoteImportacao, type PaginaLotesImportacao, type RelatorioImportacao, type TipoImportacao,
 } from '@sisdoc/contratos';
 import { ErroApi, requisitar, validar } from './api';
@@ -23,15 +25,31 @@ export function ExportacaoAdmin({ csrf, onErro, onMensagem }: {
   const [formato, setFormato] = useState<'csv' | 'xlsx'>('xlsx');
   const [afastamentos, setAfastamentos] = useState<'anual' | 'intervalo'>('anual');
   const [enviando, setEnviando] = useState(false);
+  const [destino, setDestino] = useState<'nucleo' | 'legado'>('nucleo');
+  const [lotesLegado, setLotesLegado] = useState<LotePlanilhaLegado[]>([]);
+  const [loteId, setLoteId] = useState('');
+  const [erroLegado, setErroLegado] = useState(false);
+  const [versaoLegado, setVersaoLegado] = useState(0);
+  useEffect(() => {
+    if (destino !== 'legado') return;
+    let ativo = true;
+    setErroLegado(false);
+    requisitar('admin/importacoes/legado').then((dados) => {
+      if (ativo) setLotesLegado(validar(planilhasLegadoSchema, dados));
+    }).catch((erro: unknown) => { if (ativo) { setErroLegado(true); onErro(erro); } });
+    return () => { ativo = false; };
+  }, [destino, versaoLegado, onErro]);
   async function exportar() {
     const dados = exportarDadosSchema.safeParse({ tipo, origem, formato, afastamentos });
-    if (!dados.success) { onErro(new ErroApi(400, 'Confira o tipo, origem e formato da exportação.')); return; }
+    if (destino === 'nucleo' && !dados.success) { onErro(new ErroApi(400, 'Confira o tipo, origem e formato da exportação.')); return; }
+    if (destino === 'legado' && !loteId) { onErro(new ErroApi(400, 'Selecione uma planilha legada para exportar.')); return; }
     if (!window.confirm('Exportar dados pessoais completos? Proteja o arquivo baixado e compartilhe apenas com pessoas autorizadas. O acesso será auditado.')) return;
     setEnviando(true);
     try {
-      const resposta = await fetch('/api/v1/admin/importacoes/exportar', {
+      const resposta = await fetch(destino === 'legado' ? '/api/v1/admin/importacoes/legado/exportar' : '/api/v1/admin/importacoes/exportar', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(dados.data),
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify(destino === 'legado' ? { loteId, formato } : dados.success ? dados.data : null),
       });
       if (!resposta.ok) {
         const problema: unknown = await resposta.json();
@@ -43,7 +61,7 @@ export function ExportacaoAdmin({ csrf, onErro, onMensagem }: {
       try {
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${dados.data.tipo}-${dados.data.origem}.${dados.data.formato}`;
+        link.download = destino === 'legado' ? `legado-${loteId}.${formato}` : `${tipo}-${origem}.${formato}`;
         document.body.appendChild(link);
         link.click();
         link.remove();
@@ -54,20 +72,30 @@ export function ExportacaoAdmin({ csrf, onErro, onMensagem }: {
   }
   return <section className="painel separado" aria-labelledby="exportacao-titulo">
     <h3 id="exportacao-titulo">Exportação de dados</h3>
-    <p>CSV/XLSX nos formatos da importação, por origem, somente registros ativos. Exportação não substitui backup do banco ou dos PDFs.</p>
+    <p>Núcleo: dados canônicos ativos. Legado: planilhas armazenadas com os cabeçalhos originais. Exportação não substitui backup.</p>
     <div className="grade-busca">
-      <label>Tipo<select value={tipo} onChange={(e) => {
+      <label>Schema de exportação<select value={destino} onChange={(e) => { setDestino(e.target.value === 'legado' ? 'legado' : 'nucleo'); setLoteId(''); }}>
+        <option value="nucleo">Núcleo — dados canônicos</option><option value="legado">Legado — planilhas originais</option>
+      </select></label>
+      {destino === 'nucleo' && <><label>Tipo<select value={tipo} onChange={(e) => {
         const valor = exportarDadosSchema.shape.tipo.safeParse(e.target.value);
         if (valor.success) setTipo(valor.data);
       }}>{Object.entries(nomesTipo).map(([valor, nome]) => <option key={valor} value={valor}>{nome}</option>)}</select></label>
-      <label>Origem<input required maxLength={63} value={origem} onChange={(e) => setOrigem(e.target.value)} /></label>
+      <label>Origem<input required maxLength={63} value={origem} onChange={(e) => setOrigem(e.target.value)} /></label></>}
+      {destino === 'legado' && <label>Planilha legada<select value={loteId} onChange={(e) => setLoteId(e.target.value)}>
+        <option value="">Selecionar lote</option>
+        {lotesLegado.map((lote) => <option key={lote.id} value={lote.id}>{lote.origem} — {lote.linhas} linhas — {dataHora(lote.importadoEm)}</option>)}
+      </select></label>}
       <label>Formato<select value={formato} onChange={(e) => setFormato(e.target.value === 'csv' ? 'csv' : 'xlsx')}>
         <option value="xlsx">XLSX (recomendado)</option><option value="csv">CSV UTF-8</option>
       </select></label>
-      {tipo === 'afastamentos' && <label>Modalidade<select value={afastamentos} onChange={(e) => setAfastamentos(e.target.value === 'intervalo' ? 'intervalo' : 'anual')}>
+      {destino === 'nucleo' && tipo === 'afastamentos' && <label>Modalidade<select value={afastamentos} onChange={(e) => setAfastamentos(e.target.value === 'intervalo' ? 'intervalo' : 'anual')}>
         <option value="anual">Totais anuais</option><option value="intervalo">Intervalos de datas</option>
       </select></label>}
     </div>
+    {destino === 'legado' && <button type="button" className="secundario" onClick={() => setVersaoLegado((v) => v + 1)}>
+      {erroLegado ? 'Tentar carregar planilhas novamente' : 'Atualizar planilhas legadas'}
+    </button>}
     <button type="button" disabled={enviando} onClick={() => void exportar()}>{enviando ? 'Exportando...' : 'Exportar dados completos'}</button>
   </section>;
 }
@@ -91,8 +119,8 @@ function dataHora(valor: string | null): string {
   return valor ? new Date(valor).toLocaleString('pt-BR') : '—';
 }
 
-async function enviarArquivo(csrf: string, tipo: TipoImportacao, origem: string, modo: 'validar' | 'gravar', arquivo: File): Promise<RelatorioImportacao> {
-  const consulta = new URLSearchParams({ tipo, origem, modo });
+async function enviarArquivo(csrf: string, tipo: TipoImportacao, origem: string, modo: 'validar' | 'gravar', arquivo: File, destino: 'nucleo' | 'legado'): Promise<RelatorioImportacao | RelatorioPlanilhaLegado> {
+  const consulta = new URLSearchParams({ tipo, origem, modo, destino });
   let resposta: Response;
   try {
     resposta = await fetch(`/api/v1/admin/importacoes?${consulta.toString()}`, {
@@ -116,7 +144,7 @@ async function enviarArquivo(csrf: string, tipo: TipoImportacao, origem: string,
       ? dados.detail : 'Não foi possível processar o arquivo.';
     throw new ErroApi(resposta.status, detalhe);
   }
-  return validar(relatorioImportacaoSchema, dados);
+  return destino === 'legado' ? validar(relatorioPlanilhaLegadoSchema, dados) : validar(relatorioImportacaoSchema, dados);
 }
 
 async function listarLotes(cursor?: string): Promise<PaginaLotesImportacao> {
@@ -174,9 +202,11 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   onMensagem: (mensagem: string) => void;
 }) {
   const [tipo, setTipo] = useState<TipoImportacao>('dados_funcionais');
+  const [destino, setDestino] = useState<'nucleo' | 'legado'>('nucleo');
   const [origem, setOrigem] = useState('planilha');
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [relatorio, setRelatorio] = useState<RelatorioImportacao | null>(null);
+  const [relatorioLegado, setRelatorioLegado] = useState<RelatorioPlanilhaLegado | null>(null);
   const [validadoPara, setValidadoPara] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [pagina, setPagina] = useState<PaginaLotesImportacao | null>(null);
@@ -197,7 +227,7 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
     return () => { ativa = false; };
   }, [cursor, versao, onErro]);
 
-  const assinatura = arquivo ? `${tipo}|${origem}|${arquivo.name}|${arquivo.size}|${arquivo.lastModified}` : null;
+  const assinatura = arquivo ? `${destino}|${tipo}|${origem}|${arquivo.name}|${arquivo.size}|${arquivo.lastModified}` : null;
 
   const processar = async (modo: 'validar' | 'gravar') => {
     if (!arquivo) return;
@@ -205,11 +235,12 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
       onErro(new ErroApi(413, 'O arquivo excede o limite de 64 MB.'));
       return;
     }
-    if (modo === 'gravar' && !window.confirm(`Gravar ${nomesTipo[tipo]} da origem "${origem}" no banco local? O lote poderá ser desfeito apenas pelo administrador técnico (npm run importacao -- --rollback).`)) return;
+    if (modo === 'gravar' && !window.confirm(`Gravar a planilha da origem "${origem}" no schema ${destino}? ${destino === 'legado' ? 'Cabeçalhos e linhas serão preservados, sem conversão para o núcleo.' : 'Os dados serão validados e consolidados no núcleo.'}`)) return;
     setEnviando(true);
     try {
-      const resultado = await enviarArquivo(csrf, tipo, origem, modo, arquivo);
-      setRelatorio(resultado);
+      const resultado = await enviarArquivo(csrf, tipo, origem, modo, arquivo, destino);
+      if ('destino' in resultado) { setRelatorioLegado(resultado); setRelatorio(null); }
+      else { setRelatorio(resultado); setRelatorioLegado(null); }
       if (modo === 'validar') setValidadoPara(assinatura);
       else {
         setValidadoPara(null);
@@ -226,22 +257,27 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
 
   return (
     <section aria-labelledby="importacao-titulo">
-      <h2 id="importacao-titulo">Importação de dados</h2>
-      <p>Carregue planilhas CSV ou XLSX no formato dos modelos em <code>referencias/modelos-importacao</code>. Valide primeiro; a gravação só é liberada após a validação do mesmo arquivo.</p>
+      <h2 id="importacao-titulo">Importação e exportação de dados</h2>
+      <p>Selecione o schema local: legado preserva os cabeçalhos do XLSX/CSV; núcleo exige o formato canônico dos modelos. Importar no legado não alimenta automaticamente a busca ou as declarações. Valide antes de gravar.</p>
       <div className="painel">
         <form className="formulario-importacao" onSubmit={(evento) => { evento.preventDefault(); void processar('validar'); }}>
-          <label>Tipo de dado
+          <label>Schema de destino<select value={destino} onChange={(e) => {
+            setDestino(e.target.value === 'legado' ? 'legado' : 'nucleo'); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null);
+          }}>
+            <option value="nucleo">Núcleo — pessoas e referências</option><option value="legado">Legado — preservar cabeçalhos da planilha</option>
+          </select></label>
+          {destino === 'nucleo' && <label>Tipo de dado
             <select value={tipo} onChange={(evento) => { setTipo(evento.target.value as TipoImportacao); setRelatorio(null); }}>
               {(Object.keys(nomesTipo) as TipoImportacao[]).map((chave) => <option key={chave} value={chave}>{nomesTipo[chave]}</option>)}
             </select>
-          </label>
+          </label>}
           <label>Origem
             <input value={origem} maxLength={63} pattern="[a-z0-9][a-z0-9_.\-]*" required
-              onChange={(evento) => { setOrigem(evento.target.value.toLowerCase()); setRelatorio(null); }} />
+              onChange={(evento) => { setOrigem(evento.target.value.toLowerCase()); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
           </label>
           <label>Arquivo
             <input ref={campoArquivo} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
-              onChange={(evento) => { setArquivo(evento.target.files?.[0] ?? null); setRelatorio(null); }} />
+              onChange={(evento) => { setArquivo(evento.target.files?.[0] ?? null); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
           </label>
           <div className="acoes">
             <button type="submit" disabled={enviando || !arquivo}>{enviando ? 'Processando...' : 'Validar arquivo'}</button>
@@ -250,6 +286,14 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
         </form>
       </div>
       {relatorio && <Relatorio relatorio={relatorio} />}
+      {relatorioLegado && <div className="painel" role="status">
+        <h3>{relatorioLegado.modo === 'validar' ? 'Legado validado — nada foi gravado' : 'Planilha no legado'}</h3>
+        <p>{relatorioLegado.linhas} linha(s), {relatorioLegado.cabecalhos.length} coluna(s).</p>
+        <p>Cabeçalhos preservados: {relatorioLegado.cabecalhos.join(' · ')}</p>
+        {relatorioLegado.loteId && <p>Lote: {relatorioLegado.loteId}</p>}
+        {relatorioLegado.loteExistente && <p>Arquivo já importado: {relatorioLegado.loteExistente}. Nenhuma alteração.</p>}
+      </div>}
+      <ExportacaoAdmin key={`exportacao-${versao}`} csrf={csrf} onErro={onErro} onMensagem={onMensagem} />
       {conferencia && (
         <div className="painel">
           <h3>Conferência por origem</h3>

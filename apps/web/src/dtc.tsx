@@ -23,6 +23,7 @@ import {
 import { renderizarPreviaDtc } from '@sisdoc/templates';
 import { api, ErroApi } from './api';
 import { PainelEmissao } from './emissao';
+import { ExclusaoDocumento } from './exclusao-documento';
 
 type Papel = RespostaSessao['usuario']['papel'];
 type Servidor = { pessoaId: string; vinculoId: string; nome: string; matricula: string };
@@ -462,6 +463,7 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
   const [estado, setEstado] = useState<'rascunho' | 'conferido'>('rascunho');
   const [pagina, setPagina] = useState<PaginaDtc | null>(null);
   const [versao, setVersao] = useState(0);
+  const [mensagem, setMensagem] = useState('');
   const voltar = useCallback(() => {
     if (!confirmarSaida()) return;
     onPendente(false);
@@ -499,21 +501,33 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
       <h2 id="dtc-titulo">{ROTULOS_DTC[tipo]}</h2>
       <p>{DESCRICOES[tipo]}</p>
       <div className="acoes">
-        <button type="button" onClick={() => { onLimpar(); setModo({ tela: 'busca' }); }}>Nova {ROTULOS_DTC[tipo]}</button>
+        {papel !== 'admin' && <button type="button" onClick={() => { onLimpar(); setModo({ tela: 'busca' }); }}>
+          Nova {ROTULOS_DTC[tipo]}</button>}
         <label>Situação<select value={estado} onChange={(evento) => setEstado(evento.target.value === 'conferido' ? 'conferido' : 'rascunho')}>
           <option value="rascunho">{papel === 'coordenador' || papel === 'admin' ? 'Rascunhos' : 'Meus rascunhos'}</option>
           <option value="conferido">Conferidas</option>
         </select></label>
       </div>
+      {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {!pagina ? <p role="status">Carregando...</p> : pagina.itens.length === 0 ? <p>Nenhum documento nesta situação.</p> : (
         <div className="tabela"><table>
           <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Revisão</th>
-            <th scope="col">Atualizado em</th><th scope="col">Autor</th><th scope="col">Ação</th></tr></thead>
+            <th scope="col">Atualizado em</th><th scope="col">Autor</th><th scope="col">Ações</th></tr></thead>
           <tbody>{pagina.itens.map((item) => (
             <tr key={item.id}><td>{item.nome}</td><td>{item.matricula}</td><td>{item.revisao}</td>
               <td>{new Date(item.atualizadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td><td>{item.autorNome}</td>
-              <td><button type="button" className="secundario" onClick={() => { onLimpar(); setModo({ tela: 'documento', id: item.id }); }}>
-                Abrir <span className="sr-only">{item.nome}</span></button></td></tr>
+              <td><div className="acoes">
+                <button type="button" className="secundario" onClick={() => { onLimpar(); setModo({ tela: 'documento', id: item.id }); }}>
+                  Abrir <span className="sr-only">{item.nome}</span></button>
+                {papel === 'admin' && <ExclusaoDocumento csrf={csrf} documentoId={item.id} revisao={item.revisao}
+                  descricao={`${item.status === 'rascunho' ? 'rascunho' : 'DTC conferida'} de ${item.nome}`}
+                  onErro={onErro} onPendente={onPendente} onConcluido={(resultado) => {
+                    setMensagem(resultado.estado === 'concluido'
+                      ? 'Documento apagado fisicamente; registros de auditoria foram preservados.'
+                      : 'Solicitação registrada e pendente de remoção segura do PDF ou liberação de dependências.');
+                    setVersao((atual) => atual + 1);
+                  }} />}
+              </div></td></tr>
           ))}</tbody>
         </table></div>
       )}

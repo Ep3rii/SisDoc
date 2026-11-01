@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import {
   buscarServidoresQuerySchema,
   referenciaServidorSchema,
+  atualizarServidorSchema,
+  type CadastroServidor,
   type ReferenciaServidor,
   type ReferenciaServidorQuery,
   type DetalheServidor,
@@ -16,12 +18,116 @@ type Props = { onErro: (erro: unknown) => void; onLimpar: () => void };
 type ProtecaoEdicao = { onPendente: (valor: boolean) => void; confirmarSaida: () => boolean };
 export type Consulta = { q: string; tipo: TipoBuscaServidor };
 
-function Referencias({ pessoaId, vinculoId, onErro }: { pessoaId: string; vinculoId: string; onErro: Props['onErro'] }) {
+function EditorCadastro({ dados, csrf, onErro, onPendente, confirmarSaida, onAtualizado }: {
+  dados: ReferenciaServidor;
+  csrf: string;
+  onErro: Props['onErro'];
+  onPendente: ProtecaoEdicao['onPendente'];
+  confirmarSaida: ProtecaoEdicao['confirmarSaida'];
+  onAtualizado: () => void;
+}) {
+  const [cadastro, setCadastro] = useState<CadastroServidor>(dados.cadastro);
+  const [motivo, setMotivo] = useState('');
+  const [ocupado, setOcupado] = useState(false);
+  const atualizarCampo = (campo: keyof CadastroServidor, valor: string) => {
+    setCadastro((atual) => ({ ...atual, [campo]: valor === '' ? null : valor }));
+    onPendente(true);
+  };
+  const cancelar = () => {
+    if (!confirmarSaida()) return;
+    onPendente(false);
+    setCadastro(dados.cadastro);
+    setMotivo('');
+    onAtualizado();
+  };
+  async function salvar(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const entrada = atualizarServidorSchema.safeParse({
+      pessoaId: dados.pessoaId,
+      vinculoId: dados.vinculoId,
+      revisaoPessoa: dados.revisaoPessoa,
+      revisaoVinculo: dados.revisaoVinculo,
+      cadastro,
+      motivo,
+    });
+    if (!entrada.success) {
+      onErro(new ErroApi(400, 'Confira os dados, o CPF, as datas e informe o motivo da edição.'));
+      return;
+    }
+    try {
+      setOcupado(true);
+      const resultado = await api.atualizarServidor(csrf, dados.pessoaId, entrada.data);
+      onPendente(false);
+      setMotivo('');
+      onAtualizado();
+      if (resultado.atualizado) return;
+    } catch (erro: unknown) {
+      onErro(erro);
+    } finally {
+      setOcupado(false);
+    }
+  }
+  const camposPessoais: ReadonlyArray<[keyof CadastroServidor, string]> = [
+    ['nome', 'Nome completo'], ['cpf', 'CPF'], ['nomeMae', 'Nome da mãe'], ['nomePai', 'Nome do pai'],
+    ['pisPasep', 'PIS/PASEP'], ['rgNumero', 'RG'], ['rgOrgao', 'Órgão expedidor do RG'],
+    ['tituloEleitor', 'Título de eleitor'],
+  ];
+  const camposVinculo: ReadonlyArray<[keyof CadastroServidor, string]> = [
+    ['matricula', 'Matrícula'], ['regimeJuridico', 'Regime jurídico'], ['cargo', 'Cargo'],
+    ['classe', 'Classe'], ['nivel', 'Nível'], ['referencia', 'Referência'], ['setor', 'Setor'],
+    ['orgaoCodigo', 'Código do órgão'], ['orgao', 'Órgão'],
+  ];
+  const campoData = (campo: keyof CadastroServidor, rotulo: string) => (
+    <label key={campo}>{rotulo}<input type="date" value={String(cadastro[campo] ?? '')}
+      onChange={(evento) => atualizarCampo(campo, evento.target.value)} /></label>
+  );
+  const campoTexto = (campo: keyof CadastroServidor, rotulo: string, maxLength: number) => (
+    <label key={campo}>{rotulo}<input value={String(cadastro[campo] ?? '')} maxLength={maxLength}
+      onChange={(evento) => atualizarCampo(campo, evento.target.value)} /></label>
+  );
+  return (
+    <form className="painel separado" onSubmit={salvar} aria-label="Editar cadastro local do servidor">
+      <h4>Editar cadastro local</h4>
+      <p className="aviso">A edição altera somente o núcleo local; origem, vínculos de origem e snapshots de documentos são preservados. Informe um motivo obrigatório; ele será armazenado cifrado.</p>
+      <div className="grade-formulario">
+        {camposPessoais.map(([campo, rotulo]) => campoTexto(campo, rotulo, campo === 'cpf' ? 14 : 200))}
+        {campoData('nascimento', 'Nascimento')}
+        {campoData('rgExpedicao', 'Expedição do RG')}
+        <label>Endereço<textarea value={cadastro.endereco ?? ''} maxLength={500}
+          onChange={(evento) => atualizarCampo('endereco', evento.target.value)} /></label>
+      </div>
+      <h5>Vínculo selecionado</h5>
+      <div className="grade-formulario">
+        {camposVinculo.map(([campo, rotulo]) => campoTexto(campo, rotulo, campo === 'matricula' ? 100 : 200))}
+        {campoData('admissao', 'Admissão')}
+        {campoData('desligamento', 'Desligamento')}
+      </div>
+      <label>Motivo da edição<textarea value={motivo} minLength={5} maxLength={2000} required
+        onChange={(evento) => { setMotivo(evento.target.value); onPendente(true); }} /></label>
+      <div className="acoes">
+        <button type="submit" disabled={ocupado}>{ocupado ? 'Salvando...' : 'Salvar edição local'}</button>
+        <button type="button" className="secundario" disabled={ocupado} onClick={cancelar}>Cancelar edição</button>
+      </div>
+    </form>
+  );
+}
+
+function Referencias({ pessoaId, vinculoId, csrf, podeEditarCadastro, onErro, onPendente, confirmarSaida, onAtualizado }: {
+  pessoaId: string;
+  vinculoId: string;
+  csrf: string;
+  podeEditarCadastro: boolean;
+  onErro: Props['onErro'];
+  onPendente: ProtecaoEdicao['onPendente'];
+  confirmarSaida: ProtecaoEdicao['confirmarSaida'];
+  onAtualizado: () => void;
+}) {
   const [tipo, setTipo] = useState<ReferenciaServidorQuery['tipo']>('eventos_funcionais');
   const [cursor, setCursor] = useState<string | undefined>();
   const [dados, setDados] = useState<ReferenciaServidor | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
+  const [editando, setEditando] = useState(false);
   useEffect(() => {
     let ativa = true;
     setDados(null);
@@ -49,6 +155,11 @@ function Referencias({ pessoaId, vinculoId, onErro }: { pessoaId: string; vincul
     </select></label>
     {falhou ? <button type="button" onClick={() => setVersao((v) => v + 1)}>Tentar carregar referências novamente</button>
       : !dados ? <p role="status">Carregando referências...</p> : <>
+        {podeEditarCadastro && !editando && <button type="button" className="secundario"
+          onClick={() => setEditando(true)}>Editar cadastro local</button>}
+        {podeEditarCadastro && editando && <EditorCadastro key={`${dados.revisaoPessoa}-${dados.revisaoVinculo}`}
+          dados={dados} csrf={csrf} onErro={onErro} onPendente={onPendente} confirmarSaida={confirmarSaida}
+          onAtualizado={() => { setEditando(false); onAtualizado(); setVersao((v) => v + 1); }} />}
         <dl>{Object.entries(dados.pessoa).map(([nome, valor]) => <div key={nome}><dt>{nome}</dt><dd>{valor ?? 'Não informado'}</dd></div>)}</dl>
         {dados.registros.length === 0 && <p>Nenhum registro deste tipo.</p>}
         {dados.registros.map((registro) => <dl className="bloco" key={registro.id}>
@@ -133,8 +244,9 @@ function Eventos({ pessoaId, vinculoId, onErro, onLimpar }: Props & { pessoaId: 
   );
 }
 
-function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
-  pessoaId: string; csrf: string; podeSalvar: boolean; onFechar: () => void;
+function Detalhe({ pessoaId, csrf, podeSalvar, podeEditarCadastro, onCadastroAtualizado, onFechar, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
+  pessoaId: string; csrf: string; podeSalvar: boolean; podeEditarCadastro: boolean;
+  onCadastroAtualizado: () => void; onFechar: () => void;
 }) {
   const [detalhe, setDetalhe] = useState<DetalheServidor | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
@@ -180,7 +292,12 @@ function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPen
             <option value="">Selecionar para consultar dados completos</option>
             {detalhe.vinculos.map((vinculo) => <option key={vinculo.id} value={vinculo.id}>{vinculo.matricula} — {vinculo.sistemaOrigem}</option>)}
           </select></label>
-          {referenciaId && <Referencias key={referenciaId} pessoaId={pessoaId} vinculoId={referenciaId} onErro={onErro} />}
+          {referenciaId && <Referencias key={referenciaId} pessoaId={pessoaId} vinculoId={referenciaId}
+            csrf={csrf} podeEditarCadastro={podeEditarCadastro} onErro={onErro} onPendente={onPendente}
+            confirmarSaida={confirmarSaida} onAtualizado={() => {
+              setVersao((atual) => atual + 1);
+              onCadastroAtualizado();
+            }} />}
           <div className="tabela"><table>
             <thead><tr><th scope="col">Matrícula</th><th scope="col">Origem</th><th scope="col">Regime</th><th scope="col">Cargo / referência</th><th scope="col">Classe / nível</th><th scope="col">Órgão / setor</th><th scope="col">Admissão / desligamento</th><th scope="col">Vínculo anterior</th><th scope="col">Eventos</th><th scope="col">Cálculo</th></tr></thead>
             <tbody>{detalhe.vinculos.map((vinculo) => {
@@ -224,8 +341,8 @@ function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPen
   );
 }
 
-export function Servidores({ csrf, podeSalvar, consulta, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
-  csrf: string; podeSalvar: boolean; consulta: Consulta | null;
+export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
+  csrf: string; podeSalvar: boolean; podeEditarCadastro: boolean; consulta: Consulta | null;
 }) {
   const [pagina, setPagina] = useState<PaginaBuscaServidores | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
@@ -280,6 +397,7 @@ export function Servidores({ csrf, podeSalvar, consulta, onErro, onLimpar, onPen
         </>
       ))}
       {pessoaId && <Detalhe key={pessoaId} pessoaId={pessoaId} csrf={csrf} podeSalvar={podeSalvar}
+        podeEditarCadastro={podeEditarCadastro} onCadastroAtualizado={() => setVersao((atual) => atual + 1)}
         onFechar={() => setPessoaId(null)} onErro={onErro} onLimpar={onLimpar}
         onPendente={onPendente} confirmarSaida={confirmarSaida} />}
     </section>

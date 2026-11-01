@@ -35,6 +35,7 @@ type LinhaSituacao = {
   emitido_por_nome: string;
   criado_por: string;
   status: 'emitido' | 'cancelado';
+  revisao: number;
   cancelado_em: Date | null;
   pdf_status: SituacaoEmissao['pdf']['status'];
   tentativas: number;
@@ -62,7 +63,7 @@ function concluir<T>(tentativa: Tentativa<T>): T {
 }
 
 const consultaSituacao = `
-  SELECT e.id, e.documento_id, d.pessoa_id, e.tipo, e.numero_formatado, e.emitido_em, e.emitido_por,
+  SELECT e.id, e.documento_id, d.pessoa_id, d.revisao, e.tipo, e.numero_formatado, e.emitido_em, e.emitido_por,
     emitente.nome AS emitido_por_nome, d.criado_por, d.status, d.cancelado_em,
     j.status AS pdf_status, j.tentativas, j.erro_sanitizado, p.id AS artefato_id, p.sha256,
     pessoa.nome, v.matricula
@@ -161,6 +162,10 @@ export class EmissoesService {
         await auditarConsultaFuncional(cliente, sessao, 'pdf_indisponivel', 'emissao', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'O PDF ainda não está disponível. Aguarde a geração e tente novamente.' } };
       }
+      await cliente.query(
+        'SELECT pg_advisory_xact_lock_shared(hashtextextended($1, 0))',
+        [linha.documento_id],
+      );
       const dados = this.snapshot(linha, linha.snapshot_cifrado);
       const mesmoDia = await cliente.query<{ id: string; snapshot_cifrado: Buffer }>(`
         SELECT e.id, e.snapshot_cifrado FROM documentos.emissao e
@@ -206,6 +211,8 @@ export class EmissoesService {
       const linhas = await cliente.query<LinhaSituacao>(`
         ${consultaSituacao}
         WHERE e.tipo = ANY($1::text[]) AND ($2::boolean OR d.criado_por = $3 OR e.emitido_por = $3)
+          AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x
+            WHERE x.documento_id = d.id AND x.status = 'pendente')
         ORDER BY e.emitido_em DESC, e.id DESC LIMIT $4
       `, [tiposPorGrupo[consulta.tipo], todos, sessao.usuario.id, todos ? 50 : 5]);
       await auditarConsultaFuncional(
@@ -223,6 +230,8 @@ export class EmissoesService {
             && (participa || papel === 'coordenador' || papel === 'admin'),
           podeCancelar: linha.status === 'emitido' && perfilPermiteAcao(papel, 'cancelar_emitido'),
           podeBaixar: ve && situacao.pdf.disponivel,
+          revisao: linha.revisao,
+          podeExcluir: perfilPermiteAcao(papel, 'administrar_documentos'),
         };
       });
       return historicoEmissoesSchema.parse({ grupo: consulta.tipo, escopo: consulta.escopo, itens });

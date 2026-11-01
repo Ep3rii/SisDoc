@@ -5,8 +5,11 @@ declarações: DOF, DTC IPAM, DTC Comissionado e DTC INSS.
 
 Destinado ao setor de Cadastro (analista/coordenador), com dados de referência
 completos para DOF/DTC. O administrador da Informática tem acesso funcional
-completo para revisão e operação. A tela Sincronização reúne importação e
-exportação CSV/XLSX ([decisão 026](docs/decisoes/026-cadastro-informatica-e-exportacao.md)).
+para revisão e operação de documentos existentes, mas não os cria.
+A tela Importação reúne importação e exportação CSV/XLSX, com seleção de
+schema Núcleo/Legado; Sincronização é separada. O cadastro é editado no
+núcleo local com auditoria
+([decisão 027](docs/decisoes/027-administracao-documentos-cadastro-legado.md)).
 
 **Autorizado para uso operacional local em 31/10/2026** ([decisão 021](docs/decisoes/021-autorizacao-operacional.md)),
 nas funções existentes: consulta de servidores, cálculo, rascunhos, prévia e

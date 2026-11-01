@@ -15,7 +15,10 @@ fonte externa. O cálculo é puro e compartilhado pelo servidor e navegador.
 O setor usuário é Cadastro de Pessoas (analista/coordenador). O administrador
 é da Informática e possui acesso funcional completo, por autorização explícita
 na [decisão 026](../decisoes/026-cadastro-informatica-e-exportacao.md).
-Sincronização reúne transferência por arquivos e integração com a API.
+A [decisão 027](../decisoes/027-administracao-documentos-cadastro-legado.md)
+separa Sincronização da transferência por arquivos (Importação/Exportação),
+permite edição do cadastro local, retira criação/cópia de documentos do
+administrador e autoriza exclusão física controlada.
 
 Há uma única instalação operacional, destinada à produção. O banco inicia
 vazio; dados reais são importados por usuário autorizado. Testes usam apenas

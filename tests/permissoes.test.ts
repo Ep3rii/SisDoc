@@ -5,7 +5,9 @@ const papeis: Papel[] = ['analista', 'coordenador', 'secretario_adjunto', 'admin
 const esperado: Record<Acao, Papel[]> = {
   consultar_pessoa: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
   calcular: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
-  criar_rascunho: ['analista', 'coordenador', 'admin'],
+  consultar_documentos: ['analista', 'coordenador', 'admin'],
+  administrar_documentos: ['admin'],
+  criar_rascunho: ['analista', 'coordenador'],
   editar_rascunho: ['analista', 'coordenador', 'admin'],
   receber_encaminhamento: ['coordenador', 'admin'],
   conferir: ['analista', 'coordenador', 'admin'],
@@ -21,6 +23,7 @@ const esperado: Record<Acao, Papel[]> = {
   consultar_auditoria: ['secretario_adjunto', 'admin'],
   administrar_importacao: ['admin'],
   administrar_sincronizacao: ['admin'],
+  editar_servidor: ['admin'],
   consultar_situacao_sincronizacao: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
   sincronizar_individual: ['analista', 'coordenador', 'admin'],
 };

@@ -153,7 +153,31 @@ export class ProcessadorPdfEmissao {
   async processarUm(): Promise<ResultadoProcessamentoEmissao> {
     const trabalho = await this.reivindicar();
     if (!trabalho) return { estado: 'sem_trabalho' };
+    const trava = await this.banco.connect();
+    let travaObtida = false;
+    let falha: unknown;
     try {
+      await trava.query(
+        'SELECT pg_advisory_lock_shared(hashtextextended($1, 0))',
+        [trabalho.documentoId],
+      );
+      travaObtida = true;
+      const elegivel = await transacao(this.banco, async (cliente) => {
+        const consulta = await cliente.query(`
+          SELECT 1
+          FROM documentos.documento d
+          JOIN documentos.emissao e ON e.documento_id = d.id
+          JOIN documentos.job_pdf j ON j.emissao_id = e.id
+          WHERE d.id = $1 AND e.id = $2 AND j.id = $3
+            AND j.status = 'processando' AND j.posse = $4
+            AND NOT EXISTS (
+              SELECT 1 FROM documentos.exclusao_documento x
+              WHERE x.documento_id = d.id AND x.status = 'pendente'
+            )
+        `, [trabalho.documentoId, trabalho.emissaoId, trabalho.id, trabalho.posse]);
+        return consulta.rowCount === 1;
+      });
+      if (!elegivel) return { estado: 'posse_perdida', jobId: trabalho.id, emissaoId: trabalho.emissaoId };
       const renderizar = this.renderizadores[trabalho.tipo];
       if (!renderizar) throw new Error('Tipo de documento sem template de emissão.');
       const protegido = this.protetor.decifrar(trabalho.snapshotCifrado, {
@@ -170,6 +194,7 @@ export class ProcessadorPdfEmissao {
       }
       return { estado: 'concluido', jobId: trabalho.id, emissaoId: trabalho.emissaoId, artefatoId: trabalho.posse };
     } catch (erro) {
+      falha = erro;
       let atualizado: boolean;
       try {
         atualizado = await this.falhar(trabalho);
@@ -178,6 +203,20 @@ export class ProcessadorPdfEmissao {
       }
       if (!atualizado) return { estado: 'posse_perdida', jobId: trabalho.id, emissaoId: trabalho.emissaoId };
       return { estado: 'falhou', jobId: trabalho.id, emissaoId: trabalho.emissaoId };
+    } finally {
+      try {
+        if (travaObtida) {
+          await trava.query(
+            'SELECT pg_advisory_unlock_shared(hashtextextended($1, 0))',
+            [trabalho.documentoId],
+          );
+        }
+      } catch (erroDesbloqueio) {
+        if (falha) throw new AggregateError([falha, erroDesbloqueio], 'Falha ao liberar o bloqueio do PDF.');
+        throw erroDesbloqueio;
+      } finally {
+        trava.release(falha instanceof Error ? falha : undefined);
+      }
     }
   }
 }

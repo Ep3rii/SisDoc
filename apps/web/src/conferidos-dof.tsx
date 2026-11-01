@@ -3,6 +3,7 @@ import type { PaginaConferidosDof, PreviaConferidaDof, SituacaoEmissao } from '@
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { api, ErroApi } from './api';
 import { PainelEmissao } from './emissao';
+import { ExclusaoDocumento } from './exclusao-documento';
 
 type Props = {
   csrf: string;
@@ -211,15 +212,25 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
           {pagina.itens.length === 0 ? <p>Nenhuma DOF conferida encontrada.</p> : (
             <div className="tabela"><table>
               <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Autor</th>
-                <th scope="col">Revisão</th><th scope="col">Conferida por</th><th scope="col">Fonte</th><th scope="col">Ação</th></tr></thead>
+                <th scope="col">Revisão</th><th scope="col">Conferida por</th><th scope="col">Fonte</th><th scope="col">Ações</th></tr></thead>
               <tbody>{pagina.itens.map((item) => (
                 <tr key={item.id}>
                   <td>{item.nome}</td><td>{item.matricula}</td><td>{item.autorNome}</td><td>{item.revisao}</td>
                   <td>{item.conferidoPorNome}</td>
                   <td>{item.fonteSelecionadaAlterada ? 'Pessoa ou vínculo alterado' : 'Sem alteração detectada na pessoa e no vínculo'}</td>
-                  <td><button type="button" className="secundario" onClick={() => {
-                    onLimpar(); setMensagem(''); setRevisado(false); setEmissao(null); setSelecionado(item);
-                  }}>Abrir <span className="sr-only">DOF de {item.nome}, matrícula {item.matricula}</span></button></td>
+                  <td><div className="acoes">
+                    <button type="button" className="secundario" onClick={() => {
+                      onLimpar(); setMensagem(''); setRevisado(false); setEmissao(null); setSelecionado(item);
+                    }}>Abrir <span className="sr-only">DOF de {item.nome}, matrícula {item.matricula}</span></button>
+                    {administrador && <ExclusaoDocumento csrf={csrf} documentoId={item.id} revisao={item.revisao}
+                      descricao={`DOF conferida de ${item.nome}`} onErro={onErro} onPendente={onPendente}
+                      onConcluido={(resultado) => {
+                        setMensagem(resultado.estado === 'concluido'
+                          ? 'Documento apagado fisicamente; registros de auditoria foram preservados.'
+                          : 'Solicitação registrada e pendente de remoção segura do PDF ou liberação de dependências.');
+                        setVersao((atual) => atual + 1);
+                      }} />}
+                  </div></td>
                 </tr>
               ))}</tbody>
             </table></div>

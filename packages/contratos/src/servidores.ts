@@ -29,6 +29,9 @@ export const eventosServidorQuerySchema = z.strictObject({
 });
 
 const dataOpcional = z.iso.date().nullable();
+const textoOpcionalCadastro = (maximo = 200) => z.string().trim().max(maximo)
+  .regex(/^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]*$/).nullable().transform((valor) => valor || null);
+const textoCadastro = (maximo: number) => z.string().trim().min(1).max(maximo).regex(/^[^\x00-\x1f\x7f]+$/);
 
 export const paginaBuscaServidoresSchema = z.strictObject({
   itens: z.array(z.strictObject({
@@ -91,6 +94,41 @@ export const referenciaServidorQuerySchema = z.strictObject({
   cursor: z.uuid().optional(),
 });
 export const referenciaServidorSchema = z.strictObject({
+  pessoaId: z.uuid(),
+  vinculoId: z.uuid(),
+  revisaoPessoa: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  revisaoVinculo: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  cadastro: z.strictObject({
+    nome: textoCadastro(200),
+    cpf: cpfSchema,
+    nascimento: dataOpcional,
+    nomeMae: textoOpcionalCadastro(),
+    nomePai: textoOpcionalCadastro(),
+    pisPasep: textoOpcionalCadastro(),
+    rgNumero: textoOpcionalCadastro(),
+    rgOrgao: textoOpcionalCadastro(100),
+    rgExpedicao: dataOpcional,
+    tituloEleitor: textoOpcionalCadastro(),
+    endereco: textoOpcionalCadastro(500),
+    matricula: textoCadastro(100),
+    regimeJuridico: textoOpcionalCadastro(),
+    cargo: textoOpcionalCadastro(),
+    classe: textoOpcionalCadastro(),
+    nivel: textoOpcionalCadastro(),
+    referencia: textoOpcionalCadastro(),
+    setor: textoOpcionalCadastro(),
+    orgaoCodigo: textoOpcionalCadastro(100),
+    orgao: textoOpcionalCadastro(),
+    admissao: dataOpcional,
+    desligamento: dataOpcional,
+  }).superRefine((dados, contexto) => {
+    if (normalizarNomeBusca(dados.nome).length === 0) {
+      contexto.addIssue({ code: 'custom', path: ['nome'], message: 'Informe um nome com caracteres pesquisáveis.' });
+    }
+    if (dados.admissao && dados.desligamento && dados.desligamento < dados.admissao) {
+      contexto.addIssue({ code: 'custom', path: ['desligamento'], message: 'Desligamento não pode ser anterior à admissão.' });
+    }
+  }),
   pessoa: z.record(z.string(), z.string().nullable()),
   registros: z.array(z.strictObject({
     id: z.uuid(),
@@ -98,5 +136,22 @@ export const referenciaServidorSchema = z.strictObject({
   })),
   proximoCursor: z.uuid().nullable(),
 });
+export const cadastroServidorSchema = referenciaServidorSchema.shape.cadastro;
+export const atualizarServidorSchema = z.strictObject({
+  pessoaId: z.uuid(),
+  vinculoId: z.uuid(),
+  revisaoPessoa: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  revisaoVinculo: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  cadastro: cadastroServidorSchema,
+  motivo: z.string().trim().min(5).max(2000).regex(/^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+$/),
+});
+export const resultadoEdicaoServidorSchema = z.strictObject({
+  atualizado: z.literal(true),
+  revisaoPessoa: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  revisaoVinculo: z.string().regex(/^[1-9][0-9]{0,18}$/),
+});
 export type ReferenciaServidorQuery = z.infer<typeof referenciaServidorQuerySchema>;
 export type ReferenciaServidor = z.infer<typeof referenciaServidorSchema>;
+export type CadastroServidor = z.infer<typeof cadastroServidorSchema>;
+export type AtualizarServidor = z.infer<typeof atualizarServidorSchema>;
+export type ResultadoEdicaoServidor = z.infer<typeof resultadoEdicaoServidorSchema>;

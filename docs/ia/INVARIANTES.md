@@ -24,7 +24,9 @@
   seguro e CSRF nas escritas autenticadas.
 - Permissões são verificadas no servidor. A decisão 026 amplia explicitamente
   o administrador de Informática para consulta e operação funcional, inclusive
-  documentos de terceiros; os demais perfis mantêm seus limites. Consultas e ações sensíveis são
+  documentos de terceiros. A decisão 027 retira a criação/cópia de documentos,
+  autoriza exclusão física controlada e edição do cadastro local; auditoria e
+  numeração preservada continuam obrigatórias. Os demais perfis mantêm seus limites. Consultas e ações sensíveis são
   auditadas; a aplicação não altera ou apaga registros de auditoria.
 - Entrada é validada no servidor; HTML é escapado e prévia não executa scripts.
   Dados pessoais não são guardados em `localStorage` ou `sessionStorage`.

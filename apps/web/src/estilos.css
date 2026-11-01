@@ -94,6 +94,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   border-radius: .25rem;
 }
 .painel textarea, .editor-dof textarea { min-height: 5rem; resize: vertical; }
+.grade-formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 0 1rem; }
 button { padding: .55rem .9rem; color: #fff; background: #0d4b6a; border: 1px solid #0d4b6a; border-radius: .3rem; font-weight: 600; }
 button.secundario { color: #0d4b6a; background: #fff; border-color: #bbcbd5; }
 button.cabecalho-botao { color: #fff; background: transparent; border-color: #fff; }
@@ -184,3 +185,29 @@ th { background: #e7eef2; }
 .relatorio-importacao .contagens dt { font-size: .75rem; color: #526775; }
 .relatorio-importacao .contagens dd { margin: 0; font-size: 1.2rem; font-weight: 700; }
 .relatorio-importacao .discreta { color: #526775; font-size: .8rem; }
+.exclusao-documento {
+  min-width: 15rem;
+  text-align: left;
+}
+
+.exclusao-documento summary {
+  color: #8c1d18;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.exclusao-documento form {
+  display: grid;
+  gap: 0.6rem;
+  max-width: 24rem;
+  padding: 0.75rem 0;
+}
+
+.exclusao-documento textarea,
+.exclusao-documento input {
+  width: 100%;
+}
+
+.exclusao-documento code {
+  overflow-wrap: anywhere;
+}

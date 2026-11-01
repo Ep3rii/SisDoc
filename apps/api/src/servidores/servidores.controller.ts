@@ -1,5 +1,8 @@
-import { BadRequestException, Controller, Get, Param, Query, Req } from '@nestjs/common';
-import { buscarServidoresQuerySchema, eventosServidorQuerySchema, paginaUuidQuerySchema, referenciaServidorQuerySchema } from '@sisdoc/contratos';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Query, Req } from '@nestjs/common';
+import {
+  atualizarServidorSchema, buscarServidoresQuerySchema, eventosServidorQuerySchema,
+  paginaUuidQuerySchema, referenciaServidorQuerySchema,
+} from '@sisdoc/contratos';
 import { z } from 'zod';
 import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } from '../seguranca/guarda';
 import { ServidoresService } from './servidores';
@@ -13,6 +16,17 @@ function pessoaId(valor: string): string {
 @Controller('servidores')
 export class ServidoresController {
   constructor(private readonly servidores: ServidoresService) {}
+
+  @ExigirAcao('editar_servidor')
+  @Patch(':id')
+  atualizar(@Param('id') id: string, @Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const pessoa = pessoaId(id);
+    const dados = atualizarServidorSchema.safeParse(corpo);
+    if (!dados.success || dados.data.pessoaId !== pessoa) {
+      throw new BadRequestException('Confira os dados, as revisões e o motivo obrigatório da edição.');
+    }
+    return this.servidores.atualizar(exigirSessao(req), ipRequisicao(req), dados.data);
+  }
 
   @ExigirAcao('consultar_pessoa')
   @Get(':id/referencias')

@@ -6,6 +6,7 @@ import { z } from 'zod';
 
 type OperacoesArquivo = Pick<typeof fs, 'lstat' | 'realpath' | 'open' | 'readFile' | 'link' | 'unlink'>;
 type ResultadoArmazenamento = { caminhoRelativo: string; sha256: string; reutilizado: boolean };
+export type ResultadoRemocaoPdf = 'removido' | 'ausente';
 
 function identificadorArquivo(entrada: string): string {
   const resultado = z.uuid().safeParse(entrada);
@@ -131,5 +132,23 @@ export class ArmazenamentoPdf {
     if (hash(pdf) !== sha256Esperado) throw new Error('O PDF armazenado não corresponde ao hash esperado.');
     validarPdf(pdf);
     return pdf;
+  }
+
+  async remover(artefatoId: string, sha256Esperado: string): Promise<ResultadoRemocaoPdf> {
+    const id = identificadorArquivo(artefatoId);
+    if (!/^[0-9a-f]{64}$/.test(sha256Esperado)) throw new Error('O hash esperado do PDF é inválido.');
+    const raiz = await this.raiz();
+    const caminho = path.join(raiz, `${id}.pdf`);
+    let pdf: Buffer;
+    try {
+      pdf = await this.lerArquivo(caminho);
+    } catch (erro) {
+      if (temCodigo(erro, 'ENOENT')) return 'ausente';
+      throw erro;
+    }
+    if (hash(pdf) !== sha256Esperado) throw new Error('O PDF armazenado não corresponde ao hash esperado.');
+    validarPdf(pdf);
+    await this.arquivos.unlink(caminho);
+    return 'removido';
   }
 }

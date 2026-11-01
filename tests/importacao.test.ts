@@ -8,6 +8,7 @@ import {
   conferenciaImportacaoSchema, paginaLotesImportacaoSchema, relatorioImportacaoSchema, respostaSessaoSchema,
   type Configuracao, type RelatorioImportacao, type TipoImportacao,
   referenciaServidorSchema,
+  relatorioPlanilhaLegadoSchema, planilhasLegadoSchema,
 } from '@sisdoc/contratos';
 import EmbeddedPostgres from 'embedded-postgres';
 import forge from 'node-forge';
@@ -557,6 +558,53 @@ describe('Importação de planilhas e base legada', () => {
     } finally {
       await banco().query("UPDATE nucleo.incorporacao SET convencao = 'inclusivo' WHERE sistema_origem = 'origem-tipos'");
     }
+  });
+
+  it('importa XLSX no schema legado com cabeçalhos originais, cifra linhas e exporta sem conversão canônica', async () => {
+    const sessao = usuarios.get('admin')?.sessao;
+    const analista = usuarios.get('analista')?.sessao;
+    if (!sessao || !analista) throw new Error('Sessões ausentes.');
+    const linhas = [['Código do cadastro', 'Nome completo (origem)', 'Observação especial'],
+      ['0000123', 'Pessoa legada fictícia', ' texto com espaços '],
+      ['0000124', 'Outra pessoa fictícia', 'ação; aspas "teste"']];
+    const arquivo = escreverXlsx(linhas, 'Tabela pronta');
+    const rota = 'admin/importacoes?destino=legado&origem=planilha-pronta';
+    expect((await requisitar({ metodo: 'POST', rota, corpo: arquivo, sessao: analista })).status).toBe(403);
+    expect((await requisitar({ metodo: 'POST', rota: `${rota}&destino=invalido`, corpo: arquivo, sessao })).status).toBe(400);
+    const validado = await requisitar({ metodo: 'POST', rota: `${rota}&modo=validar`, corpo: arquivo, sessao });
+    expect(validado.status, validado.corpo).toBe(200);
+    expect(relatorioPlanilhaLegadoSchema.parse(JSON.parse(validado.corpo))).toMatchObject({
+      destino: 'legado', modo: 'validar', cabecalhos: linhas[0], linhas: 2, loteId: null,
+    });
+    expect((await banco().query("SELECT count(*)::int AS n FROM legado.planilha_lote WHERE origem = 'planilha-pronta'")).rows[0].n).toBe(0);
+    const gravado = await requisitar({ metodo: 'POST', rota: `${rota}&modo=gravar`, corpo: arquivo, sessao });
+    expect(gravado.status, gravado.corpo).toBe(200);
+    const loteId = relatorioPlanilhaLegadoSchema.parse(JSON.parse(gravado.corpo)).loteId;
+    expect(loteId).not.toBeNull();
+    const cifrado = await banco().query<{ conteudo_cifrado: Buffer }>('SELECT conteudo_cifrado FROM legado.planilha_linha WHERE lote_id = $1', [loteId]);
+    expect(cifrado.rows).toHaveLength(2);
+    expect(cifrado.rows.every((linha) => !linha.conteudo_cifrado.toString('utf8').includes('fictícia'))).toBe(true);
+    expect(await contar('vinculo', 'planilha-pronta')).toBe(0);
+    const repetido = await requisitar({ metodo: 'POST', rota: `${rota}&modo=gravar`, corpo: arquivo, sessao });
+    expect(relatorioPlanilhaLegadoSchema.parse(JSON.parse(repetido.corpo)).loteExistente).toBe(loteId);
+    const lista = await requisitar({ metodo: 'GET', rota: 'admin/importacoes/legado', sessao });
+    expect(planilhasLegadoSchema.parse(JSON.parse(lista.corpo))[0]).toMatchObject({ id: loteId, cabecalhos: linhas[0], linhas: 2 });
+    expect((await requisitar({ metodo: 'GET', rota: 'admin/importacoes/legado', sessao: analista })).status).toBe(403);
+    for (const formato of ['csv', 'xlsx']) {
+      const exportado = await requisitar({ metodo: 'POST', rota: 'admin/importacoes/legado/exportar', sessao,
+        tipoConteudo: 'application/json', corpo: Buffer.from(JSON.stringify({ loteId, formato })) });
+      expect(exportado.status, exportado.corpo).toBe(200);
+      expect(lerPlanilha(exportado.binario).linhas).toEqual(linhas);
+    }
+    for (const invalidas of [
+      [['Nome', 'Nome'], ['Um', 'Outro']],
+      [['Nome', ''], ['Um', 'Outro']],
+      [['Nome'], ['Um', 'Valor sem cabeçalho']],
+    ]) {
+      expect((await requisitar({ metodo: 'POST', rota: `${rota}&modo=gravar`, corpo: escreverXlsx(invalidas), sessao })).status).toBe(422);
+    }
+    const auditado = await banco().query("SELECT count(*)::int AS n FROM seguranca.auditoria WHERE acao = 'planilha_legado_importada'");
+    expect(auditado.rows[0].n).toBe(1);
   });
 
   it('mostra referências pessoais completas ao Cadastro e administrador com paginação e auditoria', async () => {

@@ -28,7 +28,7 @@ function responderPrevia(resposta: ServerResponse, html: string, revisao: number
 export class RascunhosController {
   constructor(private readonly rascunhos: RascunhosService) {}
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get()
   listar(@Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
     const dados = paginaUuidQuerySchema.safeParse(consulta);
@@ -60,19 +60,19 @@ export class RascunhosController {
     return this.rascunhos.listarConferidos(exigirSessao(req), ipRequisicao(req), dados.data.limite, dados.data.cursor);
   }
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get(':id')
   obter(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
     return this.rascunhos.obter(exigirSessao(req), ipRequisicao(req), idDocumento(id));
   }
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get(':id/ultima-devolucao')
   ultimaDevolucao(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
     return this.rascunhos.ultimaDevolucao(exigirSessao(req), ipRequisicao(req), idDocumento(id));
   }
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get(':id/previa')
   async previa(@Param('id') id: string, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
     const { conteudo, fonte } = await this.rascunhos.obterParaPrevia(exigirSessao(req), ipRequisicao(req), idDocumento(id));
@@ -102,7 +102,7 @@ export class RascunhosController {
     });
   }
 
-  @ExigirAcao('criar_rascunho')
+  @ExigirAcao('consultar_documentos')
   @Get(':id/dados-previa')
   async dadosPrevia(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
     const { fonte } = await this.rascunhos.obterParaPrevia(exigirSessao(req), ipRequisicao(req), idDocumento(id));

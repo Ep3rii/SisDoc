@@ -9,9 +9,10 @@ export const origemImportacaoSchema = z.string().trim().toLowerCase().regex(
 );
 
 export const enviarImportacaoQuerySchema = z.strictObject({
-  tipo: tipoImportacaoSchema,
+  tipo: tipoImportacaoSchema.default('dados_funcionais'),
   origem: origemImportacaoSchema,
   modo: z.enum(['validar', 'gravar']).default('validar'),
+  destino: z.enum(['nucleo', 'legado']).default('nucleo'),
 });
 export type EnviarImportacaoQuery = z.infer<typeof enviarImportacaoQuerySchema>;
 
@@ -22,6 +23,25 @@ export const exportarDadosSchema = z.strictObject({
   afastamentos: z.enum(['anual', 'intervalo']).default('anual'),
 });
 export type ExportarDados = z.infer<typeof exportarDadosSchema>;
+
+export const lotePlanilhaLegadoSchema = z.strictObject({
+  id: z.uuid(),
+  origem: origemImportacaoSchema,
+  cabecalhos: z.array(z.string()),
+  linhas: z.number().int().nonnegative(),
+  importadoEm: z.string(),
+});
+export const planilhasLegadoSchema = z.array(lotePlanilhaLegadoSchema);
+export const relatorioPlanilhaLegadoSchema = z.strictObject({
+  destino: z.literal('legado'),
+  modo: z.enum(['validar', 'gravar']),
+  loteId: z.uuid().nullable(),
+  loteExistente: z.uuid().nullable(),
+  cabecalhos: z.array(z.string()),
+  linhas: z.number().int().nonnegative(),
+});
+export type RelatorioPlanilhaLegado = z.infer<typeof relatorioPlanilhaLegadoSchema>;
+export type LotePlanilhaLegado = z.infer<typeof lotePlanilhaLegadoSchema>;
 
 export const tipoOcorrenciaImportacaoSchema = z.enum(['rejeitada', 'quarentena', 'duplicada', 'divergencia', 'anomalia']);
 

@@ -574,3 +574,22 @@ Implantado em `https://localhost:3443/` após backup `pg_dump` e aplicação de
 `016-acesso-admin`. Health respondeu `ok`; referências e exportação sem
 login responderam 401. Nenhum dado real ou usuário operacional foi usado
 nos testes de carga.
+
+## Ajustes da administração e XLSX legado — 31/10/2026
+
+Concluído, conforme a
+[decisão 027](decisoes/027-administracao-documentos-cadastro-legado.md):
+administrador não cria DOF/DTC nem cópias, mas opera documentos existentes;
+exclusão física controlada de documentos e PDFs; edição de servidores no
+núcleo local com motivo, auditoria cifrada e revisões; Sincronização separada
+de Importação/Exportação; seleção de destino Núcleo/Legado.
+
+XLSX destinado ao legado preserva cabeçalhos e valores textuais em staging
+cifrado, sem conversão automática para o núcleo. A validação e gravação pela
+interface foram exercitadas com planilha fictícia. Nenhum XLSX pessoal do
+responsável foi aberto. Edição de servidores passou em 3 testes específicos.
+A suíte completa passou: **181 testes em 23 arquivos**, build e typecheck.
+As migrações `017-documentos-admin`, `018-edicao-cadastro` e
+`019-planilhas-legado` foram aplicadas após backup `pg_dump`; a aplicação
+foi reiniciada em `https://localhost:3443/`. Nenhum documento operacional
+foi excluído e nenhuma planilha real foi importada automaticamente.

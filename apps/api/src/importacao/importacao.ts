@@ -1,6 +1,7 @@
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import type {
   ConferenciaImportacao, Configuracao, EnviarImportacaoQuery, ExportarDados, PaginaLotesImportacao, RelatorioImportacao,
+  RelatorioPlanilhaLegado,
 } from '@sisdoc/contratos';
 import type { Pool, PoolClient } from 'pg';
 import { transacao } from '../banco';
@@ -12,6 +13,7 @@ import { ErroFormato } from './formatos';
 import { conferenciaGeral, ErroImportacao, hashArquivo, importarLinhas } from './importador';
 import { ErroPlanilha, lerPlanilha } from './planilhas';
 import { gerarExportacao } from './exportador';
+import { exportarPlanilhaLegado, importarPlanilhaLegado, listarPlanilhasLegado } from './planilha-legado';
 
 export class ImportacaoService {
   private readonly protetor: ProtetorDados;
@@ -32,7 +34,29 @@ export class ImportacaoService {
     });
   }
 
-  async enviar(sessao: SessaoAutenticada, ip: string, consulta: EnviarImportacaoQuery, conteudo: Buffer): Promise<RelatorioImportacao> {
+  async listarLegado(sessao: SessaoAutenticada, ip: string) {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+      const lotes = await listarPlanilhasLegado(cliente);
+      await cliente.query(`INSERT INTO seguranca.auditoria (usuario_id, acao, entidade, ip)
+        VALUES ($1, 'planilhas_legado_consultadas', 'planilha_lote', $2)`, [sessao.usuario.id, ip]);
+      return lotes;
+    });
+  }
+
+  async exportarLegado(sessao: SessaoAutenticada, ip: string, loteId: string, formato: 'csv' | 'xlsx') {
+    return transacao(this.banco, async (cliente) => {
+      await cliente.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+      const arquivo = await exportarPlanilhaLegado(cliente, this.protetor, loteId, formato);
+      await cliente.query(`INSERT INTO seguranca.auditoria (usuario_id, acao, entidade, entidade_id, ip, detalhes)
+        VALUES ($1, 'planilha_legado_exportada', 'planilha_lote', $2, $3, $4::jsonb)`,
+      [sessao.usuario.id, loteId, ip, JSON.stringify({ formato })]);
+      return arquivo;
+    });
+  }
+
+  async enviar(sessao: SessaoAutenticada, ip: string, consulta: EnviarImportacaoQuery, conteudo: Buffer): Promise<RelatorioImportacao | RelatorioPlanilhaLegado> {
     if (conteudo.length === 0) throw new BadRequestException('Envie um arquivo CSV ou XLSX com conteúdo.');
     let linhas: string[][];
     try {
@@ -40,6 +64,12 @@ export class ImportacaoService {
     } catch (erro) {
       if (erro instanceof ErroPlanilha) throw new UnprocessableEntityException(erro.message);
       throw erro;
+    }
+    if (consulta.destino === 'legado') {
+      return transacao(this.banco, async (cliente) => {
+        await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+        return importarPlanilhaLegado(cliente, this.protetor, linhas, conteudo, consulta, sessao.usuario.id, ip);
+      });
     }
     const cliente = await this.banco.connect();
     try {

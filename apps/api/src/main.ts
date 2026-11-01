@@ -1,7 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
-import { VERSAO_ACESSO_ADMIN } from './migracoes/acesso-admin';
+import { VERSAO_PLANILHAS_LEGADO } from './migracoes/planilhas-legado';
 
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
@@ -18,7 +18,7 @@ async function iniciar(): Promise<void> {
   try {
     const resultado = await banco.query<{ atual: boolean }>(
       'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
-      [VERSAO_ACESSO_ADMIN],
+      [VERSAO_PLANILHAS_LEGADO],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {
@@ -33,7 +33,7 @@ async function iniciar(): Promise<void> {
   }
   if (!migracaoAtual) {
     await banco.end();
-    throw new Error('O banco não possui a migração de acesso administrativo (016); execute npm run migrar com o serviço parado e inicie novamente.');
+    throw new Error('O banco não possui a migração 019 de planilhas legadas; execute npm run migrar com o serviço parado e inicie novamente.');
   }
   let app;
   try {

@@ -9,6 +9,8 @@ import { RascunhosController } from './documentos/rascunhos.controller';
 import { EmissoesController } from './documentos/emissoes.controller';
 import { EmissoesService } from './documentos/emissoes';
 import { RascunhosService } from './documentos/rascunhos';
+import { AdminDocumentosController } from './documentos/admin-documentos.controller';
+import { AdminDocumentosService } from './documentos/admin-documentos';
 import { DtcController } from './documentos/dtcs.controller';
 import { DtcService } from './documentos/dtcs';
 import { WorkerPdfEmissao } from './documentos/worker-pdf-emissao';
@@ -50,7 +52,7 @@ export class AppModule {
   static registrar(banco: Pool, configuracao: Configuracao): DynamicModule {
     return {
       module: AppModule,
-      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController, RascunhosController, EmissoesController, DtcController, SincronizacaoController, ImportacaoController],
+      controllers: [HealthController, AutenticacaoController, UsuariosController, ServidoresController, CalculosController, RascunhosController, EmissoesController, DtcController, AdminDocumentosController, SincronizacaoController, ImportacaoController],
       providers: [
         { provide: BANCO, useValue: banco },
         { provide: CONFIGURACAO, useValue: configuracao },
@@ -82,6 +84,11 @@ export class AppModule {
         {
           provide: EmissoesService,
           useFactory: (pool: Pool, config: Configuracao) => new EmissoesService(pool, config),
+          inject: [BANCO, CONFIGURACAO],
+        },
+        {
+          provide: AdminDocumentosService,
+          useFactory: (pool: Pool, config: Configuracao) => new AdminDocumentosService(pool, config),
           inject: [BANCO, CONFIGURACAO],
         },
         {

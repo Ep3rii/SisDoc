@@ -7,10 +7,13 @@ import { aplicarConfirmacaoInicioDof } from './confirmacao-inicio-dof';
 import { aplicarConsulta } from './consulta';
 import { aplicarDevolucaoDof } from './devolucao-dof';
 import { aplicarDtc } from './dtc';
+import { aplicarDocumentosAdmin } from './documentos-admin';
+import { aplicarEdicaoCadastro } from './edicao-cadastro';
 import { aplicarEmissao } from './emissao';
 import { aplicarImportacao } from './importacao';
 import { aplicarEncaminhamentoDof } from './encaminhamento-dof';
 import { aplicarModelo } from './modelo';
+import { aplicarPlanilhasLegado } from './planilhas-legado';
 import { aplicarPreconferenciaDof } from './preconferencia-dof';
 import { aplicarProcessoDof } from './processo-dof';
 import { aplicarRascunhoDof } from './rascunho-dof';
@@ -35,6 +38,9 @@ export const SEQUENCIA_MIGRACOES: readonly Migracao[] = [
   { versao: '014-dtc', aplicar: aplicarDtc },
   { versao: '015-importacao', aplicar: aplicarImportacao },
   { versao: '016-acesso-admin', aplicar: aplicarAcessoAdmin },
+  { versao: '017-documentos-admin', aplicar: aplicarDocumentosAdmin },
+  { versao: '018-edicao-cadastro', aplicar: aplicarEdicaoCadastro },
+  { versao: '019-planilhas-legado', aplicar: aplicarPlanilhasLegado },
 ];
 
 // Deve ser chamada dentro de uma transação aberta pelo papel de migração; devolve as versões aplicadas agora.

@@ -58,6 +58,7 @@ import { aplicarProcessoDof } from '../apps/api/dist/migracoes/processo-dof.js';
 import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
 import { aplicarRascunhoDof } from '../apps/api/dist/migracoes/rascunho-dof.js';
 import { aplicarModelo } from '../apps/api/dist/migracoes/modelo.js';
+import { SEQUENCIA_MIGRACOES } from '../apps/api/dist/migracoes/sequencia.js';
 import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
 import { gerarHashSenha } from '../apps/api/dist/seguranca/senhas.js';
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
@@ -369,6 +370,11 @@ async function conferirSqlSintetico(cliente: Client, documentoId: string, usuari
 }
 
 describe('fundação em recursos descartáveis', () => {
+  it('mantém a sequência de migrações alinhada ao release planilhas/legado', () => {
+    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('019-planilhas-legado');
+    expect(SEQUENCIA_MIGRACOES.at(-3)?.versao).toBe('017-documentos-admin');
+  });
+
   let temporario = '';
   let raiz = '';
   let raizAlternativa = '';

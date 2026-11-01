@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Post, PayloadTooLargeException, Query, Req, Res, UnsupportedMediaTypeException } from '@nestjs/common';
 import { enviarImportacaoQuerySchema, exportarDadosSchema, paginaLotesImportacaoQuerySchema } from '@sisdoc/contratos';
 import type { ServerResponse } from 'node:http';
+import { z } from 'zod';
 import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } from '../seguranca/guarda';
 import { ImportacaoService } from './importacao';
 import { LIMITE_ARQUIVO_BYTES } from './planilhas';
@@ -28,6 +29,26 @@ async function lerCorpoBruto(req: RequisicaoAutenticada): Promise<Buffer> {
 @Controller('admin/importacoes')
 export class ImportacaoController {
   constructor(private readonly importacao: ImportacaoService) {}
+
+  @ExigirAcao('administrar_importacao')
+  @Get('legado')
+  legado(@Req() req: RequisicaoAutenticada) {
+    return this.importacao.listarLegado(exigirSessao(req), ipRequisicao(req));
+  }
+
+  @ExigirAcao('administrar_importacao')
+  @Post('legado/exportar')
+  @HttpCode(200)
+  async exportarLegado(@Body() corpo: unknown, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
+    const dados = z.strictObject({ loteId: z.uuid(), formato: z.enum(['csv', 'xlsx']) }).safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Informe o lote legado e o formato csv/xlsx.');
+    const arquivo = await this.importacao.exportarLegado(exigirSessao(req), ipRequisicao(req), dados.data.loteId, dados.data.formato);
+    resposta.setHeader('Cache-Control', 'no-store');
+    resposta.setHeader('Content-Type', dados.data.formato === 'csv' ? 'text/csv; charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    resposta.setHeader('Content-Disposition', `attachment; filename="legado-${dados.data.loteId}.${dados.data.formato}"`);
+    resposta.statusCode = 200;
+    resposta.end(arquivo);
+  }
 
   @ExigirAcao('administrar_importacao')
   @Post('exportar')
