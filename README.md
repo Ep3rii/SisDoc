@@ -81,6 +81,7 @@ caminhos ASCII ou 8.3; consulte [operação](docs/OPERACAO.md).
 
 ## Documentação
 
+- [Manual resumido: como ligar a aplicação](docs/COMO_LIGAR.md).
 - [Instalação local e próximas etapas](docs/INSTALACAO_LOCAL.md).
 - [Operação, controles e uso da interface](docs/OPERACAO.md).
 - [Dados e importação](docs/DADOS_E_IMPORTACAO.md).
