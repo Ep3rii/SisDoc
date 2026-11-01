@@ -23,6 +23,7 @@ import { chromium, type Browser, type Page, type Route } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { CSP_APLICACAO } from '../apps/api/dist/aplicacao.js';
 
 const pessoaId = '11111111-1111-4111-8111-111111111111';
 const vinculoId = '22222222-2222-4222-8222-222222222222';
@@ -164,6 +165,18 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
             desligamento: null, removidoNaFonte: false,
           }],
           proximoCursor: null,
+        });
+      }
+      if (caminho === `/api/v1/servidores/${pessoaId}/referencias` && metodo === 'GET') {
+        return responder(rota, 200, {
+          pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1',
+          cadastro: {
+            nome, cpf: cpfSintetico(), nascimento: null, nomeMae: null, nomePai: null,
+            pisPasep: null, rgNumero: null, rgOrgao: null, rgExpedicao: null, tituloEleitor: null, endereco: null,
+            matricula, regimeJuridico: null, cargo: null, classe: null, nivel: null, referencia: null,
+            setor: null, orgaoCodigo: null, orgao: null, admissao: estado.admissao, desligamento: null,
+          },
+          pessoa: { Nome: nome }, registros: [], proximoCursor: null,
         });
       }
       if (metodo !== 'GET' && requisicao.headers()['x-csrf-token'] !== csrf) {
@@ -499,7 +512,7 @@ describe('interface de rascunhos com API sintética', () => {
   beforeAll(async () => {
     servidor = await preview({
       configFile: false, root: path.join(process.cwd(), 'apps', 'web'), logLevel: 'silent',
-      preview: { host: '127.0.0.1', port: 0, strictPort: true },
+      preview: { host: '127.0.0.1', port: 0, strictPort: true, headers: { 'Content-Security-Policy': CSP_APLICACAO } },
     });
     const porta = servidor.httpServer.address();
     if (!porta || typeof porta === 'string') throw new Error('Prévia de teste não iniciou em loopback.');
@@ -540,6 +553,8 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
     await selecionarAba(pagina, 'Dados do servidor');
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
+    expect(await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').locator('body')
+      .evaluate((elemento) => getComputedStyle(elemento).color)).toBe('rgb(23, 43, 58)');
     await pagina.locator('.dados-servidor').getByText('Mãe fictícia <img src=x>', { exact: true }).waitFor();
     expect(await pagina.getByRole('tabpanel').count()).toBe(1);
     const editor = await pagina.locator('.editor-dof').boundingBox();
@@ -1163,7 +1178,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByRole('checkbox', { name: /Revisei a prévia/ }).check();
     await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).click();
-    await pagina.getByText('DOF conferida provisoriamente.', { exact: false }).waitFor();
+    await pagina.getByText('DOF conferida. Consulte-a em DOFs conferidas', { exact: false }).waitFor();
     expect(estado.conferido).not.toBeNull();
     expect(await pagina.getByText('Há alterações não salvas.').count()).toBe(0);
 

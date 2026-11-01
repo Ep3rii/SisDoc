@@ -7,6 +7,8 @@ import {
 } from '@sisdoc/contratos';
 import { ErroApi, requisitar, validar } from './api';
 import { PromocaoLegado } from './promocao-legado';
+import { Abas } from './abas';
+import { FiltrosLista, useFiltroLista } from './filtros-lista';
 
 const LIMITE_BYTES = 64 * 1024 * 1024;
 
@@ -216,6 +218,9 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   const [conferencia, setConferencia] = useState<ConferenciaImportacao | null>(null);
   const [versao, setVersao] = useState(0);
   const [loteParaConverter, setLoteParaConverter] = useState<string | null>(null);
+  const [aba, setAba] = useState('importar');
+  const filtro = useFiltroLista(pagina?.itens ?? [], (lote) =>
+    `${dataHora(lote.iniciadoEm)} ${nomesTipo[lote.tipo]} ${lote.origem} ${lote.canal} ${nomesStatus[lote.status]} ${lote.usuario} ${lote.id}`);
   const campoArquivo = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -266,6 +271,9 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
         Núcleo: importação direta no formato canônico. Valide e confira o relatório antes de confirmar qualquer gravação.</p>
       <p className="aviso">Dados existentes e edições manuais são preservados. Campos vazios podem ser completados;
         divergências ficam indicadas para revisão, sem substituição automática.</p>
+      <Abas atual={aba} onSelecionar={setAba} rotulo="Transferência de dados" itens={[
+        { id: 'importar', titulo: 'Importar', conteudo: <>
+      <p className="etiqueta">1. Selecionar arquivo → 2. Validar e revisar → 3. Confirmar gravação</p>
       <div className="painel">
         <form className="formulario-importacao" onSubmit={(evento) => { evento.preventDefault(); void processar('validar'); }}>
           <label>Schema de destino<select value={destino} onChange={(e) => {
@@ -300,12 +308,15 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
         {relatorioLegado.loteId && <p>Lote: {relatorioLegado.loteId}</p>}
         {relatorioLegado.loteExistente && <p>Arquivo já importado: {relatorioLegado.loteExistente}. Nenhuma alteração.</p>}
       </div>}
-      <PromocaoLegado key={`conversao-${loteParaConverter ?? 'selecionar'}`} csrf={csrf} loteInicial={loteParaConverter}
+      {loteParaConverter && <button type="button" onClick={() => setAba('legado')}>Disponibilizar lote Legado para DOF/DTC</button>}
+      </> },
+        { id: 'legado', titulo: 'Disponibilizar Legado', conteudo: <PromocaoLegado key={`conversao-${loteParaConverter ?? 'selecionar'}`} csrf={csrf} loteInicial={loteParaConverter}
         onErro={onErro} onAplicado={() => {
           setCursor(undefined); setVersao((atual) => atual + 1);
           onMensagem('Conversão do Legado aplicada ao Núcleo. Confira o relatório e os servidores antes de emitir documentos.');
-        }} renderRelatorio={(dados) => <Relatorio relatorio={dados} />} />
-      <ExportacaoAdmin key={`exportacao-${versao}`} csrf={csrf} onErro={onErro} onMensagem={onMensagem} />
+        }} renderRelatorio={(dados) => <Relatorio relatorio={dados} />} /> },
+        { id: 'exportar', titulo: 'Exportar', conteudo: <ExportacaoAdmin key={`exportacao-${versao}`} csrf={csrf} onErro={onErro} onMensagem={onMensagem} /> },
+        { id: 'historico', titulo: 'Histórico', conteudo: <>
       {conferencia && (
         <div className="painel">
           <h3>Conferência por origem</h3>
@@ -324,6 +335,7 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
         </div>
       )}
       <h3>Lotes de importação</h3>
+      <FiltrosLista filtro={filtro} onAtualizar={() => setVersao((atual) => atual + 1)} />
       {!pagina ? <p role="status">Carregando lotes...</p> : (
         <>
           <div className="tabela">
@@ -331,7 +343,7 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
               <thead><tr><th scope="col">Início</th><th scope="col">Tipo</th><th scope="col">Origem</th><th scope="col">Canal</th><th scope="col">Situação</th><th scope="col">Inseridos</th><th scope="col">Atualizados</th><th scope="col">Usuário</th><th scope="col">Lote</th></tr></thead>
               <tbody>
                 {pagina.itens.length === 0 && <tr><td colSpan={9}>Nenhum lote registrado.</td></tr>}
-                {pagina.itens.map((lote) => (
+                {filtro.itens.map((lote) => (
                   <tr key={lote.id}>
                     <td>{dataHora(lote.iniciadoEm)}</td><td>{nomesTipo[lote.tipo]}</td><td>{lote.origem}</td><td>{lote.canal}</td>
                     <td>{nomesStatus[lote.status]}{lote.desfeitoEm && ` em ${dataHora(lote.desfeitoEm)}`}</td>
@@ -349,6 +361,7 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
           </div>
         </>
       )}
+      </> }]} />
     </section>
   );
 }

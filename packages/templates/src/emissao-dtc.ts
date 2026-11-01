@@ -225,16 +225,7 @@ ${dados.tipo === 'DTC_COMISSIONADO' ? '<div class="area-ipam"><p>INSTITUTO DE PR
 </section>`;
 }
 
-export function renderizarDocumentoDtc(dados: DadosDocumentoDtc): string {
-  const titulo = `${TITULOS[dados.tipo].titulo} ${dados.numeroFormatado ?? '(prévia)'}`;
-  const avisos = dados.classificacao === 'previa' && dados.resultado.avisos.length > 0
-    ? `<section class="avisos"><h2>Avisos da prévia</h2><ul>${dados.resultado.avisos.map((aviso) => `<li>${escapar(aviso.mensagem)}</li>`).join('')}</ul></section>`
-    : '';
-  return `<!doctype html>
-<html lang="pt-BR"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
-<title>${escapar(titulo)}</title>
-<style>
+export const ESTILO_DOCUMENTO_DTC = `
 @page{size:A4;margin:14mm 12mm 16mm 12mm}
 body{font-family:"Times New Roman",Times,serif;color:#000;background:#fff;font-size:10pt;line-height:1.3;margin:0;overflow-wrap:anywhere}
 header{text-align:center;margin-bottom:6pt}header p{margin:0}.orgao{font-weight:700}.anexo{font-weight:700;margin-top:4pt}
@@ -262,7 +253,18 @@ thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}
 .sem-emendas{text-align:center;font-weight:700;margin-top:10pt}
 .avisos{border:1px solid #7d1717;padding:2pt 6pt;margin-top:6pt}
 .rodape{font-size:7pt;margin-top:8pt;text-align:center}
-</style></head><body>
+`;
+
+export function renderizarDocumentoDtc(dados: DadosDocumentoDtc): string {
+  const titulo = `${TITULOS[dados.tipo].titulo} ${dados.numeroFormatado ?? '(prévia)'}`;
+  const avisos = dados.classificacao === 'previa' && dados.resultado.avisos.length > 0
+    ? `<section class="avisos"><h2>Avisos da prévia</h2><ul>${dados.resultado.avisos.map((aviso) => `<li>${escapar(aviso.mensagem)}</li>`).join('')}</ul></section>`
+    : '';
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
+<title>${escapar(titulo)}</title>
+<style>${ESTILO_DOCUMENTO_DTC}</style></head><body>
 ${cabecalho(dados)}
 ${avisos}
 ${dadosPessoais(dados)}

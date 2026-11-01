@@ -349,7 +349,7 @@ export function CalculoDof({
         </p>
       )}
       <details className="orientacoes-dof">
-        <summary>Regra e prévia provisórias — emissão oficial indisponível</summary>
+        <summary>Cálculo e prévia — salvar, conferir e emitir em etapas</summary>
         <p>Regra provisória (planilha). O cálculo não grava dados; salvar cria apenas um rascunho, sem conferir ou emitir.</p>
         <p>As ocorrências da fonte não são carregadas automaticamente. Confira os registros e informe os dias de cada intervalo; campos vazios serão tratados como zero somente após sua confirmação.</p>
       </details>
@@ -374,7 +374,7 @@ export function CalculoDof({
         <dl className="dados-servidor">{dadosServidor.map(([rotulo, valor]) => (
           <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>
         ))}</dl>
-        <p>Os campos da fonte são somente leitura. Abra a prévia auditada para consultá-los. Ajustes cadastrais exclusivos da declaração ainda não estão implementados.</p>
+        <p>Os campos da fonte são somente leitura. A prévia auditada é carregada após salvar. Ajustes cadastrais exclusivos da declaração ainda não estão implementados.</p>
         {rascunho && (podeSalvar || somenteLeitura) && (
           <ProcessoDof rascunho={rascunho} csrf={csrf}
             bloqueado={calculoPendente || blocosPendentes || encaminhamentoPendente
@@ -509,7 +509,7 @@ export function CalculoDof({
           onOcupado={marcarConferencia}
           onConferido={() => {
             marcarConferencia(false);
-            onFechar('DOF conferida provisoriamente. Consulte-a em DOFs conferidas; a emissão permanece indisponível.');
+            onFechar('DOF conferida. Consulte-a em DOFs conferidas para revisão e emissão pelo coordenador, conforme as aprovações do modelo e da regra.');
           }} onErro={onErro} onLimpar={onLimpar} />
       )}
       {rascunho && podeSalvar && !somenteLeitura && (
@@ -542,7 +542,7 @@ export function CalculoDof({
         <div className="acoes">
           {podeSalvar && resultado && pedidoCalculado && <button type="submit" form={`${id}-salvar`} className="secundario"
             disabled={bloqueioSalvar}>{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>}
-          <button type="button" disabled title="Emissão, numeração e snapshot ainda não implementados">Emitir PDF · indisponível</button>
+          <button type="button" disabled title="Após conferir, abra DOFs conferidas para revisão e emissão pelo coordenador">Emitir PDF · após conferir</button>
         </div>
       </footer>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}

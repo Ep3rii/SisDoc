@@ -4,6 +4,7 @@ import { renderizarPreviaDof } from '@sisdoc/templates';
 import { api, ErroApi } from './api';
 import { PainelEmissao } from './emissao';
 import { ExclusaoDocumento } from './exclusao-documento';
+import { FiltrosLista, useFiltroLista } from './filtros-lista';
 
 type Props = {
   csrf: string;
@@ -34,6 +35,8 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
   const [emissao, setEmissao] = useState<SituacaoEmissao | null>(null);
   const chaveEmissao = useRef<{ documento: string; revisao: number; chave: string } | null>(null);
   const ativa = useRef(true);
+  const filtro = useFiltroLista(pagina?.itens ?? [], (item) =>
+    `${item.nome} ${item.matricula} ${item.autorNome} ${item.conferidoPorNome} ${item.revisao} ${item.fonteSelecionadaAlterada ? 'Fonte alterada' : 'Sem alteração'}`);
 
   useEffect(() => {
     ativa.current = true;
@@ -178,14 +181,15 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
           </div>
         )}
         {podeDevolver && (
-          <form className="separado" onSubmit={(evento) => void devolver(evento)}>
+          <form className="zona-perigo separado" onSubmit={(evento) => void devolver(evento)}>
+            <h3>Devolução para ajustes</h3>
             <label>Motivo da devolução ao autor
               <textarea value={motivo} maxLength={2000} required disabled={ocupado} onChange={(evento) => {
                 setMotivo(evento.target.value);
                 onPendente(evento.target.value.trim().length > 0);
               }} />
             </label>
-            <button type="submit" disabled={ocupado || !motivo.trim()}>
+            <button type="submit" className="perigo" disabled={ocupado || !motivo.trim()}>
               {ocupado ? 'Devolvendo...' : 'Devolver DOF para ajustes'}
             </button>
           </form>
@@ -200,6 +204,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
   return (
     <section className="painel" aria-labelledby="conferidos-titulo">
       <h2 id="conferidos-titulo">DOFs conferidas</h2>
+      <FiltrosLista filtro={filtro} antesAlterar={confirmarSaida} onAtualizar={() => setVersao((atual) => atual + 1)} />
       <p>{administrador ? 'Todas as DOFs conferidas são exibidas. O administrador pode emitir ou devolver documentos de qualquer autoria.'
         : 'Somente suas DOFs e as encaminhadas a você são exibidas. A emissão é feita pelo coordenador.'} A emissão depende da aprovação formal da regra e do modelo.</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
@@ -213,7 +218,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
             <div className="tabela"><table>
               <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Autor</th>
                 <th scope="col">Revisão</th><th scope="col">Conferida por</th><th scope="col">Fonte</th><th scope="col">Ações</th></tr></thead>
-              <tbody>{pagina.itens.map((item) => (
+              <tbody>{filtro.itens.map((item) => (
                 <tr key={item.id}>
                   <td>{item.nome}</td><td>{item.matricula}</td><td>{item.autorNome}</td><td>{item.revisao}</td>
                   <td>{item.conferidoPorNome}</td>

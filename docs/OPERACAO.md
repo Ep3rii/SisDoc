@@ -12,8 +12,33 @@ Na DTC, a prévia da revisão salva permanece ao editar. Valores alterados no
 formulário só aparecem depois de salvar, como informado no painel.
 As tabelas são compactas sem ocultar dados completos; em telas pequenas,
 controles mantêm alvos maiores e a rolagem fica dentro da tabela.
-Veja [avaliação de UI/UX](AVALIACAO_UI_UX.md) para recomendações por tela
-e a pendência de integração dos estilos da prévia com a CSP. local — uso operacional autorizado
+Veja [avaliação de UI/UX](AVALIACAO_UI_UX.md) para recomendações por tela.
+Os estilos fixos das prévias são autorizados por hashes SHA-256 na CSP;
+estilos arbitrários continuam bloqueados e os iframes permanecem em sandbox
+sem execução de scripts. Após atualizar templates, publique juntos frontend
+e API e reinicie a aplicação para que a política corresponda aos estilos.
+
+## Organização das telas
+
+Importação e exportação têm abas **Importar**, **Disponibilizar Legado**,
+**Exportar** e **Histórico**, acessíveis por clique ou teclado (setas,
+Home/End). Trocar aba preserva arquivo, mapeamento e validação; alterar a
+entrada continua invalidando a confirmação. Nenhum dado é gravado ao trocar
+abas. Depois de gravar no Legado, use o botão de disponibilização do lote.
+
+As listas de servidores, rascunhos, conferidas, DTCs, histórico, usuários,
+auditoria e lotes compartilham **Filtrar lista carregada**, **Limpar filtro**
+e **Atualizar lista**, com quantidade de resultados. A busca ignora acentos
+e caixa, mas filtra somente registros já carregados — não o banco inteiro.
+Para pesquisar servidores no banco, use a busca global; nas demais listas,
+respeite o escopo e a paginação existentes. Filtros não ampliam permissões.
+
+O cadastro local separa identificação/contato, documentos e vínculo.
+Ao abrir um resultado, o vínculo escolhido já é selecionado para consulta.
+Referências, vínculos, períodos e cargos DTC têm grupos recolhíveis que
+preservam dados. Documentação INSS fica separada das licenças e confirmações.
+Exclusão física, cancelamento e devolução têm áreas próprias destacadas;
+motivos, confirmação e auditoria continuam obrigatórios conforme o fluxo.
 
 ## Senhas, encaminhamentos e menu
 

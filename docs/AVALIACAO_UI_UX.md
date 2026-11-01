@@ -30,6 +30,27 @@ operacionais repetidos, ações concorrentes e hierarquia entre lista/editor.
 
 ## Avaliação por tela e recomendações
 
+### Prioridades aplicadas na continuação
+
+- Transferência dividida em quatro abas com navegação por teclado e estado
+  preservado: Importar, Disponibilizar Legado, Exportar e Histórico.
+- Filtros e ações de atualização padronizados em servidores, DOFs,
+  encaminhados, DTCs, histórico, usuários, auditoria e lotes. São filtros
+  da lista carregada, com alcance e contagem explícitos; filtros globais por
+  período/responsável em todas as páginas continuam recomendação futura.
+- Cadastro local separado em identificação/contato, documentos e vínculo.
+  O vínculo escolhido na lista é selecionado automaticamente. Cadastro
+  completo, referências, vínculos, períodos e cargos têm grupos recolhíveis;
+  documentação INSS separada das licenças e das confirmações. Na DTC,
+  grupos preservam lançamentos e a prévia continua mostrando a revisão salva.
+- Exclusão física, cancelamento e devolução separados visualmente das ações
+  principais, sem retirar motivos, confirmação ou controles de autorização.
+- Orientações antigas de emissão indisponível na DOF substituídas pelo fluxo
+  Salvar → Conferir → Emitir, sem liberar emissão direta de rascunhos.
+
+A tabela abaixo conserva a avaliação original e propostas que excedem
+esses ajustes (como filtros globais, novas abas DTC e menus de ações).
+
 | Tela | Diagnóstico | Melhoria recomendada | Prioridade |
 |---|---|---|---|
 | Login / troca de senha | Formulário simples e concentrado; estados de erro já existem. | Mostrar requisito de 10 caracteres junto ao campo, permitir revelar senha com botão acessível e manter erros vinculados ao campo. | Média |
@@ -47,23 +68,33 @@ operacionais repetidos, ações concorrentes e hierarquia entre lista/editor.
 | Sincronização | Estado da integração e ações ficam juntos; configuração ausente ainda exibe comandos desabilitados. | Cartão de situação resumido, última execução e próximo passo; detalhes técnicos e erros em expansão. Diferenciar completa de incremental com explicação breve. | Média |
 | Auditoria | Identificadores UUID e códigos de ação são pouco legíveis; não há filtros. | Filtros por período, usuário e ação; rótulos compreensíveis com identificador técnico disponível ao expandir/copiar. Não acrescentar senhas, tokens ou valores pessoais aos logs. | Alta |
 
-## Achado de integração visual
+## Achado de integração visual — corrigido
 
 Na página operacional, o navegador registrou bloqueios de estilos inline
 pela política CSP. Os editores usam `iframe srcDoc`, que herda a política da
 página; os templates usam estilos inline. Isso pode comprometer a aparência
 das prévias mesmo quando seu conteúdo está disponível.
 
-Recomenda-se isolar o HTML da prévia em resposta dedicada com CSP restrita
-(há precedente na rota HTML da DOF), mantendo sandbox, proibição de scripts,
-autorização e auditoria. Não liberar estilos/scripts globalmente como
-atalho. Essa correção de integração não foi incluída no ajuste de densidade.
+A correção autoriza somente os dois blocos CSS fixos dos templates por
+hash SHA-256 na política herdada. Não libera `unsafe-inline` na página
+principal, scripts, atributos de estilo ou CSS arbitrário. Os templates
+compartilham as constantes usadas para gerar a política, evitando hashes
+manuais desatualizados. Iframes continuam em sandbox sem permissões.
+
+Essa abordagem preserva a prévia local dos blocos ainda não salvos, sem
+enviar HTML adicional ao servidor ou abandonar a autorização/auditoria da
+consulta. É uma alternativa à resposta HTML dedicada originalmente sugerida.
+Frontend e API precisam ser publicados juntos e a API reiniciada quando
+o CSS do template mudar. Os testes de navegador usam a CSP de produção,
+verificam estilos calculados de DOF e dos três tipos DTC e comprovam o
+bloqueio de CSS arbitrário e scripts inseridos na prévia DTC.
 
 ## Sequência sugerida e aceite
 
-1. Corrigir a integração visual das prévias e mensagens antigas de emissão.
-2. Unificar filtros/listas e reorganizar Cadastro e Importação em abas.
-3. Reorganizar DTC e ações de Histórico; depois compactar o menu.
+1. Concluído: integração visual das prévias e mensagens antigas de emissão.
+2. Concluído: filtros da lista carregada, grupos cadastrais e abas de transferência.
+3. Concluído: grupos DTC e separação das ações destrutivas. Próximos opcionais:
+   filtros globais, abas DTC, menus de ações e compactação do menu.
 4. Validar com operadores: localizar servidor, corrigir referência, salvar,
    conferir e emitir; medir passos, tempo e erros sem registrar dados pessoais.
 

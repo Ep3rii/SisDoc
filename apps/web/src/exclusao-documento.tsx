@@ -38,7 +38,7 @@ export function ExclusaoDocumento({
   }
 
   return (
-    <details className="exclusao-documento">
+    <details className="exclusao-documento zona-perigo">
       <summary>Excluir</summary>
       <form onSubmit={(evento) => void excluir(evento)}>
         <p>Exclusão física de {descricao}, revisão {revisao}. Esta ação é irreversível e não reutiliza números oficiais.</p>

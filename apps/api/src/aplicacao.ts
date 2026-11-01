@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ServerOptions } from 'node:https';
@@ -6,9 +7,13 @@ import path from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Configuracao } from '@sisdoc/contratos';
+import { ESTILO_DOCUMENTO_DTC, ESTILO_PREVIA_DOF } from '@sisdoc/templates';
 import type { Pool } from 'pg';
 import { AppModule } from './app.module';
 import { FiltroProblemas } from './problemas';
+
+export const CSP_APLICACAO = `default-src 'self'; style-src 'self' ${[ESTILO_PREVIA_DOF, ESTILO_DOCUMENTO_DTC]
+  .map((estilo) => `'sha256-${createHash('sha256').update(estilo).digest('base64')}'`).join(' ')}; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'`;
 
 export async function criarAplicacao(configuracao: Configuracao, banco: Pool): Promise<NestExpressApplication> {
   let key: Buffer;
@@ -33,7 +38,7 @@ export async function criarAplicacao(configuracao: Configuracao, banco: Pool): P
   app.setGlobalPrefix('api/v1');
   app.useGlobalFilters(new FiltroProblemas());
   app.use((_req: IncomingMessage, res: ServerResponse, next: () => void) => {
-    res.setHeader('Content-Security-Policy', "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', CSP_APLICACAO);
     res.setHeader('Strict-Transport-Security', 'max-age=31536000');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');

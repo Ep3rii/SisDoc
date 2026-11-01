@@ -24,6 +24,7 @@ import { api, ErroApi } from './api';
 import { PainelEmissao } from './emissao';
 import { ExclusaoDocumento } from './exclusao-documento';
 import { anosDoPeriodo } from './anos-dtc';
+import { FiltrosLista, useFiltroLista } from './filtros-lista';
 
 type Papel = RespostaSessao['usuario']['papel'];
 type Servidor = { pessoaId: string; vinculoId: string; nome: string; matricula: string };
@@ -152,15 +153,21 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
 
   const inss = conteudo.inss;
   return (
-    <form className="editor-dof" onSubmit={(evento) => void salvar(evento)} aria-label={`Editor da ${ROTULOS_DTC[tipo]}`}>
+    <form className="editor-dof" onSubmit={(evento) => void salvar(evento)} aria-label={`Editor da ${ROTULOS_DTC[tipo]}`}
+      onInvalidCapture={(evento) => {
+        if (evento.target instanceof HTMLElement) {
+          const grupo = evento.target.closest('details');
+          if (grupo) grupo.open = true;
+        }
+      }}>
       <p className="identificador-documento">{documento ? `Rascunho · revisão ${documento.revisao}` : 'Novo rascunho'}</p>
       <h2>{ROTULOS_DTC[tipo]} — {servidor.nome}</h2>
       <p>Matrícula {servidor.matricula}. {DESCRICOES[tipo]}</p>
       <fieldset>
         <legend><strong>Períodos ({conteudo.periodos.length} de {MAXIMO_PERIODOS_DTC})</strong></legend>
         {conteudo.periodos.map((periodo, indice) => (
-          <div className="bloco" key={indice}>
-            <h5>{indice + 1}º período</h5>
+          <details className="grupo-formulario" key={indice} open>
+            <summary>{indice + 1}º período — datas, deduções e incorporações</summary>
             <div className="grade-busca">
               <label>Início<input type="date" required value={periodo.inicio}
                 onChange={(evento) => alterarPeriodo(indice, { inicio: evento.target.value })} /></label>
@@ -192,10 +199,10 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
                 </tr>
               ))}</tbody>
             </table><p>* Incorporações provisórias; informe os dias anuais conforme documentação conferida.</p></div>}
-            {conteudo.periodos.length > 1 && <button type="button" className="secundario"
+            {conteudo.periodos.length > 1 && <button type="button" className="perigo"
               onClick={() => alterar({ ...conteudo, periodos: conteudo.periodos.filter((_, posicao) => posicao !== indice) })}>
               Remover {indice + 1}º período</button>}
-          </div>
+          </details>
         ))}
         {conteudo.periodos.length < MAXIMO_PERIODOS_DTC && <div className="acoes"><button type="button" className="secundario"
           onClick={() => alterar({ ...conteudo, periodos: [...conteudo.periodos, periodoVazio(tipo)] })}>Adicionar período</button></div>}
@@ -203,8 +210,8 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
       {tipo === 'DTC_COMISSIONADO' && <fieldset className="separado">
         <legend><strong>Cargos em comissão ({conteudo.cargos.length} de {MAXIMO_CARGOS_COMISSIONADOS})</strong></legend>
         {conteudo.cargos.map((cargo, indice) => (
-          <div className="bloco" key={indice}>
-            <h5>{indice + 1}º cargo</h5>
+          <details className="grupo-formulario" key={indice} open>
+            <summary>{indice + 1}º cargo — nomeação e exoneração</summary>
             <label>Cargo<input required maxLength={200} value={cargo.cargo} onChange={(evento) => alterarCargo(indice, { cargo: evento.target.value })} /></label>
             <div className="grade-busca">
               <label>Decreto de nomeação<input required maxLength={200} value={cargo.decretoNomeacao}
@@ -220,15 +227,15 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
               <label>Encerramento/afastamento<input type="date" value={cargo.dataEncerramento ?? ''}
                 onChange={(evento) => alterarCargo(indice, { dataEncerramento: textoOuNulo(evento.target.value) })} /></label>
             </div>
-            {conteudo.cargos.length > 1 && <button type="button" className="secundario"
+            {conteudo.cargos.length > 1 && <button type="button" className="perigo"
               onClick={() => alterar({ ...conteudo, cargos: conteudo.cargos.filter((_, posicao) => posicao !== indice) })}>
               Remover {indice + 1}º cargo</button>}
-          </div>
+          </details>
         ))}
         {conteudo.cargos.length < MAXIMO_CARGOS_COMISSIONADOS && <div className="acoes"><button type="button" className="secundario"
           onClick={() => alterar({ ...conteudo, cargos: [...conteudo.cargos, cargoVazio()] })}>Adicionar cargo</button></div>}
       </fieldset>}
-      {tipo === 'DTC_INSS' && inss && <fieldset className="separado">
+      {tipo === 'DTC_INSS' && inss && <fieldset className="grupo-formulario">
         <legend><strong>Informações adicionais (textos provisórios)</strong></legend>
         <label className="marcador"><input type="checkbox" checked={inss.licencas.possui}
           onChange={(evento) => alterarInss({ licencas: { possui: evento.target.checked, descricao: evento.target.checked ? inss.licencas.descricao : null } })} />
@@ -236,7 +243,9 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
         {inss.licencas.possui && <label>Datas, tipo e período/vínculo de cada ocorrência
           <textarea maxLength={2000} required value={inss.licencas.descricao ?? ''}
             onChange={(evento) => alterarInss({ licencas: { possui: true, descricao: textoOuNulo(evento.target.value) } })} /></label>}
-        <p><strong>Documentação-base</strong></p>
+      </fieldset>}
+      {tipo === 'DTC_INSS' && inss && <fieldset className="grupo-formulario">
+        <legend>Documentação-base e observações</legend>
         {([
           ['nomeacao', 'Atos de nomeação e exoneração'],
           ['ctps', 'Contrato de trabalho, CTPS ou ficha funcional'],
@@ -251,7 +260,7 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
         <label>Observações<textarea maxLength={2000} value={inss.observacao ?? ''}
           onChange={(evento) => alterarInss({ observacao: textoOuNulo(evento.target.value) })} /></label>
       </fieldset>}
-      <fieldset className="separado">
+      <fieldset className="grupo-formulario">
         <legend><strong>Processo e confirmações</strong></legend>
         <label>Número do processo{documento?.mascarasProcesso.length ? ` (${documento.mascarasProcesso.join(' ou ')})` : ''}
           <input maxLength={60} value={conteudo.processo ?? ''}
@@ -374,18 +383,19 @@ function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, onPenden
             if (resultado.documentoId !== id) throw new ErroApi(0, 'Não foi possível confirmar a emissão. Consulte o Histórico.');
             setEmissao(resultado);
           })}>Emitir</button></div>
+          <section className="zona-perigo"><h3>Devolução para ajustes</h3>
           <label>Motivo da devolução<textarea maxLength={2000} value={motivo} onChange={(evento) => {
             setMotivo(evento.target.value);
             onPendente(evento.target.value.trim().length > 0);
           }} /></label>
-          <div className="acoes"><button type="button" className="secundario" disabled={ocupado || !motivo.trim()}
+          <div className="acoes"><button type="button" className="perigo" disabled={ocupado || !motivo.trim()}
             onClick={() => void executar(async () => {
               await api.devolverDtc(csrf, id, { revisao: documento.revisao, motivo });
               setMotivo('');
               onPendente(false);
               setPrevia(null);
               setVersao((atual) => atual + 1);
-            })}>Devolver para rascunho</button></div>
+            })}>Devolver para rascunho</button></div></section>
         </>}
         <div className="acoes"><button type="button" className="secundario" onClick={onVoltar}>Voltar à lista</button></div>
       </div>
@@ -448,6 +458,8 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
   const [pagina, setPagina] = useState<PaginaDtc | null>(null);
   const [versao, setVersao] = useState(0);
   const [mensagem, setMensagem] = useState('');
+  const filtro = useFiltroLista(pagina?.itens ?? [], (item) =>
+    `${item.nome} ${item.matricula} ${item.autorNome} ${item.revisao} ${item.status} ${new Date(item.atualizadoEm).toLocaleString('pt-BR')}`);
   const voltar = useCallback(() => {
     if (!confirmarSaida()) return;
     onPendente(false);
@@ -484,20 +496,22 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
     <section className="painel" aria-labelledby="dtc-titulo">
       <h2 id="dtc-titulo">{ROTULOS_DTC[tipo]}</h2>
       <p>{DESCRICOES[tipo]}</p>
-      <div className="acoes">
+      <FiltrosLista filtro={filtro} antesAlterar={confirmarSaida} onAtualizar={() => setVersao((atual) => atual + 1)}>
         {papel !== 'admin' && <button type="button" onClick={() => { onLimpar(); setModo({ tela: 'busca' }); }}>
           Nova {ROTULOS_DTC[tipo]}</button>}
-        <label>Situação<select value={estado} onChange={(evento) => setEstado(evento.target.value === 'conferido' ? 'conferido' : 'rascunho')}>
+        <label>Situação<select value={estado} onChange={(evento) => {
+          if (confirmarSaida()) setEstado(evento.target.value === 'conferido' ? 'conferido' : 'rascunho');
+        }}>
           <option value="rascunho">{papel === 'coordenador' || papel === 'admin' ? 'Rascunhos' : 'Meus rascunhos'}</option>
           <option value="conferido">Conferidas</option>
         </select></label>
-      </div>
+      </FiltrosLista>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {!pagina ? <p role="status">Carregando...</p> : pagina.itens.length === 0 ? <p>Nenhum documento nesta situação.</p> : (
         <div className="tabela"><table>
           <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Revisão</th>
             <th scope="col">Atualizado em</th><th scope="col">Autor</th><th scope="col">Ações</th></tr></thead>
-          <tbody>{pagina.itens.map((item) => (
+          <tbody>{filtro.itens.map((item) => (
             <tr key={item.id}><td>{item.nome}</td><td>{item.matricula}</td><td>{item.revisao}</td>
               <td>{new Date(item.atualizadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td><td>{item.autorNome}</td>
               <td><div className="acoes">

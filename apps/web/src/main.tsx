@@ -291,7 +291,7 @@ function App() {
             )}
             {tela === 'historico' && (
               <Historico key={chaveTela} csrf={sessao.csrf} escopos={escoposHistorico}
-                onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia}
+                onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida}
                 {...(podeSalvar ? { onAbrirRascunhos: () => navegar('rascunhos') } : {})} />
             )}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (

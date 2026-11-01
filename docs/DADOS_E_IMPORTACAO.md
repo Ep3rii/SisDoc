@@ -13,6 +13,13 @@ legada em PostgreSQL e, futuramente, a API da folha). Desenho registrado na
 
 ## Visão geral
 
+Na interface administrativa, **Importação e exportação** está organizada
+em **Importar**, **Disponibilizar Legado**, **Exportar** e **Histórico**.
+Upload e relatório ficam em Importar; mapeamento, prévia e confirmação de
+promoção ficam em Disponibilizar Legado. As abas preservam o estado, mas não
+gravam dados. Histórico reúne conferência por origem e lotes, com filtro
+somente dos lotes carregados. Veja [operação](OPERACAO.md#organização-das-telas).
+
 | Tipo (`--tipo`) | Chave de identificação | Destino | Obrigatório? |
 | --- | --- | --- | --- |
 | `dados_funcionais` | pessoa por CPF; vínculo por (origem, matrícula) | `nucleo.pessoa`, `nucleo.vinculo` | **sim** (importe primeiro) |

@@ -3,6 +3,7 @@ import type { PaginaEncaminhamentosDof, PaginaRascunhosDof, RascunhoDof } from '
 import { api } from './api';
 import { CalculoDof } from './calculo-dof';
 import { ExclusaoDocumento } from './exclusao-documento';
+import { FiltrosLista, useFiltroLista } from './filtros-lista';
 
 type Props = {
   csrf: string;
@@ -23,6 +24,8 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
   const [mensagem, setMensagem] = useState('');
   const [versao, setVersao] = useState(0);
   const ativa = useRef(true);
+  const filtro = useFiltroLista<PaginaRascunhosDof['itens'][number] | PaginaEncaminhamentosDof['itens'][number]>(pagina?.itens ?? [], (item) =>
+    `${item.nome} ${item.matricula} ${'autorNome' in item ? item.autorNome : ''} ${item.revisao} ${new Date(item.atualizadoEm).toLocaleString('pt-BR')}`);
 
   useEffect(() => {
     ativa.current = true;
@@ -77,6 +80,7 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
         ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta, conferência provisória e devolução.'
         : 'Somente rascunhos de sua autoria são exibidos. Você pode encaminhá-los a um coordenador para análise.'}</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
+      <FiltrosLista filtro={filtro} antesAlterar={confirmarSaida} onAtualizar={() => setVersao((atual) => atual + 1)} />
       {falhou ? (
         <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>
           Tentar carregar rascunhos novamente
@@ -86,7 +90,7 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
           {pagina.itens.length === 0 ? <p>Nenhum rascunho encontrado.</p> : (
             <div className="tabela"><table>
               <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th>{recebidos && <th scope="col">Autor</th>}<th scope="col">Revisão</th><th scope="col">Atualizado</th><th scope="col">Ações</th></tr></thead>
-              <tbody>{pagina.itens.map((item) => {
+              <tbody>{filtro.itens.map((item) => {
                 if (recebidos && !('autorNome' in item)) throw new Error('O encaminhamento não identifica o autor.');
                 return (
                 <tr key={item.id}>

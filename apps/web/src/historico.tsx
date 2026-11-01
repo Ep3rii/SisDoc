@@ -3,6 +3,7 @@ import { ROTULOS_DTC, type GrupoHistorico, type HistoricoEmissoes, type ItemHist
 import { api, ErroApi } from './api';
 import { baixarPdfEmissao, rotuloPdf } from './emissao';
 import { ExclusaoDocumento } from './exclusao-documento';
+import { FiltrosLista, useFiltroLista } from './filtros-lista';
 
 type Props = {
   csrf: string;
@@ -10,12 +11,13 @@ type Props = {
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
+  confirmarSaida: () => boolean;
   onAbrirRascunhos?: () => void;
 };
 
 const nomesEscopo = { proprio: 'Minhas emissões (5 últimas)', todos: 'Todas as emissões (50 últimas)' } as const;
 
-export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrirRascunhos }: Props) {
+export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, confirmarSaida, onAbrirRascunhos }: Props) {
   const [grupo, setGrupo] = useState<GrupoHistorico>('DOF');
   const [escopo, setEscopo] = useState<'proprio' | 'todos'>(escopos[0] ?? 'proprio');
   const [dados, setDados] = useState<HistoricoEmissoes | null>(null);
@@ -27,6 +29,8 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
   const [motivo, setMotivo] = useState('');
   const [confirmado, setConfirmado] = useState(false);
   const ativa = useRef(true);
+  const filtro = useFiltroLista(dados?.itens ?? [], (item) =>
+    `${item.tipo} ${item.numero} ${item.nome ?? ''} ${item.matricula ?? ''} ${item.emitidoPorNome} ${item.status === 'cancelado' ? 'Cancelada' : 'Emitida'} ${new Date(item.emitidoEm).toLocaleString('pt-BR')}`);
 
   useEffect(() => {
     ativa.current = true;
@@ -120,7 +124,7 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
             onChange={(evento) => setConfirmado(evento.target.checked)} />
             Confirmo o cancelamento desta emissão</label>
           <div className="acoes">
-            <button type="submit" disabled={ocupado || !motivo.trim() || !confirmado}>
+            <button type="submit" className="perigo" disabled={ocupado || !motivo.trim() || !confirmado}>
               {ocupado ? 'Cancelando...' : 'Cancelar emissão'}
             </button>
             <button type="button" className="secundario" disabled={ocupado} onClick={() => {
@@ -135,21 +139,25 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
   return (
     <section className="painel" aria-labelledby="historico-titulo">
       <h2 id="historico-titulo">Histórico de emissões</h2>
-      <div className="acoes">
+      <FiltrosLista filtro={filtro} antesAlterar={confirmarSaida} onAtualizar={() => setVersao((atual) => atual + 1)}>
         <label>Grupo
-          <select value={grupo} onChange={(evento) => setGrupo(evento.target.value === 'DTC' ? 'DTC' : 'DOF')}>
+          <select value={grupo} onChange={(evento) => {
+            if (confirmarSaida()) setGrupo(evento.target.value === 'DTC' ? 'DTC' : 'DOF');
+          }}>
             <option value="DOF">DOF</option>
             <option value="DTC">DTCs</option>
           </select>
         </label>
         {escopos.length > 1 && (
           <label>Escopo
-            <select value={escopo} onChange={(evento) => setEscopo(evento.target.value === 'todos' ? 'todos' : 'proprio')}>
+            <select value={escopo} onChange={(evento) => {
+              if (confirmarSaida()) setEscopo(evento.target.value === 'todos' ? 'todos' : 'proprio');
+            }}>
               {escopos.map((valor) => <option key={valor} value={valor}>{nomesEscopo[valor]}</option>)}
             </select>
           </label>
         )}
-      </div>
+      </FiltrosLista>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}
         {onAbrirRascunhos && mensagem.includes('Meus rascunhos') && <>{' '}
           <button type="button" className="secundario" onClick={onAbrirRascunhos}>Abrir Meus rascunhos</button></>}
@@ -165,7 +173,7 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
           <thead><tr><th scope="col">Tipo</th><th scope="col">Número</th><th scope="col">Nome</th><th scope="col">Matrícula</th>
             <th scope="col">Emitida em</th><th scope="col">Emitida por</th><th scope="col">Situação</th>
             <th scope="col">PDF</th><th scope="col">Ações</th></tr></thead>
-          <tbody>{dados.itens.map((item) => (
+          <tbody>{filtro.itens.map((item) => (
             <tr key={item.emissaoId}>
               <td>{item.tipo === 'DOF' ? 'DOF' : ROTULOS_DTC[item.tipo]}</td><td>{item.numero}</td><td>{item.nome ?? '—'}</td><td>{item.matricula ?? '—'}</td>
               <td>{new Date(item.emitidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
@@ -177,7 +185,9 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
                   onClick={() => void baixar(item)}>Baixar PDF <span className="sr-only">da emissão {item.numero}</span></button>}
                 {item.podeCopiar && <button type="button" className="secundario" disabled={ocupado}
                   onClick={() => void copiar(item)}>Copiar como rascunho <span className="sr-only">da emissão {item.numero}</span></button>}
-                {item.podeCancelar && item.status === 'emitido' && <button type="button" className="secundario" disabled={ocupado}
+              </div>
+              {(item.podeExcluir || (item.podeCancelar && item.status === 'emitido')) && <div className="zona-perigo">
+                {item.podeCancelar && item.status === 'emitido' && <button type="button" className="perigo" disabled={ocupado}
                   onClick={() => { onLimpar(); setMensagem(''); setCancelando(item); }}>
                   Cancelar <span className="sr-only">emissão {item.numero}</span></button>}
                 {item.podeExcluir && <ExclusaoDocumento csrf={csrf} documentoId={item.documentoId} revisao={item.revisao}
@@ -188,7 +198,7 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, onAbrir
                       : `Exclusão de ${item.numero} solicitada; a remoção segura do PDF ainda está pendente.`);
                     setVersao((atual) => atual + 1);
                   }} />}
-              </div></td>
+              </div>}</td>
             </tr>
           ))}</tbody>
         </table></div>

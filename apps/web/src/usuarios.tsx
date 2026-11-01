@@ -7,6 +7,7 @@ import {
   type UsuarioAdministrativo,
 } from '@sisdoc/contratos';
 import { api, ErroApi } from './api';
+import { FiltrosLista, useFiltroLista } from './filtros-lista';
 
 export const nomesPerfis: Record<UsuarioAdministrativo['papel'], string> = {
   analista: 'Analista',
@@ -43,6 +44,8 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada }: Prop
   const [selecionado, setSelecionado] = useState<UsuarioAdministrativo | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [falhou, setFalhou] = useState(false);
+  const filtro = useFiltroLista(pagina?.itens ?? [], (usuario) =>
+    `${usuario.nome} ${usuario.matricula} ${nomesPerfis[usuario.papel]} ${usuario.ativo ? 'Ativo' : 'Inativo'}`);
   const recarregar = useCallback(() => setVersao((atual) => atual + 1), []);
 
   useEffect(() => {
@@ -143,6 +146,7 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada }: Prop
   return (
     <section aria-labelledby="usuarios-titulo">
       <h2 id="usuarios-titulo">Administração de usuários</h2>
+      <FiltrosLista filtro={filtro} onAtualizar={recarregar} />
       <p>O administrador tem acesso completo aos dados e documentos funcionais, inclusive aos rascunhos de outros usuários. Todas as ações são auditadas.</p>
       <div className="grade">
         <form className="painel" onSubmit={criar}>
@@ -186,7 +190,7 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada }: Prop
             <table>
               <thead><tr><th scope="col">Matrícula</th><th scope="col">Nome</th><th scope="col">Perfil</th><th scope="col">Situação</th><th scope="col">Ações</th></tr></thead>
               <tbody>
-                {pagina.itens.map((usuario) => (
+                {filtro.itens.map((usuario) => (
                   <tr key={usuario.id}>
                     <td>{usuario.matricula}</td><td>{usuario.nome}</td><td>{nomesPerfis[usuario.papel]}</td>
                     <td>{usuario.ativo ? 'Ativo' : 'Inativo'}</td>

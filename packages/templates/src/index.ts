@@ -3,7 +3,7 @@ import { analisarTextoDof, valoresVariaveisDof } from './variaveis-dof';
 
 export { analisarTextoDof, valoresVariaveisDof, verificarVariaveisDof } from './variaveis-dof';
 export { renderizarEmissaoDof } from './emissao-dof';
-export { CNPJ_SEMAD, MARCA_INSS_PROVISORIO, TEXTO_SEM_EMENDAS, renderizarDocumentoDtc, renderizarEmissaoDtc, renderizarPreviaDtc } from './emissao-dtc';
+export { CNPJ_SEMAD, MARCA_INSS_PROVISORIO, TEXTO_SEM_EMENDAS, ESTILO_DOCUMENTO_DTC, renderizarDocumentoDtc, renderizarEmissaoDtc, renderizarPreviaDtc } from './emissao-dtc';
 export type { DadosDocumentoDtc } from './emissao-dtc';
 export type { ParteTextoDof } from './variaveis-dof';
 
@@ -11,6 +11,18 @@ type DadosPreviaDof = Pick<RascunhoDof, 'nome' | 'matricula' | 'revisao' | 'resu
   fonte?: Omit<DadosFontePreviaDof, 'documentoId' | 'revisao' | 'provaFonte'>;
   fonteSelecionadaAlterada?: boolean;
 };
+
+export const ESTILO_PREVIA_DOF = `
+body{font-family:system-ui,sans-serif;color:#172b3a;margin:1rem;line-height:1.45;overflow-wrap:anywhere}
+h1{font-size:1.25rem}h2{font-size:1rem;margin-top:1.4rem}
+.aviso{font-weight:700;color:#7d1717}.texto{white-space:pre-wrap;overflow-wrap:anywhere}
+.tabela{overflow-x:auto}table{border-collapse:collapse;font-size:.8rem}th,td{border:1px solid #627988;padding:.25rem;text-align:right}th{background:#e7eef2}
+@media print{
+body{margin:0;font-size:9pt}.tabela{overflow:visible}
+table{width:100%;table-layout:fixed;font-size:6.5pt}th,td{padding:1pt;overflow-wrap:anywhere}
+thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}
+}
+`;
 
 function escapar(valor: string | number): string {
   return String(valor).replace(/[&<>"']/g, (caractere) => ({
@@ -73,7 +85,7 @@ ${fonte.avisoNivel ? `<p class="aviso">${escapar(fonte.avisoNivel)}</p>` : ''}
 ${fonte.removidoNaFonte ? '<p class="aviso">O vínculo está marcado como removido na fonte.</p>' : ''}
 ${dados.fonteSelecionadaAlterada ? '<p class="aviso">A pessoa ou o vínculo mudou após a conferência.</p>' : ''}
 ${fonte.admissao !== resultado.admissaoConsiderada ? '<p class="aviso">A admissão atual difere da utilizada no cálculo; reabra e confira o rascunho.</p>' : ''}
-<p>Fonte consultada em ${escapar(new Date(fonte.consultadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))}. Mudanças posteriores não aparecem automaticamente; feche e reabra a prévia.</p>
+<p>Fonte consultada em ${escapar(new Date(fonte.consultadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }))}. Para consultar mudanças posteriores, use Atualizar prévia.</p>
 ` : '<p class="aviso">Os demais dados da fonte não estão disponíveis nesta prévia.</p>';
 
   return `<!doctype html>
@@ -81,17 +93,7 @@ ${fonte.admissao !== resultado.admissaoConsiderada ? '<p class="aviso">A admiss�
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prévia provisória de DOF</title>
-<style>
-body{font-family:system-ui,sans-serif;color:#172b3a;margin:1rem;line-height:1.45;overflow-wrap:anywhere}
-h1{font-size:1.25rem}h2{font-size:1rem;margin-top:1.4rem}
-.aviso{font-weight:700;color:#7d1717}.texto{white-space:pre-wrap;overflow-wrap:anywhere}
-.tabela{overflow-x:auto}table{border-collapse:collapse;font-size:.8rem}th,td{border:1px solid #627988;padding:.25rem;text-align:right}th{background:#e7eef2}
-@media print{
-body{margin:0;font-size:9pt}.tabela{overflow:visible}
-table{width:100%;table-layout:fixed;font-size:6.5pt}th,td{padding:1pt;overflow-wrap:anywhere}
-thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}
-}
-</style></head><body>
+<style>${ESTILO_PREVIA_DOF}</style></head><body>
 <h1>PRÉVIA PROVISÓRIA — SEM VALIDADE OFICIAL</h1>
 <p class="aviso">Não é modelo aprovado, conferência nem emissão. Revisão salva de referência: ${escapar(dados.revisao)}.</p>
 <p>Nome: ${escapar(fonte?.nome ?? dados.nome)}. Matrícula: ${escapar(fonte?.matricula ?? dados.matricula)}.</p>

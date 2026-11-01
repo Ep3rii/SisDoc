@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { calcularDtc } from '../apps/api/dist/documentos/dtcs.js';
 import { anosDoPeriodo } from '../apps/web/src/anos-dtc.js';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { CSP_APLICACAO } from '../apps/api/dist/aplicacao.js';
 
 const pessoaId = '11111111-1111-4111-8111-111111111111';
 const vinculoId = '22222222-2222-4222-8222-222222222222';
@@ -57,7 +58,7 @@ describe('Editor DTC', () => {
   beforeAll(async () => {
     servidor = await preview({
       configFile: false, root: path.join(process.cwd(), 'apps', 'web'), logLevel: 'silent',
-      preview: { host: '127.0.0.1', port: 0, strictPort: true },
+      preview: { host: '127.0.0.1', port: 0, strictPort: true, headers: { 'Content-Security-Policy': CSP_APLICACAO } },
     });
     const porta = servidor.httpServer.address();
     if (!porta || typeof porta === 'string') throw new Error('Prévia isolada não iniciou.');
@@ -128,9 +129,29 @@ describe('Editor DTC', () => {
         await pagina.goto(endereco);
         await pagina.getByRole('button', { name: new RegExp(`^${ROTULOS_DTC[tipo]}`) }).click();
         expect(await pagina.getByRole('button', { name: `Nova ${ROTULOS_DTC[tipo]}` }).count()).toBe(0);
+        await pagina.getByRole('searchbox', { name: 'Filtrar lista carregada' }).fill('inexistente');
+        expect(await pagina.getByRole('button', { name: `Abrir ${nome}` }).count()).toBe(0);
+        await pagina.getByRole('button', { name: 'Limpar filtro', exact: true }).click();
+        expect(await pagina.locator('.exclusao-documento.zona-perigo').count()).toBe(1);
         await pagina.getByRole('button', { name: `Abrir ${nome}` }).click();
+        const quadro = pagina.frameLocator(`iframe[title="Prévia da ${ROTULOS_DTC[tipo]}"]`);
+        await quadro.locator('body').waitFor();
+        expect(await quadro.locator('body').evaluate((elemento) => getComputedStyle(elemento).fontFamily))
+          .toBe('"Times New Roman", Times, serif');
+        expect(await quadro.locator('body').evaluate((elemento) => {
+          const estilo = document.createElement('style');
+          estilo.textContent = 'body{font-family:monospace!important}';
+          document.head.append(estilo);
+          const script = document.createElement('script');
+          script.textContent = 'document.body.dataset.executou = "sim"';
+          document.body.append(script);
+          return { fonte: getComputedStyle(elemento).fontFamily, executou: elemento.dataset.executou ?? null };
+        })).toEqual({ fonte: '"Times New Roman", Times, serif', executou: null });
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
         expect(await pagina.locator(`iframe[title="Prévia da ${ROTULOS_DTC[tipo]}"]`).isVisible()).toBe(true);
+        await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();
+        expect(await pagina.getByLabel('PB em 2020', { exact: true }).isVisible()).toBe(false);
+        await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();
         await pagina.getByLabel('PB em 2020', { exact: true }).fill('40');
         await pagina.getByLabel('PV em 2020', { exact: true }).fill('50');
         await pagina.getByLabel('Licença-prêmio em 2020', { exact: true }).fill('60');

@@ -1,5 +1,34 @@
 # Progresso da construção
 
+## Prioridades de UI/UX e correção CSP — 01/11/2026
+
+Transferência dividida em Importar, Disponibilizar Legado, Exportar e
+Histórico, com teclado e estado preservado. Filtros, contagens, limpeza e
+atualização padronizados em oito listas; seu alcance é somente a lista
+carregada, sem ampliar o escopo autorizado. Alterações pendentes em
+formulários de exclusão são protegidas ao trocar filtros.
+
+Cadastro dividido em identificação/contato, documentos e vínculo, com
+seleção automática do vínculo escolhido na lista. Grupos recolhíveis
+organizam referências, vínculos, períodos e cargos DTC; documentação INSS
+separada de licenças e confirmações. Ações destrutivas foram separadas
+visualmente das principais, preservando motivos e autorização. Mensagens
+antigas de emissão indisponível na DOF foram corrigidas.
+
+CSP da página autoriza apenas os hashes SHA-256 dos estilos fixos DOF/DTC.
+Sandbox e bloqueio de scripts/CSS arbitrário preservados; sem novas rotas,
+migrações ou gravações operacionais. 51 testes direcionados aprovados
+(incluindo revalidação focada de 9 testes de transferência/listas),
+build e typecheck aprovados. Cobertura inclui CSP real em prévias,
+três tipos DTC, estado entre abas, teclado, transferência em 375 px,
+filtros e confirmação de saída com formulário pendente.
+
+API e frontend publicados juntos; aplicação reiniciada em loopback,
+health e página HTTPS 200, política com os dois hashes confirmada.
+Na página compartilhada, a prévia DOF exibiu a cor e a fonte esperadas,
+com sandbox sem permissões; não foram alterados documentos reais.
+Avaliação e operação atualizadas; propostas adicionais continuam opcionais.
+
 ## Prévias persistentes e densidade — 01/11/2026
 
 DOF salva/reaberta carrega a prévia automaticamente e recarrega a cada
@@ -11,8 +40,7 @@ DTC em edição e tamanho dos campos anuais; build e typecheck aprovados.
 Frontend publicado na instalação existente, com health e página 200.
 
 A [avaliação por tela](AVALIACAO_UI_UX.md) registra sugestões não implementadas
-e a pendência visual da CSP: estilos inline em prévias `srcDoc` podem ser
-bloqueados pela política da página. A prévia disponível não equivale a
+e a pendência visual da CSP, resolvida no ajuste registrado acima. A prévia disponível não equivale a
 conferência ou emissão autorizada.
 
 ## Senhas, destinatários e organização do menu — 01/11/2026

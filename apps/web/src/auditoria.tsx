@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import type { PaginaAuditoria } from '@sisdoc/contratos';
 import { api } from './api';
+import { FiltrosLista, useFiltroLista } from './filtros-lista';
 
 export function Auditoria({ onErro }: { onErro: (erro: unknown) => void }) {
   const [pagina, setPagina] = useState<PaginaAuditoria | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [versao, setVersao] = useState(0);
   const [falhou, setFalhou] = useState(false);
+  const filtro = useFiltroLista(pagina?.itens ?? [], (item) =>
+    `${new Date(item.em).toLocaleString('pt-BR')} ${item.acao} ${item.entidade} ${item.entidadeId ?? ''} ${item.usuarioId ?? ''}`);
   useEffect(() => {
     let ativa = true;
     setPagina(null);
@@ -25,13 +28,14 @@ export function Auditoria({ onErro }: { onErro: (erro: unknown) => void }) {
     <section aria-labelledby="auditoria-titulo">
       <h2 id="auditoria-titulo">Auditoria</h2>
       <p>Eventos apresentados com dados minimizados.</p>
+      <FiltrosLista filtro={filtro} onAtualizar={() => setVersao((atual) => atual + 1)} />
       {falhou ? <button type="button" className="secundario" onClick={() => setVersao((atual) => atual + 1)}>Tentar carregar auditoria novamente</button> : !pagina ? <p role="status">Carregando auditoria...</p> : (
         <>
           <div className="tabela">
             <table>
               <thead><tr><th scope="col">Data e hora</th><th scope="col">Ação</th><th scope="col">Entidade</th><th scope="col">Alvo administrativo</th><th scope="col">Identificador do usuário</th></tr></thead>
               <tbody>
-                {pagina.itens.map((evento) => (
+                {filtro.itens.map((evento) => (
                   <tr key={evento.id}>
                     <td>{new Date(evento.em).toLocaleString('pt-BR')}</td><td>{evento.acao}</td><td>{evento.entidade}</td><td>{evento.entidadeId ?? '—'}</td>
                     <td>{evento.usuarioId ?? 'Não identificado'}</td>

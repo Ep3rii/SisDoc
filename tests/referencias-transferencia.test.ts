@@ -37,6 +37,68 @@ afterAll(async () => {
   if (servidor) await new Promise<void>((resolve, reject) => servidor.close((erro) => erro ? reject(erro) : resolve()));
 });
 
+it.each(['Usuários', 'Auditoria', 'Histórico'] as const)('padroniza filtro e atualização em %s sem gravar dados', async (menu) => {
+  const page = await browser.newPage();
+  let leituras = 0;
+  let escritas = 0;
+  let marcador = '';
+  const endpoint = menu === 'Usuários' ? 'admin/usuarios' : menu === 'Auditoria' ? 'admin/auditoria' : 'historico';
+  try {
+    await simular(page, 'admin');
+    await page.route(`**/api/v1/${endpoint}**`, async (rota) => {
+      if (rota.request().method() !== 'GET') escritas += 1;
+      leituras += 1;
+      const itens = ['ALVO', 'OUTRO'].map((nome) => {
+        const id = randomUUID();
+        const exibido = `${nome} (${leituras})`;
+        if (nome === 'ALVO') marcador = exibido;
+        if (menu === 'Usuários') return { id, matricula: nome, nome: exibido, papel: 'analista',
+          trocaSenhaObrigatoria: false, email: null, ativo: true };
+        if (menu === 'Auditoria') return { id, usuarioId: null, acao: exibido, entidade: 'documento',
+          entidadeId: null, em: '2026-11-01T12:00:00.000Z' };
+        return { emissaoId: id, documentoId: randomUUID(), tipo: 'DOF', numero: nome, emitidoEm: '2026-11-01T12:00:00.000Z',
+          emitidoPorNome: 'Operador fictício', status: 'emitido', canceladoEm: null,
+          pdf: { status: 'concluido', tentativas: 1, erro: null, disponivel: true },
+          nome: exibido, matricula: nome, revisao: 1, podeCopiar: false, podeBaixar: true, podeCancelar: true, podeExcluir: true };
+      });
+      const query = new URL(rota.request().url()).searchParams;
+      await rota.fulfill({ contentType: 'application/json', body: JSON.stringify(menu === 'Histórico'
+        ? { grupo: query.get('tipo'), escopo: query.get('escopo'), itens }
+        : { itens, proximoCursor: null }) });
+    });
+    await page.goto(origem);
+    await page.getByRole('button', { name: new RegExp(`^${menu}`) }).click();
+    await page.locator('tbody tr').first().waitFor();
+    expect(await page.locator('tbody tr').count()).toBe(2);
+    await page.getByRole('searchbox', { name: 'Filtrar lista carregada' }).fill('alvo');
+    expect(await page.locator('tbody tr').count()).toBe(1);
+    const anteriores = leituras;
+    const respostaAtualizada = page.waitForResponse((resposta) => resposta.url().includes(`/api/v1/${endpoint}`));
+    await page.getByRole('button', { name: 'Atualizar lista', exact: true }).click();
+    await respostaAtualizada;
+    await page.getByRole('cell', { name: marcador, exact: true }).waitFor();
+    expect(leituras).toBeGreaterThan(anteriores);
+    expect(await page.getByRole('searchbox', { name: 'Filtrar lista carregada' }).inputValue()).toBe('alvo');
+    if (menu === 'Histórico') {
+      expect(await page.getByRole('button', { name: /^Baixar PDF/ }).locator('..').getAttribute('class')).toBe('acoes');
+      expect(await page.getByRole('button', { name: /^Cancelar emissão/ }).locator('..').getAttribute('class')).toBe('zona-perigo');
+      await page.locator('.exclusao-documento summary').click();
+      await page.getByLabel('Motivo da exclusão', { exact: true }).fill('Motivo fictício pendente');
+      page.once('dialog', (dialog) => void dialog.dismiss());
+      await page.getByRole('searchbox', { name: 'Filtrar lista carregada' }).fill('inexistente');
+      expect(await page.getByRole('searchbox', { name: 'Filtrar lista carregada' }).inputValue()).toBe('alvo');
+      expect(await page.locator('.exclusao-documento textarea').inputValue()).toBe('Motivo fictício pendente');
+      await page.locator('.exclusao-documento textarea').fill('');
+      await page.getByRole('button', { name: /^Cancelar emissão/ }).click();
+      expect(await page.getByRole('button', { name: 'Cancelar emissão', exact: true }).isDisabled()).toBe(true);
+      await page.getByRole('button', { name: 'Voltar ao Histórico', exact: true }).click();
+    }
+    await page.getByRole('button', { name: 'Limpar filtro', exact: true }).click();
+    expect(await page.locator('tbody tr').count()).toBe(2);
+    expect(escritas).toBe(0);
+  } finally { await page.close(); }
+});
+
 async function simular(page: Page, papel: 'admin' | 'analista') {
   await page.route('**/api/v1/**', async (rota) => {
     const url = new URL(rota.request().url());
@@ -72,6 +134,22 @@ async function simular(page: Page, papel: 'admin' | 'analista') {
     await rota.fulfill({ contentType: 'application/json', body: JSON.stringify(dados) });
   });
 }
+
+it('mantém as abas de transferência utilizáveis em 375 px sem overflow da página', async () => {
+  const page = await browser.newPage({ viewport: { width: 375, height: 812 } });
+  try {
+    await simular(page, 'admin');
+    await page.goto(origem);
+    await page.getByRole('button', { name: 'Menu', exact: true }).click();
+    await page.getByRole('button', { name: /^Importação/ }).click();
+    for (const titulo of ['Importar', 'Disponibilizar Legado', 'Exportar', 'Histórico']) {
+      await page.getByRole('tab', { name: titulo, exact: true }).click();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      const caixa = await page.getByRole('tab', { name: titulo, exact: true }).boundingBox();
+      expect(caixa?.height).toBeGreaterThanOrEqual(44);
+    }
+  } finally { await page.close(); }
+});
 
 it('confere prévia completa, invalida mapeamento alterado e confirma conversão do legado', async () => {
   const page = await browser.newPage({ acceptDownloads: true });
@@ -111,6 +189,7 @@ it('confere prévia completa, invalida mapeamento alterado e confirma conversão
     });
     await page.goto(origem);
     await page.getByRole('button', { name: /^Importação/ }).click();
+    await page.getByRole('tab', { name: 'Disponibilizar Legado', exact: true }).click();
     await page.getByLabel('Lote para disponibilizar').selectOption(loteId);
     await page.getByRole('heading', { name: /Prévia completa/ }).waitFor();
     expect(await page.getByRole('cell', { name: '52998224725', exact: true }).count()).toBe(1);
@@ -137,6 +216,7 @@ it('separa sincronização de importação/exportação e baixa dados mediante c
   try {
     await simular(page, 'admin');
     await page.goto(origem);
+    await page.locator('aside .grupo-menu').first().waitFor();
     const categorias = await page.locator('aside .grupo-menu').allTextContents();
     expect(categorias).toEqual(['Administração', 'Cadastro de pessoas', 'DOFs', 'DTCs', 'Documentos emitidos']);
     const menu = await page.locator('aside nav button').allTextContents();
@@ -146,8 +226,10 @@ it('separa sincronização de importação/exportação e baixa dados mediante c
     await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor();
     expect(await page.getByRole('heading', { name: 'Exportação de dados' }).count()).toBe(0);
     await page.getByRole('button', { name: /^Importação/ }).click();
+    await page.getByRole('tab', { name: 'Exportar', exact: true }).click();
     await page.getByRole('heading', { name: 'Exportação de dados', exact: true }).waitFor();
-    expect(await page.getByRole('button', { name: 'Validar arquivo' }).count()).toBe(1);
+    expect(await page.getByRole('button', { name: 'Validar arquivo' }).count()).toBe(0);
+    expect(await page.getByRole('tab', { name: 'Exportar', exact: true }).getAttribute('aria-selected')).toBe('true');
     let exportados: unknown;
     await page.route('**/api/v1/admin/importacoes/exportar', async (rota) => {
       exportados = rota.request().postDataJSON();
@@ -197,6 +279,14 @@ it('seleciona legado na interface e valida/grava XLSX com cabeçalhos originais'
         await page.getByRole('button', { name: 'Validar arquivo' }).click();
         await page.getByRole('heading', { name: 'Legado validado — nada foi gravado' }).waitFor();
         await page.getByText(/Cabeçalhos preservados: Cabeçalho original/).waitFor();
+        await page.getByRole('tab', { name: 'Importar', exact: true }).focus();
+        await page.keyboard.press('End');
+        expect(await page.getByRole('tab', { name: 'Histórico', exact: true }).getAttribute('aria-selected')).toBe('true');
+        await page.keyboard.press('Home');
+        expect(await page.getByRole('tab', { name: 'Importar', exact: true }).getAttribute('aria-selected')).toBe('true');
+        expect(await page.getByRole('button', { name: 'Gravar importação' }).isEnabled()).toBe(true);
+        expect(await page.getByLabel('Arquivo', { exact: true }).evaluate((elemento) =>
+          elemento instanceof HTMLInputElement ? elemento.files?.[0]?.name : null)).toBe('dados-ficticios.xlsx');
         page.once('dialog', (dialog) => void dialog.accept());
         await page.getByRole('button', { name: 'Gravar importação' }).click();
         await page.getByRole('heading', { name: 'Planilha no legado' }).waitFor();
@@ -214,7 +304,7 @@ it('permite ao Cadastro consultar os dados completos e alternar as referências'
     await page.getByRole('textbox', { name: 'Termo de busca' }).fill('Pessoa');
     await page.getByRole('button', { name: 'Buscar', exact: true }).click();
     await page.getByRole('button', { name: /^Ver vínculos/ }).click();
-    await page.getByLabel('Dados de referência do vínculo').selectOption(vinculoId);
+    expect(await page.getByLabel('Dados de referência do vínculo').inputValue()).toBe(vinculoId);
     await page.getByText('CPF fictício completo', { exact: true }).waitFor();
     await page.getByLabel('Referências').selectOption('incorporacoes');
     await page.getByText('incorporacoes', { exact: true }).waitFor();
@@ -245,6 +335,10 @@ it('lista vínculos previamente e solicita páginas de 50 sem ordenar somente na
     });
     await page.goto(origem);
     await page.getByRole('button', { name: /^Ver vínculos/ }).first().waitFor();
+    expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(50);
+    await page.getByRole('searchbox', { name: 'Filtrar lista carregada' }).fill('Pessoa ficticia 12');
+    expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(1);
+    await page.getByRole('button', { name: 'Limpar filtro', exact: true }).click();
     expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(50);
     expect(await page.locator('tbody tr').nth(2).locator('td').nth(2).innerText()).toBe('002');
     expect(await page.locator('tbody tr').first().locator('td').nth(1).innerText()).toBe(itens[0].cpf);
