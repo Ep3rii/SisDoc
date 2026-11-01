@@ -1,5 +1,54 @@
 # Progresso da construção
 
+## Preparação de migração Windows Server — 01/11/2026
+
+Reanalisados checkout, bootstrap/setup, configuração, sequência de migrações,
+armazenamento/worker PDF e documentos de instalação. O responsável escolheu
+**migração completa para Windows Server x64**, preservando dados, usuários,
+documentos e aprovações; nesta etapa foi preparado o procedimento, sem
+exportar ou restaurar dados operacionais.
+
+Guias de instalação/início/operação e README atualizados: retiradas
+afirmações antigas de emissão não implementada, setup limitado à 014,
+ausência de atualização de schema e máscaras antigas na consulta.
+Novo [guia de migração](MIGRACAO_WINDOWS_SERVER.md) cobre captura consistente,
+papéis/GRANTs, restore no destino vazio, preservação cifra/HMAC/PDF,
+TLS/ACLs por conta do destino, cache Chromium, aceite e retorno controlado.
+Exportação CSV/XLSX não substitui migração da instalação.
+
+Implementado `npm run verificar-instalacao`: diagnóstico somente leitura,
+com configuração externa, arquivos/TLS, Chromium, PostgreSQL 16 local,
+login restrito e histórico completo. Erros indicam etapa com detalhes
+externos sanitizados. Aprovações/máscaras são informadas, não alteradas.
+Bootstrap passou a exigir `023-modelos-oficiais`, evitando iniciar release
+v2 sobre banco ainda em 022; aviso inicial do setup acompanha recursos atuais.
+
+Validação:
+
+- Typecheck e build aprovados; aviso de bundle web acima de 500 KB permanece.
+- **31/31 testes em duas suítes** após correção do teste de bootstrap:
+  27 da fundação e quatro iniciais do diagnóstico, todos em recursos descartáveis.
+- Após acrescentar verificação da falha CLI sem vazamento de caminho:
+  typecheck e **5/5 testes do diagnóstico** aprovados.
+- Links locais de dez documentos conferidos sem falhas.
+- Diagnóstico na origem aprovado sem escrita: histórico até 023,
+  PostgreSQL/login locais, arquivos e Chromium acessíveis. Um formato de
+  processo já configurado; quatro aprovações v2 pendentes.
+- `pg_dump` e `pg_restore` 16.15 disponíveis na origem; não executado dump.
+
+**Não houve** carga, seed, aprovação, restauração, migração de schema ou
+partida/parada da API operacional. A porta 3443 estava sem listener na
+inspeção inicial; na verificação final, página/health HTTPS responderam 200
+e rota privada 401, com certificado validado e sem intervenção no processo.
+Não se tratou a disponibilidade histórica como estado atual.
+Nenhuma máquina Windows Server foi homologada nesta etapa.
+
+**Pendente:** janela de captura/transferência autorizada, restauração/aceite
+no destino e aprovação formal v2. Backup agendado, serviço automático,
+exposição de rede e revisão integral do restante do projeto permanecem fora
+desta entrega. A última suíte completa anterior continua sendo a de 251 testes
+dos modelos; não somar execuções direcionadas como nova regressão completa.
+
 ## Modelos oficiais de saída — 01/11/2026
 
 DOF, DTC IPAM, Comissionado e INSS adaptados às referências locais indicadas

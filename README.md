@@ -34,8 +34,8 @@ automático da aplicação ainda não estão implementados.
 
 - PostgreSQL permanente em loopback, banco `sisdoc` e papéis separados.
 - HTTPS local com certificado confiável no Windows.
-- Administrador inicial com troca obrigatória de senha; dados reais ainda
-  não importados (use `npm run importacao` ou a tela **Importação**).
+- Administrador inicial com troca obrigatória de senha; dados são carregados
+  apenas por usuário autorizado (a existência de dados depende da instalação).
 - Autenticação, usuários, auditoria, busca e fluxo provisório de rascunhos DOF.
 - Lista inicial de servidores por matrícula em ordem natural crescente,
   50 vínculos por página, com CPF completo e busca por nome/CPF/matrícula.
@@ -46,21 +46,31 @@ automático da aplicação ainda não estão implementados.
 - Sincronização opcional, configurada fora do Git;
   nenhuma fonte é alterada pela edição de rascunhos.
 
-## Acesso à instalação desta máquina
+## Instalação e migração
 
-Endereço: **https://localhost:3443/**. A aplicação foi iniciada manualmente e
-não volta automaticamente após reiniciar o Windows.
+- **Outra máquina, preservando a instalação:** siga
+  [Migração completa para Windows Server](docs/MIGRACAO_WINDOWS_SERVER.md).
+  Banco, configuração/chaves e PDFs precisam da mesma captura; não execute setup.
+- **Instalação vazia:** siga [Requisitos e instalação](docs/INSTALACAO_LOCAL.md)
+  e [Operação](docs/OPERACAO.md). `npm run setup` não instala PostgreSQL/TLS,
+  não cria banco/papéis e não registra aprovação formal.
+- **Uso diário:** [Como ligar](docs/COMO_LIGAR.md). HTTPS somente em loopback;
+  não volta automaticamente após reiniciar o Windows.
 
-Para iniciar novamente, execute na raiz deste repositório, sem executar setup:
+Na raiz do checkout já compilado, com a conta executora:
 
 ```powershell
 $env:SISDOC_CONFIG = 'C:\ProgramData\SisDoc\instalacao\config\aplicacao.json'
+npm run verificar-instalacao
+if ($LASTEXITCODE -ne 0) { throw 'Corrija o diagnóstico antes de iniciar.' }
 npm start
 ```
 
-Se o código mudou, pare a aplicação, execute `npm run build` e
-`npm run migrar` (aplica só migrações pendentes, com o papel de migração
-lido de `C:\ProgramData\SisDoc\provisionamento\banco.json`) antes de iniciar.
+Se usar cache Chromium compartilhado, mantenha `PLAYWRIGHT_BROWSERS_PATH`
+igual na instalação, diagnóstico e início. O diagnóstico não exporta dados,
+aplica migrações ou autoriza emissão. Atualizações de schema exigem serviço
+parado e cópia consistente; `npm run migrar` usa o provisionamento externo,
+não transfere a instalação. O release atual exige `023-modelos-oficiais`.
 A aprovação formal da regra e do template, quando houver, é registrada por
 tipo com `npm run aprovar-modelo -- DOF|DTC_IPAM|DTC_COMISSIONADO|DTC_INSS`; veja [operação](docs/OPERACAO.md). Não inicie outra
 cópia enquanto a porta estiver ocupada. Configuração, senhas, certificados e
@@ -89,6 +99,7 @@ caminhos ASCII ou 8.3; consulte [operação](docs/OPERACAO.md).
 
 - [Manual resumido: como ligar a aplicação](docs/COMO_LIGAR.md).
 - [Instalação local e próximas etapas](docs/INSTALACAO_LOCAL.md).
+- [Migração completa e aceite no Windows Server](docs/MIGRACAO_WINDOWS_SERVER.md).
 - [Operação, controles e uso da interface](docs/OPERACAO.md).
 - [Dados e importação](docs/DADOS_E_IMPORTACAO.md).
 - [Progresso e evidências de verificação](docs/PROGRESSO.md).

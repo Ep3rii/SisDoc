@@ -16,6 +16,7 @@
     "start": "node apps/api/dist/main.js",
     "usuario": "node apps/api/dist/seguranca/usuarios.cli.js",
     "migrar": "node apps/api/dist/setup/migrar.cli.js",
+    "verificar-instalacao": "node scripts/verificar-instalacao.cjs",
     "aprovar-modelo": "node apps/api/dist/setup/aprovar-modelo.cli.js",
     "importacao": "node apps/api/dist/importacao/importacao.cli.js",
     "importacao:conferir": "node apps/api/dist/importacao/conferir.cli.js",

@@ -36,8 +36,9 @@ teste ou homologação.
 
 Modelos limpos e regras precisam ser aprovados antes da emissão operacional.
 Inferências e perfis provisórios não constituem aprovação administrativa;
-a emissão afetada permanece bloqueada. A imagem é referência visual, não fonte
-de dados nem de texto oficial.
+a emissão afetada permanece bloqueada. Os modelos de saída locais foram
+indicados como referência oficial na decisão 029; exemplos individuais
+nunca são fonte de dados e os templates v2 exigem aprovação própria.
 
 O guia distingue EE de contribuição e exige modelos e fluxos próprios para
 cada declaração. Os ajustes de campos durante a preparação, previstos na
@@ -52,7 +53,9 @@ operacional pelo responsável em 31/10/2026
 ([decisão 021](../decisoes/021-autorizacao-operacional.md)); emissão com PDF
 foi implementada e aprovada por tipo na
 [decisão 022](../decisoes/022-aprovacao-formal-e-emissao.md), mantendo a
-identificação provisória do modelo INSS.
+identificação provisória do modelo INSS v1. Modelos v2 da
+[decisão 029](../decisoes/029-modelos-oficiais-versionados.md) estão cadastrados,
+mas aguardam aprovação específica; não reaproveitar a liberação histórica.
 Estado, confiança HTTPS e próxima etapa estão em
 [INSTALACAO_LOCAL.md](../INSTALACAO_LOCAL.md).
 
@@ -69,8 +72,9 @@ integral das funções ainda estão em revisão; evidências e árvore atual em
 
 Consulta/cálculo DTC, importador e sincronização foram decompostos mantendo
 transações e locks. Cálculo e funções nomeadas dos contratos receberam
-JSDoc específico. Última regressão completa: 230 testes em 30 arquivos.
-A revisão de DOF, unidades restantes, templates, CLI/setup/ferramentas e
+JSDoc específico. Última regressão completa dos modelos: 251 testes em 32
+arquivos; validações posteriores ficam em Progresso. DOF/templates e recursos
+CLI foram decompostos. A revisão de unidades restantes, setup/ferramentas e
 funções nomeadas dos testes ainda não terminou.
 
 A refatoração de 01/11/2026 preserva o monólito local e é publicada por

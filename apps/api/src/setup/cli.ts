@@ -12,7 +12,7 @@ async function executar(): Promise<void> {
   try {
     process.stdout.write(
       'Inicialização de uma nova instalação: use um banco PostgreSQL 16 vazio e uma raiz ainda inexistente.\n' +
-      'O cálculo de referência da DOF é provisório; documentos e emissão operacional ainda não estão disponíveis.\n',
+      'DOF/DTC e PDFs estão implementados; a emissão exige autorização e aprovação formal por tipo da regra/template vigente.\n',
     );
     const raiz = await perguntar('Caminho absoluto da nova raiz: ');
     const porta = Number(await perguntar('Porta HTTPS em loopback: '));

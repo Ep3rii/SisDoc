@@ -248,6 +248,9 @@ A auditoria registra usuário, tipo, origem, formato e modalidade, sem valores
 pessoais. O arquivo baixado **não é cifrado**; guarde-o em pasta protegida,
 fora do Git. Exportação de dados não substitui backup de banco, auditorias,
 documentos emitidos ou PDFs.
+Para mover a instalação completa com usuários/aprovações/numeração, use o
+[procedimento Windows Server](MIGRACAO_WINDOWS_SERVER.md), não reimportação
+de planilhas nem setup sobre o banco restaurado.
 
 ## Garantias
 

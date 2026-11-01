@@ -1,5 +1,15 @@
 # Operação local — uso operacional autorizado
 
+## Escolha o procedimento
+
+- Ligar diariamente: [Como ligar](COMO_LIGAR.md).
+- Instalar vazio: [Instalação e requisitos atuais](INSTALACAO_LOCAL.md).
+- Transferir dados/usuários/documentos para outra máquina:
+  [Migração completa Windows Server](MIGRACAO_WINDOWS_SERVER.md).
+- Diagnosticar instalação compilada: defina `SISDOC_CONFIG` e execute
+  `npm run verificar-instalacao` com a conta executora. Somente leitura,
+  sem aprovação automática; não substitui ACLs e aceite da restauração.
+
 ## Novos modelos de saída — versão 2
 
 Os formulários seguem as referências locais em
@@ -77,7 +87,7 @@ se o destinatário deixar de ser coordenador, recolha e encaminhe novamente.
 No menu do administrador, **Administração** vem primeiro: Usuários,
 Importação e exportação, Sincronização e Auditoria. Depois: Cadastro de
 pessoas, DOFs, DTCs e Documentos emitidos. A busca de servidores é compartilhada
-por DOF/DTC e não fica mais rotulada exclusivamente como DOF. local — uso operacional autorizado
+por DOF/DTC e não fica mais rotulada exclusivamente como DOF.
 
 Há uma [instalação local inicializada](INSTALACAO_LOCAL.md), com banco
 permanente, HTTPS e administrador inicial, **autorizada para uso operacional**
@@ -163,15 +173,17 @@ npm run build
 npm run usuario -- criar
 ```
 
-Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco já
-possuir a migração 012, mas a criação ou troca de senha retorna erro até que a
+Configurações antigas sem `seguranca.listaSenhas` podem iniciar se o banco
+estiver atualizado, mas a criação ou troca de senha retorna erro até que a
 lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `014-dtc` ao banco novo. Uma instalação anterior sem essa
-migração (por exemplo, em `013-emissao`) não inicia com esta versão. Para atualizar uma instalação existente,
-pare a aplicação e execute na raiz do repositório:
+O setup aplica até `023-modelos-oficiais` ao banco novo. O bootstrap exige
+essa migração; o diagnóstico confere a sequência completa do release.
+Para atualizar uma instalação existente sob autorização, pare a aplicação,
+preserve uma cópia consistente conforme o guia de migração e execute na raiz
+do repositório:
 
 ```powershell
 npm run build
@@ -241,11 +253,12 @@ configuração explícita e testes de origem e proxies confiáveis, ainda ausent
 
 ## Consulta de servidores
 
-Analista, coordenador e secretário adjunto podem buscar por nome, CPF válido
+Todos os perfis autenticados podem buscar por nome, CPF válido
 ou matrícula exata, incluindo seu sufixo. Nome exige pelo menos três
 caracteres. Resultados, vínculos e eventos são paginados; matrículas
 duplicadas são apresentadas com sua origem, sem escolha automática. A busca
-não devolve CPF e os detalhes iniciais exibem apenas máscara. Para consultar
+a partir da decisão 028 mostra CPF completo; não aplique o comportamento
+antigo de máscaras aos dados de trabalho. Para consultar
 os dados completos de DOF/DTC, selecione **Dados de referência do vínculo**:
 CPF, filiação, documentos pessoais, endereço e registros paginados por tipo.
 Esse acesso é auditado. Analista/coordenador são os perfis do setor de
@@ -542,12 +555,29 @@ recomendação institucional. São aceitas até dez máscaras de até 100
 caracteres, sem partes opcionais ou repetição variável dentro de cada máscara.
 
 Na aba **Dados do servidor**, informe o processo compatível e um motivo.
-A instalação local atual não tem máscara configurada; inclusão e substituição
-permanecem indisponíveis até uma definição institucional. A gravação é cifrada e
+Na verificação de 01/11/2026 há um formato configurado na origem; o conteúdo
+institucional deve ser conferido no arquivo externo. Instalações novas sem
+essa configuração bloqueiam inclusão/substituição. A gravação é cifrada e
 compartilha a revisão com cálculo e blocos. Para remover um processo incorreto,
 marque a confirmação e informe o motivo; a remoção permanece possível mesmo sem
 máscara configurada. O histórico de ajustes preserva os valores cifrados. A
 prévia usa o processo salvo, não o texto ainda em edição.
+
+Em uma instalação existente, acrescente/edite somente a propriedade
+`processos` no objeto principal de `aplicacao.json`, mantendo segredos e
+demais campos. Exemplo **sintético**, que aceita `1234/2026`:
+
+```json
+"processos": {
+  "mascaras": ["####/####"]
+}
+```
+
+Isso é um fragmento JSON: respeite as vírgulas das propriedades vizinhas.
+Use vários formatos na mesma lista se o setor os adotar. As máscaras são
+compartilhadas por DOF/DTC, não são máscaras do número da declaração.
+Reinicie a API, reabra o documento, salve o processo e reconfira.
+Não execute setup nem aprove modelos apenas para remover um bloqueio.
 
 ## Encaminhamento para análise
 
@@ -557,7 +587,8 @@ consultar o cálculo, os blocos, o processo e a prévia em **Encaminhados a mim*
 Ele também pode selecionar **Devolver rascunho** e informar o motivo para o
 autor. A devolução encerra o acesso do destinatário e não registra conferência.
 O documento permanece rascunho. Nenhum outro perfil ganha acesso ao rascunho
-por esse envio; a emissão ainda não está disponível.
+por esse envio. Emissão é uma etapa posterior, com conferência e aprovação
+da regra/template vigente; encaminhar não autoriza emitir.
 
 Enquanto o encaminhamento estiver ativo, as edições ficam bloqueadas também
 para o autor. Para corrigir ou trocar o destinatário, informe um motivo e use
@@ -650,7 +681,10 @@ com API inteiramente simulada e dados sintéticos; não reduzem os controles da
 API HTTPS. Eles não substituem o teste do navegador integrado ao serviço com a
 CA operacional confiável, nem uma revisão humana de acessibilidade.
 
-Backup, restauração, atualização de instalações existentes e recuperação das
-chaves ainda não estão implementados. A migração de uma fundação anterior foi
-testada apenas em banco descartável; não há comando autorizado para executá-la
-em instalação existente. Não há evidência de prontidão operacional.
+Atualização de schema existe via `npm run migrar`, com histórico validado e
+transação; não equivale a transferir a instalação. Backup agendado e
+restauração/recuperação automática de chaves continuam não implementados.
+O [guia Windows Server](MIGRACAO_WINDOWS_SERVER.md) prepara captura/restore
+manual protegido, preservação de chaves/PDF e aceite. Não houve restauração
+operacional nem certificação do destino nesta etapa. A aprovação institucional
+de emissão continua específica por regra/template, separada de infraestrutura.

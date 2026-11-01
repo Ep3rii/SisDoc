@@ -641,6 +641,35 @@ describe('fundação em recursos descartáveis', () => {
     });
   });
 
+  it('recusa inicialização sem a migração dos modelos vigentes mesmo com a versão 022 registrada', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: 'sisdoc_ocupado',
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    try {
+      await cliente.query(`
+        CREATE SCHEMA seguranca;
+        CREATE TABLE seguranca.migracao (versao text PRIMARY KEY);
+        INSERT INTO seguranca.migracao VALUES ('022-destinatario-coordenador');
+        GRANT USAGE ON SCHEMA seguranca TO sisdoc_aplicativo;
+        GRANT SELECT ON seguranca.migracao TO sisdoc_aplicativo;
+      `);
+      const config = await carregarConfiguracao(arquivoConfig);
+      config.banco.nome = 'sisdoc_ocupado';
+      const arquivo = path.join(temporario, 'configuracao-sem-modelos.json');
+      await writeFile(arquivo, JSON.stringify(config), 'utf8');
+      await expect(execFile(process.execPath, [path.join(process.cwd(), 'apps', 'api', 'dist', 'main.js')], {
+        env: { ...ambiente(), SISDOC_CONFIG: arquivo }, timeout: 10000, windowsHide: true,
+      })).rejects.toMatchObject({
+        stderr: expect.stringContaining('não possui a migração 023-modelos-oficiais'),
+      });
+    } finally {
+      await cliente.query('DROP TABLE seguranca.migracao; DROP SCHEMA seguranca');
+      await cliente.end();
+    }
+  });
+
   it('aplica a migração versão 001 de forma transacional e idempotente sobre a fundação', async () => {
     const cliente = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_atualizacao',

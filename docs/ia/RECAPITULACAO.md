@@ -1,7 +1,7 @@
 # Pontos de memória do projeto
 
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
-Atualizada em **01/11/2026**, após os modelos oficiais de saída versionados.
+Atualizada em **01/11/2026**, após preparar instalação/migração Windows Server.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
 
 ## 1. Objetivo e permissões
@@ -32,6 +32,7 @@ e [decisão 028](../decisoes/028-legado-operacional-e-conferencia.md).
 | Modelos de saída v2 | `versoes.ts` centraliza versões/CSS; `modelo-dof.ts` compartilha prévia/emissão; `emissao-dtc.ts` inclui anexo; `*-v1.ts` preservam históricos. |
 | Importador | `importacao/importador.ts` coordena; estado, gravação, relatório, conferência e rollback separados. |
 | CLI de importação | `argumentos-cli.ts` e `recursos-cli.ts` compartilhados; conferência não importa outra CLI executável. |
+| Diagnóstico da instalação | `scripts/verificar-instalacao.cjs`: arquivos/TLS/Chromium e metadados do banco somente leitura; não aprova/restaura. |
 | Sincronização | `sincronizacao/sincronizacao.ts` coordena; mapeamento e persistência por item separados. |
 
 Caminhos de DTC/DOF/importador/CLI/sincronização são relativos a `apps/api/src`;
@@ -48,8 +49,13 @@ Detalhes e invariantes de extração: [Arquitetura](../ARQUITETURA.md).
 - Última regressão completa após modelos oficiais: **251/251 testes em 32
   arquivos**, typecheck/build aprovados. Inclui 12 casos dedicados de
   versionamento, escape, prévias e geometria/paginação A4.
-- Produção local verificada após a última publicação: página e
-  `/api/v1/health` com HTTP 200; rota privada sem sessão com HTTP 401.
+- Preparação de migração validada posteriormente: typecheck/build,
+  31 testes direcionados em duas suítes; diagnóstico final com cinco testes,
+  incluindo falha CLI sanitizada. Não é nova execução completa.
+- Produção tinha página/health 200 e privados 401 após os modelos. Na
+  inspeção da preparação de migração, a porta 3443 estava sem listener;
+  na verificação final voltou a responder página/health 200 e privados 401
+  com validação TLS. Nenhum processo operacional foi iniciado/parado nesta etapa.
 - Migração autorizada `023-modelos-oficiais` cadastra quatro templates v2.
   Aplicada sem novas aprovações, preservando históricos/documentos/jobs.
   Nenhuma carga real ou sincronização externa executada.
@@ -105,6 +111,14 @@ Início manual e atualização: [Como ligar](../COMO_LIGAR.md) e
 [Operação](../OPERACAO.md). Não iniciar segunda cópia com a porta ocupada;
 verificar PID/comando antes de parar somente o processo correto.
 Não executar setup, migração ou operação de dados apenas para recapitular.
+
+Migração completa para Windows Server é preparada em
+[Migração Windows Server](../MIGRACAO_WINDOWS_SERVER.md): preservar dump,
+cifra/HMAC, PDFs e arquivos externos da mesma captura; reaplicar ACLs por
+conta do destino e instalar Chromium no contexto correto. Não executar
+setup sobre restauração. `npm run verificar-instalacao` usa `SISDOC_CONFIG`
+e diagnóstico somente leitura; bootstrap exige 023. Captura/restauração
+operacional e aceite no Windows Server ainda não foram executados.
 
 Configuração, chaves e certificados ficam fora do Git; nunca copiar seu
 conteúdo para memórias. A pasta `Modelos e Documentação/imagens modelo/`

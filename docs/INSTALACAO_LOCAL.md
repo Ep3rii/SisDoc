@@ -1,138 +1,109 @@
-# Instalação local — 31/10/2026
+# Instalação e estado atual — 01/11/2026
 
-Esta é a instalação permanente preparada para a futura operação, inicialmente
-vazia. Não é uma demonstração com dados fictícios. Está disponível para
-configuração e uso local; **o uso operacional foi autorizado em 31/10/2026**
-([decisão 021](decisoes/021-autorizacao-operacional.md)). A emissão com PDF
-ainda não está implementada.
+Este documento descreve a instalação de origem e os requisitos do release
+atual. Não é um instalador automático nem evidência de homologação em outra
+máquina. Para a **migração completa para Windows Server x64**, use o
+[procedimento de migração](MIGRACAO_WINDOWS_SERVER.md).
 
-## Etapas concluídas
+## O que está implementado
 
-1. PostgreSQL instalado como serviço automático, restrito ao próprio
-   computador.
-2. Banco vazio e papéis de migração/aplicação provisionados separadamente.
-3. HTTPS configurado e confiança local instalada com autorização para todos
-   os usuários do Windows.
-4. Setup executado com sucesso: estrutura versionada, chaves, configuração e
-   administrador inicial.
-5. Layout reorganizado conforme a referência visual, sem habilitar recursos
-   que ainda não existem.
+- Monólito modular: API NestJS serve React/Vite por HTTPS em loopback;
+  contratos, cálculo e templates compartilhados.
+- Autenticação, usuários, auditoria, busca/cadastro e edição local autorizada.
+- DOF e DTC IPAM/Comissionado/INSS: rascunho, prévia, conferência, emissão,
+  numeração, snapshot cifrado, worker PDF, download, histórico e cancelamento.
+- Importação/exportação CSV/XLSX, seleção Núcleo/Legado e conversão conferida
+  Legado → Núcleo. Exportar planilhas **não equivale a migrar a instalação**.
+- Setup para banco/raiz novos e `npm run migrar` para instalações existentes.
+- Modelos v2 registrados; v1 e aprovações/PDFs históricos preservados.
 
-## Componentes e arquivos externos
+Fatias 5–7 implementadas; recursos extras não estão automaticamente autorizados.
+A revisão integral de serviços/telas/setup/testes permanece aberta.
 
-| Componente | Configuração verificada |
+## Verificação da origem nesta etapa
+
+| Item | Estado observado |
 |---|---|
-| Node / npm | 24.20.0 / 11.19.0 |
-| PostgreSQL | 16.15; serviço `postgresql-x64-16`, automático, `NetworkService` |
-| Escuta do banco | `127.0.0.1:5432`, autenticação SCRAM-SHA-256 |
-| Banco | `sisdoc`, UTF-8 |
-| Proprietário / migração | `sisdoc_migracao` |
-| Aplicação | `sisdoc_app`, login distinto, sem privilégios administrativos ou associações a papéis |
-| Migrações aplicadas | 13 registros, até `012-conferencia-dof` |
-| Configuração | `C:\ProgramData\SisDoc\instalacao\config\aplicacao.json` |
-| Credenciais de provisionamento | `C:\ProgramData\SisDoc\provisionamento\banco.json` |
-| Certificado / chave / confiança Node | `C:\ProgramData\SisDoc\tls\localhost.pem`, `localhost.key` e o mesmo PEM como âncora de confiança |
-| Certificado Windows | `C:\ProgramData\SisDoc\tls\localhost.cer`, confiável em `LocalMachine\Root` |
-| Lista de senhas comuns | `C:\ProgramData\SisDoc\seguranca\senhas-comuns.txt` |
-| API e interface | `https://localhost:3443/`, escuta somente em `127.0.0.1` |
+| Código de referência antes desta preparação | `c440237`; worktree inicialmente limpa |
+| Runtime | Windows x64; Node 24.20.0 / npm 11.19.0 |
+| Banco | PostgreSQL 16, serviço `postgresql-x64-16` ativo, escuta local e login restrito |
+| Histórico | Completo, de `000-fundacao` até `023-modelos-oficiais` |
+| Configuração/TLS/lista de senhas/PDF | Arquivos externos acessíveis e Chromium iniciado/encerrado pelo diagnóstico |
+| Processo | Um formato configurado; conferir seu conteúdo institucional localmente |
+| Aprovação v2 | Pendente nos quatro tipos; não foi registrada por esta preparação |
+| API | Inicialmente sem listener; na verificação final, HTTPS/página/health 200 e rota privada 401, sem iniciar/parar processos nesta etapa |
 
-As senhas foram geradas/introduzidas localmente, sem inclusão no repositório.
-O arquivo de provisionamento contém credenciais de migração e permite acesso
-somente à conta instaladora e a SYSTEM. Não entregue esse arquivo à conta da
-aplicação. A instalação protege seus arquivos com ACLs; não copie as chaves,
-configuração ou credenciais para o checkout.
+Não se inferiu quantidade/ausência de dados operacionais a partir do histórico.
+O diagnóstico não expõe pessoas, senhas ou chaves e não certifica integridade
+dos arquivos/dados, ACLs ou confiança do navegador.
 
-O SID `S-1-5-19` (`LocalService`) foi informado ao setup para as permissões da
-futura conta de serviço. **Não foi instalado um serviço Windows do SisDoc**:
-o processo atual foi iniciado manualmente. Isso é diferente do serviço
-PostgreSQL, que inicia automaticamente.
+## Separação obrigatória de código e instalação
 
-A lista de senhas usa 99.999 entradas não vazias de
-`xato-net-10-million-passwords-100000.txt`, do SecLists. A licença MIT foi
-preservada no diretório externo de segurança como `LICENSE-SecLists`.
+| Recurso | Local da instalação de origem |
+|---|---|
+| Configuração, inclusive chaves cifra/HMAC | `C:\ProgramData\SisDoc\instalacao\config\aplicacao.json` |
+| Provisionamento de migração | `C:\ProgramData\SisDoc\provisionamento\banco.json` |
+| PDFs | `pdf.diretorio` da configuração; se ausente, `C:\ProgramData\SisDoc\instalacao\pdf` |
+| Certificado e chave TLS | Caminhos em `tls.certificado`, `tls.chave` e `tls.ca` |
+| Lista de senhas comuns | Caminho em `seguranca.listaSenhas`; preservar licença da lista |
+| Credencial opcional de sincronização | Caminho em `sincronizacao.credencialArquivo`, se configurado |
 
-## Primeiro acesso e reinicialização
+Não copie esses arquivos para o Git/checkout. Banco cifrado **depende das
+chaves originais**, e os PDFs são arquivos separados. O SID da conta da
+máquina antiga não configura a conta do destino. Reaplique ACLs locais.
 
-Acesse **https://localhost:3443/**. Use o administrador definido no setup e
-troque a senha obrigatória no primeiro acesso. Não forneça senhas no chat,
-em argumentos de comandos ou em variáveis de ambiente.
+## Requisitos para Windows Server
 
-O administrador da Informática gerencia usuários/auditoria e possui acesso
-funcional completo por autorização na decisão 026. Crie contas de
-analista/coordenador para o setor de Cadastro conforme
-[os controles de operação](OPERACAO.md). Nenhuma pessoa foi importada.
+- Windows Server x64 com Desktop Experience e suporte de segurança vigente,
+  NTFS local e espaço para banco, PDFs, cópia protegida e validação.
+- Node.js **24 x64**, npm e PostgreSQL **16 x64** com ferramentas
+  `psql`, `pg_dump`, `pg_restore`. Não trocar o major na mesma migração.
+- PostgreSQL somente em loopback, UTF-8 e autenticação SCRAM-SHA-256.
+- Conta instaladora autorizada e conta executora sem privilégios administrativos,
+  distinta do login proprietário/migrador do banco.
+- TLS local confiável no Windows e arquivos privados com ACLs restritas.
+- Chromium Playwright instalado para a conta executora ou em cache compartilhado
+  protegido. A pasta `chromium` criada pelo setup não o instala automaticamente.
 
-Após reiniciar o Windows, abra PowerShell na raiz do repositório:
+Windows Server/Server Core, execução desassistida e concorrência no destino
+**não estão certificados pela suíte executada na origem**. Server Core exige
+validação específica antes de adotar este guia. Serviço Windows da aplicação,
+backup agendado e restauração automatizada não estão implementados.
+Nenhum acesso LAN, proxy, firewall ou recurso externo foi autorizado.
+
+## Instalação nova versus migração completa
+
+**Instalação nova:** provisionar banco/papéis/TLS/lista de senhas e uma raiz
+inexistente; depois `npm ci`, instalar Chromium e executar `npm run setup`
+em terminal interativo. O setup aplica até `023-modelos-oficiais`, gera
+chaves novas e administrador com troca obrigatória. Não cria PostgreSQL,
+banco, papéis, certificado, confiança Windows nem serviço da aplicação.
+A aprovação institucional continua separada.
+Se instalar Chromium em cache dentro da nova raiz, faça isso **após o setup**:
+criar `instalacao\chromium` antes faria a raiz existir e o instalador recusaria.
+
+**Migração completa (opção escolhida):** restaurar banco e arquivos/chaves
+originais. **Não executar setup sobre a restauração.** Ele criaria outra
+identidade criptográfica e foi projetado para banco/raiz vazios.
+Seguir [Migração Windows Server](MIGRACAO_WINDOWS_SERVER.md), sem inicializar
+uma segunda base operacional ou regenerar chaves.
+
+## Diagnóstico e início
+
+Na raiz do checkout já compilado, com a conta que executará a aplicação:
 
 ```powershell
 $env:SISDOC_CONFIG = 'C:\ProgramData\SisDoc\instalacao\config\aplicacao.json'
-npm start
+npm run verificar-instalacao
 ```
 
-O terminal precisa permanecer aberto. Não execute `npm run setup` novamente
-nem tente recriar o banco; o instalador recusa raiz existente e banco não
-vazio. Não existe procedimento aprovado para atualizar o schema de
-instalações existentes.
+O comando é somente leitura: verifica arquivos, TLS, Chromium, PostgreSQL,
+papel e sequência completa de migrações; informa máscaras e aprovações de
+template. Não instala, exporta, restaura, aprova ou inicia a API.
+Código de saída diferente de zero exige corrigir a etapa indicada.
+Saída zero **não autoriza emissão nem substitui o aceite da restauração**.
 
-Para verificar a disponibilidade, sem ignorar erros de certificado:
-
-```powershell
-Get-Service postgresql-x64-16
-Get-NetTCPConnection -State Listen -LocalPort 3443,5432 |
-  Select-Object LocalAddress,LocalPort,OwningProcess
-curl.exe --fail https://localhost:3443/api/v1/health
-```
-
-O health deve retornar `{"status":"ok"}` e as escutas devem ser locais.
-Se a porta estiver ocupada, verifique o PID e sua linha de comando antes de
-encerrar qualquer processo. Não encerre processos apenas pelo nome.
-
-## HTTPS e limites de confiança
-
-O certificado é uma folha autossinada RSA de 3.072 bits, SHA-256, com uso
-`serverAuth` e SANs `localhost` e `127.0.0.1`. Não é uma CA emissora geral
-(`cA:false`). A confiança foi instalada no computador, não apenas no perfil
-do operador, conforme autorização expressa.
-
-Validade até **31/10/2027**. Não há renovação automática implementada. Antes
-da expiração, valide um procedimento de substituição do certificado, chave,
-confiança do Node e confiança do Windows, seguido de reinício e teste HTTPS.
-Para retirar uma confiança antiga, use o gerenciador de certificados do
-computador (`certlm.msc`), confirme impressão digital e validade do
-certificado específico e remova somente essa entrada. Nunca remova outras
-raízes de confiança indiscriminadamente.
-
-Não use `--insecure`, não desative TLS e não reduza os controles de sessão.
-O HTTPS direto basta para o acesso local; Caddy/IIS não foram instalados.
-Não publicar na LAN, abrir portas de firewall ou encaminhar conexões externas.
-
-## Autorização operacional e pendências
-
-O responsável autorizou o uso operacional desta instalação em 31/10/2026
-([decisão 021](decisoes/021-autorizacao-operacional.md)). A autorização vale
-para as funções existentes; os itens abaixo são as próximas etapas para
-ampliar o que pode ser feito pelo sistema.
-
-1. Confirmar modelos, campos obrigatórios, regras de EE/contribuição e
-   formato institucional do número de processo. As máscaras ficaram
-   **sem configuração**: inclusão/substituição de processo estão bloqueadas.
-2. Definir e implementar o mapeamento e a importação autorizada das fontes,
-   com reconciliação e auditoria; o banco permanece sem pessoas.
-3. Concluir a DOF: ajustes cadastrais exclusivos da declaração, snapshot,
-   numeração, emissão/PDF, processamento, download e histórico.
-4. Implementar os fluxos e modelos distintos das DTCs IPAM, Comissionado e
-   INSS, sem misturar as respectivas regras.
-5. Implementar e testar backup/restauração, recuperação de chaves,
-   atualizações, instalação como serviço e controles finais de operação.
-6. Confirmar suporte de segurança do Windows e concluir revisão humana,
-   validação institucional e aceite dos fluxos integrados.
-
-O Windows 10 Pro 22H2 está fora do suporte regular desde 14/10/2025. A
-cobertura por atualizações de segurança estendidas não foi verificada.
-
-O [guia descritivo](../Modelos%20e%20Documentação/guia_descritivo_declaracoes_funcionais_e_tempo_contribuicao.md),
-especialmente a seção 9, orienta ajustes durante a preparação da declaração.
-Esses ajustes deverão pertencer ao documento/rascunho e sua auditoria, sem
-sobrescrever a fonte importada. A imagem define o layout, não textos oficiais,
-dados reais ou regras de cálculo. Consulte [progresso](PROGRESSO.md) para as
-evidências e [operação](OPERACAO.md) para as limitações de cada fluxo.
+Para ligar, veja [Como ligar](COMO_LIGAR.md). Atualizações autorizadas exigem
+parar a aplicação, preservar cópia consistente, compilar e aplicar apenas
+migrações conhecidas com `npm run migrar`. O bootstrap exige a versão 023.
+Regressão anterior e validações desta preparação: [Progresso](PROGRESSO.md).

@@ -238,6 +238,22 @@ Não afirmar que “todo o código está comentado” até concluir essas etapas
 
 ## Sequência e validação
 
+### Preparação de instalação e migração Windows Server
+
+`scripts/verificar-instalacao.cjs` usa configuração e sequência do build,
+verifica TLS/Chromium/arquivos e abre apenas uma transação `READ ONLY` com
+o login da aplicação. Não usa credencial de migração, não exporta dados,
+não aplica schema e não inicia API/worker. Informa pendências de máscaras
+e aprovação de templates sem imprimir credenciais ou conteúdo pessoal.
+O bootstrap recusa instalação sem `023-modelos-oficiais`.
+
+O guia de migração preserva o monólito local e a identidade cifra/HMAC,
+snapshot/numeração/aprovações no dump, mais PDFs/arquivos externos da mesma
+captura. Setup não é restauração. Não foi introduzido serviço Windows,
+backup automático, proxy ou exposição LAN. Aceite no destino e restauração
+operacional permanecem pendentes.
+Procedimento: [Migração Windows Server](MIGRACAO_WINDOWS_SERVER.md).
+
 ### Modelos de saída versionados
 
 Os formulários de referência usam CSS fixo compartilhado em
