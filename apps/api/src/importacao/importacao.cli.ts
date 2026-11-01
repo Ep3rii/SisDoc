@@ -1,72 +1,19 @@
-import { tipoImportacaoSchema, type RelatorioImportacao, type TipoImportacao } from '@sisdoc/contratos';
-import { readFile, stat, writeFile } from 'node:fs/promises';
+import { tipoImportacaoSchema, type RelatorioImportacao } from '@sisdoc/contratos';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Client } from 'pg';
 import { z } from 'zod';
-import { carregarConfiguracao } from '../configuracao';
-import { ProtetorDados } from '../seguranca/protecao-dados';
 import { arquivoProvisionamento, conectarMigracao, lerProvisionamento } from '../setup/migrar';
+import { lerArgumentos, texto } from './argumentos-cli';
 import { ErroImportacao, hashArquivo } from './estado-importacao';
 import { ErroFormato } from './formatos';
 import { importarLinhas } from './importador';
 import { lerLegado, lerMapeamento } from './legado';
-import { ErroPlanilha, LIMITE_ARQUIVO_BYTES, lerPlanilha } from './planilhas';
+import { ErroPlanilha, lerPlanilha } from './planilhas';
+import { conectarAplicacao, lerArquivo } from './recursos-cli';
 import { desfazerLote } from './rollback-importacao';
 
-export type ArgumentosCli = Record<string, string | true>;
-
-export function lerArgumentos(argumentos: readonly string[]): ArgumentosCli {
-  const resultado: ArgumentosCli = {};
-  for (let indice = 0; indice < argumentos.length; indice += 1) {
-    const atual = argumentos[indice];
-    if (!atual.startsWith('--')) throw new Error(`Argumento inesperado: ${atual}. Use --ajuda para ver as opções.`);
-    const [nome, valorEmbutido] = atual.slice(2).split(/=(.*)/s, 2);
-    if (valorEmbutido !== undefined) resultado[nome] = valorEmbutido;
-    else if (argumentos[indice + 1] !== undefined && !argumentos[indice + 1].startsWith('--')) {
-      resultado[nome] = argumentos[indice + 1];
-      indice += 1;
-    } else resultado[nome] = true;
-  }
-  return resultado;
-}
-
-export function texto(argumentos: ArgumentosCli, nome: string): string | undefined {
-  const valor = argumentos[nome];
-  if (valor === true) throw new Error(`Informe um valor para --${nome}.`);
-  return valor;
-}
-
-export async function lerArquivo(arquivo: string): Promise<Buffer> {
-  const caminho = path.resolve(arquivo);
-  let tamanho: number;
-  try {
-    tamanho = (await stat(caminho)).size;
-  } catch {
-    throw new Error('Não foi possível localizar o arquivo informado.');
-  }
-  if (tamanho > LIMITE_ARQUIVO_BYTES) throw new Error('O arquivo excede o limite de 64 MB.');
-  return readFile(caminho);
-}
-
-export async function conectarAplicacao(): Promise<{ cliente: Client; protetor: ProtetorDados }> {
-  const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
-  const cliente = new Client({
-    host: configuracao.banco.host,
-    port: configuracao.banco.porta,
-    database: configuracao.banco.nome,
-    user: configuracao.banco.usuario,
-    password: configuracao.banco.senha,
-    connectionTimeoutMillis: 5000,
-  });
-  try {
-    await cliente.connect();
-  } catch {
-    await cliente.end().catch(() => undefined);
-    throw new Error('Não foi possível conectar ao banco com a configuração do aplicativo.');
-  }
-  return { cliente, protetor: new ProtetorDados(configuracao.chaves) };
-}
-
+/** Atualiza progresso somente em terminal TTY, sem misturar a barra com saída redirecionada de relatório. */
 function barraProgresso(rotulo: string): (feitos: number, total: number) => void {
   if (!process.stderr.isTTY) return () => undefined;
   let ultimo = -1;
@@ -80,6 +27,7 @@ function barraProgresso(rotulo: string): (feitos: number, total: number) => void
   };
 }
 
+/** Apresenta contagens, avisos e ocorrências mascaradas, limitando detalhes exibidos no terminal a cinquenta itens. */
 export function imprimirRelatorio(relatorio: RelatorioImportacao): void {
   const c = relatorio.contagens;
   const linhas = [
@@ -108,6 +56,7 @@ const AJUDA = `Uso:
 Tipos: dados_funcionais, afastamentos, incorporacoes, periodos_ipam, eventos_funcionais.
 Sem --commit a importação apenas valida e nada é gravado.`;
 
+/** Exige matrícula de administrador ativo para atribuir responsabilidade ao lote importado. */
 async function usuarioAdmin(cliente: Client, matricula: string | undefined): Promise<string> {
   if (!matricula) throw new Error('Informe --usuario com a matrícula de um administrador ativo.');
   const resultado = await cliente.query<{ id: string }>(
@@ -117,6 +66,7 @@ async function usuarioAdmin(cliente: Client, matricula: string | undefined): Pro
   return resultado.rows[0].id;
 }
 
+/** Coordena validação/gravação/rollback pelos comandos existentes e fecha o cliente ao concluir ou falhar. */
 async function executar(): Promise<void> {
   const argumentos = lerArgumentos(process.argv.slice(2));
   if (argumentos.ajuda || Object.keys(argumentos).length === 0) {
@@ -163,7 +113,7 @@ async function executar(): Promise<void> {
       if (!arquivo || !origem) throw new Error('Informe --arquivo e --origem (ex.: --origem planilha-dof).');
       const conteudo = await lerArquivo(arquivo);
       const relatorio = await importarLinhas(cliente, protetor, lerPlanilha(conteudo).linhas, {
-        tipo: tipo.data as TipoImportacao, origem, canal: 'cli', usuarioId, gravar, hashArquivo: hashArquivo(conteudo),
+        tipo: tipo.data, origem, canal: 'cli', usuarioId, gravar, hashArquivo: hashArquivo(conteudo),
         progresso: barraProgresso(tipo.data),
       });
       imprimirRelatorio(relatorio);

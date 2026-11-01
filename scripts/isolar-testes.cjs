@@ -1,11 +1,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+/** Verifica contenção de caminhos resolvidos sem confundir prefixos semelhantes de diretórios. */
 function estaDentro(caminho, diretorio) {
   const relativo = path.relative(diretorio, caminho);
   return relativo === '' || (!relativo.startsWith(`..${path.sep}`) && relativo !== '..' && !path.isAbsolute(relativo));
 }
 
+/** Recusa temporários dentro do checkout, na raiz de unidade ou sobrepostos à instalação operacional. */
 function validarDestinos(repositorio, temporario, configuracao) {
   const repositorioReal = fs.realpathSync.native(repositorio);
   const temporarioReal = fs.realpathSync.native(temporario);

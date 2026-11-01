@@ -1,5 +1,6 @@
 import { arquivoProvisionamento, lerProvisionamento, migrar } from './migrar';
 
+/** Aplica migrações pendentes usando provisionamento externo e informa versões; não inicializa instalação. */
 async function executar(): Promise<void> {
   const arquivo = arquivoProvisionamento();
   const provisionamento = await lerProvisionamento(arquivo);

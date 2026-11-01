@@ -1,3 +1,4 @@
+import { data } from './html';
 import type { DadosFontePreviaDof, RascunhoDof } from '@sisdoc/contratos';
 
 type CamposFonteVariaveisDof = Omit<Pick<DadosFontePreviaDof,
@@ -11,11 +12,7 @@ export type ParteTextoDof =
   | { tipo: 'variavel'; conteudo: string; nome: string }
   | { tipo: 'malformada'; conteudo: string };
 
-function data(dataIso: string): string {
-  const [ano, mes, dia] = dataIso.split('-');
-  return `${dia}/${mes}/${ano}`;
-}
-
+/** Relaciona nomes de variáveis aos valores da fonte e resultado salvos; ausência permanece vazia. */
 export function valoresVariaveisDof(dados: DadosVariaveisDof): ReadonlyMap<string, string> {
   const { resultado } = dados;
   const fonte = dados.fonte;
@@ -40,6 +37,7 @@ export function valoresVariaveisDof(dados: DadosVariaveisDof): ReadonlyMap<strin
   ]);
 }
 
+/** Tokeniza delimitadores em passagem progressiva, distinguindo texto, variável válida e expressão malformada. */
 export function analisarTextoDof(texto: string): ParteTextoDof[] {
   const partes: ParteTextoDof[] = [];
   let inicio = 0;
@@ -79,6 +77,7 @@ export function analisarTextoDof(texto: string): ParteTextoDof[] {
   return partes;
 }
 
+/** Verifica apenas blocos ativos e retorna nomes indisponíveis ordenados e presença de expressões malformadas. */
 export function verificarVariaveisDof(
   dados: DadosVariaveisDof & Pick<RascunhoDof, 'blocos'>,
 ): { indisponiveis: string[]; malformadas: boolean } {

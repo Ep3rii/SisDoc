@@ -1,24 +1,12 @@
+import { escapar, data, campo } from './html';
 import { TITULOS_BLOCOS_DOF, type SnapshotEmissaoDof } from '@sisdoc/contratos';
 import { analisarTextoDof, valoresVariaveisDof } from './variaveis-dof';
 
-function escapar(valor: string | number): string {
-  return String(valor).replace(/[&<>"']/g, (caractere) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[caractere] ?? caractere);
-}
-
-function data(dataIso: string): string {
-  const [ano, mes, dia] = dataIso.split('-');
-  return `${dia}/${mes}/${ano}`;
-}
-
-function campo(valor: string | null | undefined): string {
-  return valor?.trim() ? escapar(valor) : '&nbsp;';
-}
-
+/** Monta DOF do snapshot oficial e rejeita variáveis ausentes ou malformadas em blocos ativos. */
 export function renderizarEmissaoDof(dados: SnapshotEmissaoDof): string {
   const { resultado, fonte } = dados;
   const variaveis = valoresVariaveisDof(dados);
+  /** Substitui variáveis com escape HTML; a prévia sinaliza ausências e a emissão rejeita conteúdo inválido. */
   const textoComVariaveis = (texto: string): string => analisarTextoDof(texto).map((parte) => {
     if (parte.tipo === 'texto') return escapar(parte.conteudo);
     const valor = parte.tipo === 'variavel' ? variaveis.get(parte.nome) : undefined;
@@ -32,6 +20,7 @@ export function renderizarEmissaoDof(dados: SnapshotEmissaoDof): string {
     linha.ano, linha.diasBrutos, linha.faltas, linha.ts, linha.pf, linha.ip, linha.outros,
     linha.efetivoExercicio, linha.contribuicao, linha.pb, linha.pv, linha.licencaPremio,
   ].map((valor) => `<td>${escapar(valor)}</td>`).join('')}</tr>`).join('');
+  /** Soma deduções anuais do resultado existente para a linha de total, sem alterar o cálculo. */
   const soma = (chave: 'faltas' | 'ts' | 'pf' | 'ip' | 'outros') =>
     resultado.periodo.linhas.reduce((total, linha) => total + linha[chave], 0);
   const totais = `<tr class="total"><th>TOTAL</th>${[

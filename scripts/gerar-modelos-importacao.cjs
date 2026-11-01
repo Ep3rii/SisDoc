@@ -4,6 +4,7 @@ const { mkdirSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 const { escreverCsv, escreverXlsx } = require('../apps/api/dist/importacao/planilhas.js');
 
+/** Calcula verificadores para os identificadores fictícios dos modelos; não consulta dados operacionais. */
 function cpf(indice) {
   const digitos = String(indice).padStart(9, '0').split('').map(Number);
   for (let posicao = 9; posicao <= 10; posicao += 1) {

@@ -12,6 +12,7 @@ import { EntradaInterativa } from '../entrada-interativa';
 
 type Resposta = { dados: unknown; cookie?: string };
 
+/** Envia POST em loopback validando CA/nome TLS, limitando resposta e carregando cookie/CSRF quando autenticado. */
 async function requisitar(
   config: Configuracao,
   ca: Buffer,
@@ -68,6 +69,7 @@ async function requisitar(
   });
 }
 
+/** Cria usuário via API administrativa após confirmação interativa e tenta encerrar a sessão mesmo após falha de criação. */
 async function executar(): Promise<void> {
   if (process.argv.length !== 3 || process.argv[2] !== 'criar') {
     throw new Error('Uso: npm run usuario -- criar. Senhas são informadas somente no terminal.');

@@ -3,6 +3,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { validarDestinos } = require('./isolar-testes.cjs');
 
+/** Obtém caminho 8.3 via Windows para que PostgreSQL temporário não dependa de Unicode no checkout. */
 function caminhoCurto(diretorio) {
   try {
     return execFileSync(

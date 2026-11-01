@@ -1,3 +1,4 @@
+import { escapar, data, campo } from './html';
 import {
   ROTULOS_CATEGORIA_INSS,
   type ConteudoDtc,
@@ -26,33 +27,22 @@ export type DadosDocumentoDtc = {
 
 const MESES = ['JANEIRO', 'FEVEREIRO', 'MARÇO', 'ABRIL', 'MAIO', 'JUNHO', 'JULHO', 'AGOSTO', 'SETEMBRO', 'OUTUBRO', 'NOVEMBRO', 'DEZEMBRO'];
 
-function escapar(valor: string | number): string {
-  return String(valor).replace(/[&<>"']/g, (caractere) => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-  })[caractere] ?? caractere);
-}
-
-function data(dataIso: string): string {
-  const [ano, mes, dia] = dataIso.split('-');
-  return `${dia}/${mes}/${ano}`;
-}
-
+/** Formata mês/ano em português para os períodos IPAM já validados pelo contrato. */
 function mesAno(dataIso: string): string {
   return `${MESES[Number(dataIso.slice(5, 7)) - 1] ?? ''}/${dataIso.slice(0, 4)}`;
 }
 
-function campo(valor: string | null | undefined): string {
-  return valor?.trim() ? escapar(valor) : '&nbsp;';
-}
-
+/** Formata e escapa data informada ou preserva célula vazia no modelo impresso. */
 function dataCampo(valor: string | null | undefined): string {
   return valor ? escapar(data(valor)) : '&nbsp;';
 }
 
+/** Aplica máscara somente a CPF com onze dígitos, sem alterar valores já formatados. */
 function cpfFormatado(cpf: string): string {
   return /^\d{11}$/.test(cpf) ? `${cpf.slice(0, 3)}.${cpf.slice(3, 6)}.${cpf.slice(6, 9)}-${cpf.slice(9)}` : cpf;
 }
 
+/** Monta célula com rótulo escapado; o conteúdo deve vir previamente escapado pelos helpers de campo. */
 function celula(rotulo: string, valor: string, colspan = 1): string {
   return `<td${colspan > 1 ? ` colspan="${colspan}"` : ''}><span class="rotulo">${escapar(rotulo)}</span>${valor}</td>`;
 }
@@ -75,6 +65,7 @@ const TITULOS: Readonly<Record<TipoDtc, { anexo: string | null; titulo: string; 
   },
 };
 
+/** Seleciona título/anexo por tipo, mantendo marcas de prévia e texto INSS provisório. */
 function cabecalho(dados: DadosDocumentoDtc): string {
   const titulo = TITULOS[dados.tipo];
   const numero = dados.numeroFormatado
@@ -94,6 +85,7 @@ function cabecalho(dados: DadosDocumentoDtc): string {
 </header>`;
 }
 
+/** Monta dados completos do servidor; inclui nome do pai apenas no modelo INSS. */
 function dadosPessoais(dados: DadosDocumentoDtc): string {
   const { fonte } = dados;
   const linhaPai = dados.tipo === 'DTC_INSS'
@@ -112,6 +104,7 @@ ${linhaPai}
 </tbody></table>`;
 }
 
+/** Monta atos de nomeação/exoneração apenas para DTC de cargos comissionados. */
 function cargosComissionados(dados: DadosDocumentoDtc): string {
   if (dados.tipo !== 'DTC_COMISSIONADO') return '';
   const blocos = dados.conteudo.cargos.map((cargo, indice) => `
@@ -123,6 +116,7 @@ function cargosComissionados(dados: DadosDocumentoDtc): string {
   return `<h2>Cargos em comissão</h2>${blocos}`;
 }
 
+/** Renderiza períodos calculados e relaciona cargo/categoria INSS pela ordem validada. */
 function periodos(dados: DadosDocumentoDtc): string {
   const inss = dados.tipo === 'DTC_INSS';
   const linhas = dados.resultado.periodos.map((periodo) => {
@@ -140,12 +134,14 @@ function periodos(dados: DadosDocumentoDtc): string {
 <p class="texto"><strong>Total:</strong> ${escapar(dados.resultado.textoTotal || '0 dias')}</p>`;
 }
 
+/** Monta demonstrativo de cada período com somas e excedentes, sem recalcular as regras do domínio. */
 function tabelasAnuais(dados: DadosDocumentoDtc): string {
   return dados.resultado.periodos.map((periodo) => {
     const linhas = periodo.linhas.map((linha) => `<tr>${[
       linha.ano, linha.diasBrutos, linha.faltas, linha.ts, linha.pf, linha.ip, linha.outros,
       linha.contribuicao, linha.efetivoExercicio,
     ].map((valor) => `<td>${escapar(valor)}</td>`).join('')}</tr>`).join('');
+    /** Soma deduções anuais do resultado existente para a linha de total, sem alterar o cálculo. */
     const soma = (chave: 'faltas' | 'ts' | 'pf' | 'ip' | 'outros') =>
       periodo.linhas.reduce((total, linha) => total + linha[chave], 0);
     const total = `<tr class="total"><th>TOTAL</th>${[
@@ -164,6 +160,7 @@ function tabelasAnuais(dados: DadosDocumentoDtc): string {
   }).join('');
 }
 
+/** Apresenta totais calculados e identifica linhas provisórias ou inferidas do modelo. */
 function totais(dados: DadosDocumentoDtc): string {
   const inferidas = dados.tipo !== 'DTC_IPAM';
   const linhas = dados.resultado.linhasTotais.map((linha) => `<tr><th class="rotulo-total">${escapar(linha.rotulo)}${
@@ -176,6 +173,7 @@ function totais(dados: DadosDocumentoDtc): string {
 <p class="nota">* Linha provisória: ${inferidas ? 'estrutura inferida do modelo de referência e ' : ''}incorporações sem regra aprovada para este documento.</p>`;
 }
 
+/** Mostra contribuições IPAM nos tipos compatíveis, usando os períodos consultados da fonte. */
 function periodosIpam(dados: DadosDocumentoDtc): string {
   if (dados.tipo === 'DTC_INSS') return '';
   const itens = dados.fonte.periodosIpam.map((periodo) => `<li>${escapar(mesAno(periodo.inicio))} A ${escapar(mesAno(periodo.fim))}</li>`).join('');
@@ -184,6 +182,7 @@ function periodosIpam(dados: DadosDocumentoDtc): string {
 ${itens ? `<ul class="ipam">${itens}</ul>` : '<p>Não há períodos de contribuição ao IPAM registrados na fonte.</p>'}`;
 }
 
+/** Apresenta licenças, documentação e observações INSS escapadas, preservando indicação provisória. */
 function blocosInss(dados: DadosDocumentoDtc): string {
   const inss = dados.conteudo.inss;
   if (dados.tipo !== 'DTC_INSS' || !inss) return '';
@@ -205,6 +204,7 @@ function blocosInss(dados: DadosDocumentoDtc): string {
 </section>`;
 }
 
+/** Monta áreas de assinatura por tipo sem preencher assinaturas efetivas. */
 function assinaturas(dados: DadosDocumentoDtc): string {
   const local = `SÃO LUÍS - MA: ${dados.dataEmissao ? escapar(data(dados.dataEmissao)) : '____/____/______'}`;
   if (dados.tipo === 'DTC_INSS') {
@@ -255,6 +255,7 @@ thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}
 .rodape{font-size:7pt;margin-top:8pt;text-align:center}
 `;
 
+/** Compõe HTML DTC sem scripts e com CSS fixo compartilhado entre prévia e emissão. */
 export function renderizarDocumentoDtc(dados: DadosDocumentoDtc): string {
   const titulo = `${TITULOS[dados.tipo].titulo} ${dados.numeroFormatado ?? '(prévia)'}`;
   const avisos = dados.classificacao === 'previa' && dados.resultado.avisos.length > 0
@@ -280,6 +281,7 @@ ${tabelasAnuais(dados)}
 </body></html>`;
 }
 
+/** Renderiza exclusivamente o snapshot salvo, sem consultar ou incorporar mudanças posteriores da fonte. */
 export function renderizarEmissaoDtc(dados: SnapshotEmissaoDtc): string {
   return renderizarDocumentoDtc({
     classificacao: 'emissao',
@@ -294,6 +296,7 @@ export function renderizarEmissaoDtc(dados: SnapshotEmissaoDtc): string {
   });
 }
 
+/** Renderiza revisão salva como prévia sem número/validade oficial, removendo a prova de fonte do corpo. */
 export function renderizarPreviaDtc(previa: Pick<PreviaDtc, 'documento' | 'fonte'>): string {
   const { documentoId: _documentoId, revisao: _revisao, provaFonte: _prova, ...fonte } = previa.fonte;
   return renderizarDocumentoDtc({

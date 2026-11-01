@@ -5,6 +5,7 @@ import {
 } from '@sisdoc/contratos';
 import { cpfSintetico } from './dados-sinteticos.js';
 
+/** Gera cálculo de 45 anos sem ocorrências usando a mesma regra provisória validada pelo domínio. */
 export function resultadoDofSintetico(): ResultadoCalculoDof {
   const calculo = calcular({
     tipo: 'DOF', posse: '1980-01-01', dataReferencia: '2026-01-01', regras: REGRAS_PLANILHA,
@@ -31,6 +32,7 @@ export function resultadoDofSintetico(): ResultadoCalculoDof {
   });
 }
 
+/** Monta prévia fictícia com caracteres HTML, variável ativa e bloco inativo para testar escape e renderização. */
 export function previaDofSintetica(): PreviaConferidaDof {
   const documentoId = randomUUID();
   return previaConferidaDofSchema.parse({

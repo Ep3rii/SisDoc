@@ -1,5 +1,54 @@
 # Progresso da construção
 
+## Modularização — etapa 7: DOF, templates e recursos CLI — 01/11/2026
+
+DOF separada em contexto/helpers puros, consultas/validação, escrita de
+ajustes e emissão/cópia. O serviço público mantém as transições do
+rascunho; emissão/cópia compõem os mesmos recursos. Consultas e escrita
+recebem o cliente existente, sem abrir transações adicionais. Preservados
+locks, autoria/destinatários, revisões, conferência, aprovação, idempotência
+e numeração/snapshot/job PDF atômicos.
+
+Editor DOF separado em apresentação, hook de coordenação e contexto
+tipado. Painéis ocultos continuam montados; pendências, revisão salva e
+prévia auditada não foram descartadas. Templates agora têm índice somente
+de exports, prévia DOF própria e helpers HTML compartilhados. CSS fixos
+DOF/DTC permaneceram idênticos para não alterar hashes CSP.
+**87/87 funções/métodos/construtores e arrows nomeadas** nas unidades
+DOF da API, editor de cálculo e templates receberam JSDoc específico.
+
+Importação/conferência CLI usam argumentos e recursos compartilhados,
+sem importar outra entrada executável. Falha de encerramento após erro
+de conexão não é mais ocultada; ambas as causas são preservadas. Chaves
+são validadas antes de abrir conexão. Entradas setup/usuários, scripts
+de isolamento/modelos e fixtures sintéticas revisados receberam JSDoc;
+isso não encerra a revisão dos serviços setup nem de todas as suítes.
+Varredura final confirmou **111/111 funções nomeadas** documentadas no
+conjunto específico de arquivos revisados nesta etapa.
+
+Validação:
+
+- Typecheck e build aprovados; regressão completa após DOF/templates:
+  **230/230 testes em 30 arquivos**, incluindo navegador e PDFs.
+- Após extração dos recursos CLI: typecheck e **29/29 testes em três
+  arquivos**, incluindo **oito novos testes** de argumentos, limite exato
+  de 64 MB, conexão simulada e preservação de falhas de limpeza.
+- Validação final dos recursos CLI: **9/9 testes**, incluindo o teste
+  adicional de chaves inválidas recusadas antes de qualquer conexão.
+- Verificação mecânica: 14 métodos DOF extraídos e 21 funções de templates
+  com corpos equivalentes; HTML de prévia/emissão DOF sintéticas igual
+  byte a byte à implementação anterior em execução.
+- Prévia sintética no limite (45 anos/200 blocos/20.000 caracteres):
+  99,7 ms; delimitadores malformados: 169,6 ms. Warning de bundle web
+  superior a 500 KB permanece; não houve mudança incidental de carregamento.
+
+Nenhuma migração, importação real ou alteração de dados operacionais.
+Pasta de imagens modelo ignorada; instruções curtas e recapitulação
+adicionadas para retomada do agente.
+**Revisão integral permanece aberta:** demais serviços/helpers, componentes
+DOF/transferência e telas ainda não revisados, implementação setup,
+ferramentas e funções nomeadas das suítes restantes.
+
 ## Modularização — etapa 6: sincronização — 01/11/2026
 
 Módulo separado em coordenação do lote, mapeamento puro e persistência por

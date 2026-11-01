@@ -1,16 +1,18 @@
 import { tipoImportacaoSchema } from '@sisdoc/contratos';
 import path from 'node:path';
+import { lerArgumentos, texto } from './argumentos-cli';
 import { conferenciaGeral, conferirArquivo } from './conferencia-importacao';
 import { ErroImportacao } from './estado-importacao';
 import { ErroFormato } from './formatos';
-import { conectarAplicacao, lerArgumentos, lerArquivo, texto } from './importacao.cli';
 import { ErroPlanilha, lerPlanilha } from './planilhas';
+import { conectarAplicacao, lerArquivo } from './recursos-cli';
 
 const AJUDA = `Uso:
   npm run importacao:conferir                         (contagens gerais por origem)
   npm run importacao:conferir -- --tipo <tipo> --arquivo <caminho> --origem <origem> [--amostra 20]
 A amostra compara campo a campo registros sorteados do arquivo com o banco, com CPF e matrícula mascarados.`;
 
+/** Compara contagens ou amostra contra o arquivo sem importar dados; divergências retornam código de saída dois. */
 async function executar(): Promise<void> {
   const argumentos = lerArgumentos(process.argv.slice(2));
   if (argumentos.ajuda) {

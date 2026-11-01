@@ -238,6 +238,54 @@ Não afirmar que “todo o código está comentado” até concluir essas etapas
 
 ## Sequência e validação
 
+### DOF, templates e recursos CLI — etapa 7
+
+```text
+apps/api/src/documentos/
+  rascunhos.ts       listas e transições de rascunhos/conferência
+  contexto-dof.ts    tipos, confirmação de início, ordenação e diferenças
+  consulta-dof.ts    consulta autorizada, prova de fonte e apresentação
+  escrita-dof.ts     valores/ajustes cifrados no cliente existente
+  emissao-dof.ts     emissão oficial e cópia com transação por operação
+apps/web/src/dof/
+  calculo-dof.tsx          apresentação dos painéis montados e prévia
+  use-editor-dof.ts        cálculo, gravação e agregação das pendências
+  contexto-editor-dof.ts   contrato do editor e campos/abas tipados
+packages/templates/src/
+  index.ts          somente exports públicos
+  html.ts           escape, data e campo compartilhados
+  previa-dof.ts     prévia provisória DOF
+  emissao-dof.ts     snapshot DOF oficial
+  emissao-dtc.ts     composição por tipo DTC
+  variaveis-dof.ts   análise e valores de variáveis
+apps/api/src/importacao/
+  argumentos-cli.ts  leitura pura de flags/valores
+  recursos-cli.ts    leitura limitada e conexão sem privilégios
+  *.cli.ts          coordenação dos comandos, não helpers de outra CLI
+```
+
+Consultas/escrita DOF não possuem pool nem criam transações; usam o cliente
+e locks da operação chamadora. Emissão/cópia são compostas pelo serviço
+público com o mesmo pool/protetor/consultas/escrita. Não são novos providers
+globais nem alteram controllers. O hook web preserva ordem dos estados,
+cleanup e agregação das pendências; painéis ocultos permanecem montados.
+Helpers de templates foram compartilhados somente após verificar
+equivalência, sem mudar os CSS usados nos hashes CSP.
+
+Na CLI, a confirmação e o modo de validação continuam na coordenação.
+O protetor é construído antes da conexão para não deixar cliente aberto
+caso a chave seja inválida. Falhas de conexão/encerramento são explícitas
+e mantêm as causas; não há uso de dados de produção nos testes.
+
+Evidências: 87 funções nomeadas documentadas nas unidades DOF/templates,
+230 testes completos após a extração e 29 direcionados após recursos CLI
+(oito novos nessa execução; suíte CLI final ampliada para nove aprovados).
+JSDoc adicional cobre entradas setup/usuários, scripts e
+fixtures revisados, não todas as funções do repositório.
+Ver detalhes em [Progresso](PROGRESSO.md).
+
+### Próximas etapas
+
 1. **Composição API:** extração de módulos e testes de injeção, escopo,
    encerramento e regressão HTTPS/banco.
 2. **Interface por domínio:** mover componentes e transporte com todos os

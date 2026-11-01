@@ -1,9 +1,12 @@
 import { EntradaInterativa } from '../entrada-interativa';
 import { instalar, type OpcoesInstalacao } from './instalador';
 
+/** Coleta configuração e segredos no terminal e exige confirmação explícita para instalar em banco/raiz novos. */
 async function executar(): Promise<void> {
   const entrada = new EntradaInterativa('A instalação exige um terminal interativo; senhas não são aceitas por argumentos.');
+  /** Encaminha configuração não secreta à entrada interativa, que é fechada no finally. */
   const perguntar = (texto: string) => entrada.perguntar(texto);
+  /** Solicita segredo sem aceitar senha por argumento nem exibi-la no terminal. */
   const segredo = (texto: string) => entrada.segredo(texto);
 
   try {

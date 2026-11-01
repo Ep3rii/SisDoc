@@ -1,3 +1,4 @@
+/** Produz identificador fictício com dígitos verificadores válidos a partir de índice controlado pelo teste. */
 export function cpfSintetico(indice = 1): string {
   if (!Number.isInteger(indice) || indice < 1 || indice > 999999999) {
     throw new Error('Índice de CPF sintético inválido.');

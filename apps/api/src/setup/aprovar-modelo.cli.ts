@@ -4,6 +4,7 @@ import {
 } from './aprovacao-modelo';
 import { arquivoProvisionamento, conectarMigracao, lerProvisionamento } from './migrar';
 
+/** Consulta versão por tipo e exige referência e confirmação formal antes da aprovação permanente de emissão. */
 async function executar(): Promise<void> {
   const entrada = new EntradaInterativa('A aprovação de modelo exige um terminal interativo.');
   try {
