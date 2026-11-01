@@ -17,11 +17,28 @@ bordas e normalização de caixa, sem alterar pontuação ou sufixo. CPF válido
 os critérios aplicáveis; a interface exige que o usuário escolha o tipo.
 Todas as correspondências são exibidas com sua origem, sem seleção implícita.
 
-A paginação usa UUID de vínculo ou evento e limite máximo 50; a interface
-solicita 25. O detalhe revela somente CPF mascarado. A consulta de eventos
+A tela Buscar Servidores carrega previamente vínculos locais, sem exigir termo.
+A listagem e a busca são ordenadas e paginadas no PostgreSQL por matrícula
+natural crescente (2 antes de 10, inclusive sufixos numéricos), com desempate
+por origem e UUID. Zeros à esquerda e texto são preservados na apresentação;
+sequências numéricas equivalentes usam apenas origem/UUID como desempate.
+A listagem solicita 50 vínculos por página. O cursor continua sendo o UUID
+do último vínculo, cuja chave natural é resolvida no banco. Os vínculos dos
+detalhes seguem a mesma ordem. Eventos continuam paginados por UUID.
+
+Todos os perfis autenticados recebem CPF completo no resumo e nos detalhes;
+o contrato `pessoa.cpf` substitui `pessoa.cpfMascarado`, e os itens da listagem
+incluem `cpf`. Os demais dados pessoais completos permanecem nas referências.
+As permissões de edição, cálculo e emissão não mudam. A consulta de eventos
 confere que o vínculo pertence à pessoa solicitada. A sessão e o perfil são
-revalidados na transação que lê e audita, e o administrador técnico não tem
-permissão de consulta funcional. A auditoria não recebe o termo pesquisado.
+revalidados na transação que lê e audita. A auditoria não recebe o termo
+pesquisado nem o CPF retornado.
+
+A migração `020-listagem-servidores` cria uma função imutável de chave natural
+por segmentos de texto/dígitos e índices de ordem global e por pessoa.
+Ela evita conversões numéricas limitadas por tamanho, serve também após
+edições/importações e é exigida na inicialização. Atualizações existentes
+devem seguir o procedimento de migração com backup e serviço parado.
 
 A migração `003-consulta` adiciona índices por pessoa/vínculo e
 vínculo/evento: sem o primeiro, a busca ampla excedeu um segundo no teste

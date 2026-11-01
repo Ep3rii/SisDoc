@@ -180,7 +180,7 @@ export function BuscaGlobal({ onBuscar, onErro }: {
     evento.preventDefault();
     const valores = new FormData(evento.currentTarget);
     const resultado = buscarServidoresQuerySchema.safeParse({ q: valores.get('q'), tipo: valores.get('tipo') });
-    if (!resultado.success || !resultado.data.tipo) {
+    if (!resultado.success || !resultado.data.tipo || !resultado.data.q) {
       onErro(new ErroApi(400, 'Informe nome com ao menos três caracteres, CPF válido ou matrícula exata.'));
       return;
     }
@@ -287,7 +287,7 @@ function Detalhe({ pessoaId, csrf, podeSalvar, podeEditarCadastro, onCadastroAtu
       {falhou ? <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>Tentar carregar detalhes novamente</button> : !detalhe ? <p role="status">Carregando detalhes...</p> : (
         <>
           <h4>{detalhe.pessoa.nome}</h4>
-          <p>CPF: {detalhe.pessoa.cpfMascarado}</p>
+          <p>CPF: {detalhe.pessoa.cpf}</p>
           <label>Dados de referência do vínculo<select value={referenciaId ?? ''} onChange={(evento) => setReferenciaId(evento.target.value || null)}>
             <option value="">Selecionar para consultar dados completos</option>
             {detalhe.vinculos.map((vinculo) => <option key={vinculo.id} value={vinculo.id}>{vinculo.matricula} — {vinculo.sistemaOrigem}</option>)}
@@ -353,11 +353,10 @@ export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onE
     if (confirmarSaida()) { onPendente(false); acao(); }
   };
   useEffect(() => {
-    if (!consulta) return;
     let ativa = true;
     setPagina(null);
     setFalhou(false);
-    api.buscarServidores(consulta.q, consulta.tipo, cursor).then((resultado) => {
+    api.buscarServidores(consulta?.q, consulta?.tipo, cursor).then((resultado) => {
       if (ativa) setPagina(resultado);
     }).catch((erro: unknown) => {
       if (ativa) { setFalhou(true); onErro(erro); }
@@ -369,16 +368,17 @@ export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onE
     <section aria-labelledby="busca-titulo">
       <h2 id="busca-titulo" className={pessoaId ? 'sr-only' : undefined}>Consulta de servidores</h2>
       {!pessoaId && <p>Os resultados são locais. Matrículas e sufixos são preservados; confira a origem quando houver duplicidade.</p>}
-      {!consulta && <p>Use a busca no topo por nome, CPF ou matrícula para selecionar um vínculo.</p>}
-      {!pessoaId && (falhou ? <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>Tentar buscar novamente</button> : consulta && !pagina ? <p role="status">Buscando...</p> : pagina && (
+      {!consulta && <p>Vínculos por matrícula em ordem natural crescente, 50 por página. Use a busca no topo para filtrar por nome, CPF ou matrícula.</p>}
+      {!pessoaId && <p className="aviso">Dados pessoais completos para atividades autorizadas do setor. O acesso é auditado.</p>}
+      {!pessoaId && (falhou ? <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>Tentar buscar novamente</button> : !pagina ? <p role="status">Buscando...</p> : pagina && (
         <>
           <h3>Resultados</h3>
           {pagina.itens.length === 0 ? <p>Nenhum vínculo encontrado.</p> : (
             <div className="tabela"><table>
-              <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Órgão</th><th scope="col">Origem</th><th scope="col">Detalhes</th></tr></thead>
+              <thead><tr><th scope="col">Nome</th><th scope="col">CPF</th><th scope="col">Matrícula</th><th scope="col">Órgão</th><th scope="col">Origem</th><th scope="col">Detalhes</th></tr></thead>
               <tbody>{pagina.itens.map((item) => (
                 <tr key={item.vinculoId}>
-                  <td>{item.nome}</td><td>{item.matricula}{item.removidoNaFonte ? ' — removido na fonte' : ''}</td>
+                  <td>{item.nome}</td><td>{item.cpf}</td><td>{item.matricula}{item.removidoNaFonte ? ' — removido na fonte' : ''}</td>
                   <td>{item.orgao ?? 'Não informado'}</td><td>{item.sistemaOrigem}</td>
                   <td><button type="button" className="secundario" onClick={() => {
                     if (pessoaId === item.pessoaId) return;

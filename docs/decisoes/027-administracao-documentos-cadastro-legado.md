@@ -33,6 +33,11 @@ com revisão concorrente, CPF validado/cifrado e motivo em auditoria cifrada.
 
 ## XLSX para o legado
 
+A recepção descrita abaixo foi complementada pela
+[decisão 028](028-legado-operacional-e-conferencia.md): lotes guardados
+podem ser mapeados, validados e aplicados ao Núcleo por confirmação na tela.
+Guardar um lote, isoladamente, continua sem alimentar as declarações.
+
 O responsável solicitou preservar os cabeçalhos da planilha já pronta, sem
 fornecer DDL ou nomes de tabelas. Por isso a migração `019-planilhas-legado`
 cria uma área de recepção no schema **legado**, não tabelas arbitrárias

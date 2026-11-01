@@ -198,8 +198,10 @@ export const api = {
   async iniciarSincronizacao(csrf: string, tipo: IniciarSincronizacao['tipo']): Promise<LoteSincronizacao> {
     return validar(loteSincronizacaoSchema, await requisitar('admin/sincronizacoes', 'POST', { tipo }, csrf));
   },
-  async buscarServidores(q: string, tipo: TipoBuscaServidor, cursor?: string): Promise<PaginaBuscaServidores> {
-    const consulta = new URLSearchParams({ q, tipo, limite: '25' });
+  async buscarServidores(q?: string, tipo?: TipoBuscaServidor, cursor?: string): Promise<PaginaBuscaServidores> {
+    const consulta = new URLSearchParams({ limite: '50' });
+    if (q) consulta.set('q', q);
+    if (tipo) consulta.set('tipo', tipo);
     if (cursor) consulta.set('cursor', cursor);
     return validar(paginaBuscaServidoresSchema, await requisitar(`servidores?${consulta.toString()}`));
   },

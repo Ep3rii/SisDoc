@@ -13,11 +13,13 @@ import { aplicarEmissao } from './emissao';
 import { aplicarImportacao } from './importacao';
 import { aplicarEncaminhamentoDof } from './encaminhamento-dof';
 import { aplicarModelo } from './modelo';
+import { aplicarListagemServidores } from './listagem-servidores';
 import { aplicarPlanilhasLegado } from './planilhas-legado';
 import { aplicarPreconferenciaDof } from './preconferencia-dof';
 import { aplicarProcessoDof } from './processo-dof';
 import { aplicarRascunhoDof } from './rascunho-dof';
 import { aplicarRevisaoFonteDof } from './revisao-fonte-dof';
+import { aplicarRevisaoPeriodosIpam } from './revisao-periodos-ipam';
 
 type Migracao = { versao: string; aplicar: (cliente: Client, usuarioAplicacao: string) => Promise<boolean> };
 
@@ -41,6 +43,8 @@ export const SEQUENCIA_MIGRACOES: readonly Migracao[] = [
   { versao: '017-documentos-admin', aplicar: aplicarDocumentosAdmin },
   { versao: '018-edicao-cadastro', aplicar: aplicarEdicaoCadastro },
   { versao: '019-planilhas-legado', aplicar: aplicarPlanilhasLegado },
+  { versao: '020-listagem-servidores', aplicar: aplicarListagemServidores },
+  { versao: '021-revisao-periodos-ipam', aplicar: aplicarRevisaoPeriodosIpam },
 ];
 
 // Deve ser chamada dentro de uma transação aberta pelo papel de migração; devolve as versões aplicadas agora.

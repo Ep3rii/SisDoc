@@ -5,6 +5,38 @@ e [regras](../Modelos%20e%20Documentação/REGRAS_E_BASES_DE_CALCULO_DOF_DTC.md)
 [guia descritivo](../Modelos%20e%20Documentação/guia_descritivo_declaracoes_funcionais_e_tempo_contribuicao.md)
 e [protótipo visual](../Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg).
 
+## Plano aprovado: Legado operacional e interface — 31/10–01/11/2026
+
+Concluídos o assistente Legado → prévia/mapeamento → validação assinada →
+confirmação → Núcleo, a preservação de valores existentes/edições manuais
+com divergências explícitas e o download completo de ocorrências em XLSX.
+A base cadastral possui 18 campos; informações extras permanecem no lote
+Legado e não são inferidas como frequência ou períodos contributivos.
+Veja [decisão 028](decisoes/028-legado-operacional-e-conferencia.md).
+
+Busca de servidores abre uma lista paginada por matrícula natural crescente,
+preservando zeros e texto, com desempate por origem e UUID. CPF e referências
+são completos para todos os perfis autenticados, sem ampliar permissões de
+alteração/exportação. O editor DTC oferece PB/PV/licença-prêmio e a prova de
+revisão incorpora períodos IPAM e detecta mudanças concorrentes.
+
+**Validação:** 204 casos verificados em 25 arquivos. Na execução completa
+final de produto, 202 passaram; duas expectativas de sequência/contagem de
+migrações foram corrigidas e revalidadas pelos testes focados (emissão 11/11;
+sequência 1/1). Build e `npm run typecheck` passaram. O ensaio HTTPS com
+64 sessões por perfil e mistas completou 960 requisições sem erros, com p95
+entre 3,57 e 3,75 segundos e máximo de 4,15 segundos nessa execução conjunta;
+não reutilizar a medição anterior de aproximadamente 0,7 segundo como
+resultado desta versão. Não mede emissão de PDFs concorrentes.
+
+**Implantação:** backup `pg_dump -Fc` confirmado; migrações
+`020-listagem-servidores` e `021-revisao-periodos-ipam` aplicadas. Produção
+reiniciada em `https://localhost:3443/`, health e página 200, rotas novas 401
+sem sessão e escuta exclusiva em loopback. Conferências DTC com a prova antiga
+exigem reconferência; PDFs emitidos permanecem imutáveis.
+Nenhuma carga real foi aplicada ao Núcleo pelo agente: depende da conferência
+e confirmação posteriores do responsável. Fatias 8–9 continuam como extras.
+
 | Fatia | Estado | Evidência |
 |---|---|---|
 | 0 — fundação | gate técnico verificado | `npm run setup` e `npm start` em recursos descartáveis; HTTPS com CA e nome verificados; health e página inicial |
@@ -501,6 +533,20 @@ Na finalização, dois testes antigos foram ajustados ao novo comportamento:
 - o item **DTC IPAM** do menu passou a ficar habilitado.
 
 `npm test` passou com **148 testes em 19 arquivos**.
+
+Complemento DTC: editor preserva e permite PB/PV/licença-prêmio anuais;
+cálculo e snapshot mantêm valores não zero com aviso provisório. A prova
+específica inclui os períodos IPAM e fica cifrada no evento imutável de
+ajuste da revisão conferida. Bloqueio SHARE/NOWAIT mantém a fonte estável
+até o commit; alteração posterior invalida conferência/emissão, inclusive
+com prévia renovada. Conferências anteriores sem prova completa precisam
+ser devolvidas e reconferidas. Migração `021-revisao-periodos-ipam` instala
+helper SECURITY DEFINER restrito, sem ampliar UPDATE; setup e gate da API
+exigem 021. INSS provisório e
+proibição de administrador criar/copiar permanecem inalterados.
+Validação focada do complemento: cálculo/editor **37/37** e integração DTC
+**18/18**, incluindo papel real, prova antiga/nova e escritas IPAM
+concorrentes. Build API e typecheck dos testes passaram. Sem deploy.
 
 A instalação local foi atualizada, com backup `pg_dump` prévio, por
 `npm run migrar`, que aplicou `014-dtc`. A aplicação foi reiniciada em

@@ -20,6 +20,14 @@ separa Sincronização da transferência por arquivos (Importação/Exportação
 permite edição do cadastro local, retira criação/cópia de documentos do
 administrador e autoriza exclusão física controlada.
 
+A [decisão 028](../decisoes/028-legado-operacional-e-conferencia.md) habilita
+conversão de lotes cifrados do Legado para o Núcleo, com mapeamento, prévia
+completa, validação assinada e confirmação. Preserva dados existentes e
+edições manuais, preenche vazios e indica divergências para revisão explícita.
+Dados de trabalho são completos para todos os perfis autenticados; isso não
+amplia permissões de escrita ou exportação. A carga real requer confirmação
+após conferência e não ocorre durante os testes.
+
 Há uma única instalação operacional, destinada à produção. O banco inicia
 vazio; dados reais são importados por usuário autorizado. Testes usam apenas
 recursos descartáveis e dados inteiramente fictícios, fora do banco, histórico

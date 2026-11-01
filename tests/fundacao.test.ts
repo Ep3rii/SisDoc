@@ -370,9 +370,9 @@ async function conferirSqlSintetico(cliente: Client, documentoId: string, usuari
 }
 
 describe('fundação em recursos descartáveis', () => {
-  it('mantém a sequência de migrações alinhada ao release planilhas/legado', () => {
-    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('019-planilhas-legado');
-    expect(SEQUENCIA_MIGRACOES.at(-3)?.versao).toBe('017-documentos-admin');
+  it('mantém a sequência de migrações alinhada ao release listagem de servidores', () => {
+    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('021-revisao-periodos-ipam');
+    expect(SEQUENCIA_MIGRACOES.at(-5)?.versao).toBe('017-documentos-admin');
   });
 
   let temporario = '';
@@ -1704,7 +1704,6 @@ describe('fundação em recursos descartáveis', () => {
           duracoes[tipo] = Math.max(duracoes[tipo], duracao);
           expect(resposta.status, resposta.corpo).toBe(200);
           expect(duracao, `${tipo}: ${duracao.toFixed(1)} ms`).toBeLessThan(1000);
-          expect(resposta.corpo).not.toContain(primeira.cpf);
           return paginaBuscaServidoresSchema.parse(JSON.parse(resposta.corpo));
         };
         for (let repeticao = 0; repeticao < 3; repeticao += 1) {
@@ -1748,16 +1747,15 @@ describe('fundação em recursos descartáveis', () => {
         const seguinte = paginaBuscaServidoresSchema.parse(JSON.parse(paginaSeguinte.corpo));
         expect(seguinte.itens.every((item) => !pagina.itens.some((primeiro) => primeiro.vinculoId === item.vinculoId))).toBe(true);
 
-        for (const papel of ['analista', 'coordenador', 'secretario_adjunto']) {
+        for (const papel of ['admin', 'analista', 'coordenador', 'secretario_adjunto']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão funcional sintética ausente.');
           const detalhe = await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: `/api/v1/servidores/${primeira.id}`, cookie: sessao.cookie,
           });
           expect(detalhe.status, detalhe.corpo).toBe(200);
-          expect(detalhe.corpo).not.toContain(primeira.cpf);
           const dados = detalheServidorSchema.parse(JSON.parse(detalhe.corpo));
-          expect(dados.pessoa.cpfMascarado).toBe(`***.***.${primeira.cpf.slice(6, 9)}-**`);
+          expect(dados.pessoa.cpf).toBe(primeira.cpf);
           expect(dados.vinculos.map((vinculo) => vinculo.id).sort()).toEqual(primeira.vinculos.map((vinculo) => vinculo.id).sort());
           expect(dados.vinculos.find((vinculo) => vinculo.id === primeira.vinculos[1].id)?.matriculaAnteriorId)
             .toBe(primeira.vinculos[0].id);
@@ -1804,6 +1802,89 @@ describe('fundação em recursos descartáveis', () => {
           metodo: 'GET', rota: `/api/v1/servidores/${pessoas[1].id}/eventos?vinculoId=${primeira.vinculos[0].id}`,
           cookie: analista.cookie,
         })).status).toBe(404);
+        const pessoaNatural = randomUUID();
+        const cpfNatural = cpfSintetico(990001);
+        await cliente.query(`
+          INSERT INTO nucleo.pessoa (id, nome, nome_busca, cpf_cifrado, cpf_hash)
+          VALUES ($1, 'Ordenacao Natural Ficticia', 'ordenacao natural ficticia', $2, $3)
+        `, [pessoaNatural, protetor.cifrar(Buffer.from(cpfNatural, 'ascii'), {
+          schema: 'nucleo', tabela: 'pessoa', registroId: pessoaNatural, campo: 'cpf_cifrado',
+        }), protetor.hashCpf(cpfNatural)]);
+        const naturais = Array.from({ length: 65 }, (_, numero) => ({
+          id: randomUUID(), matricula: numero === 0 ? '000' : numero === 2 ? '002' : String(numero),
+          origem: 'natural-b',
+        }));
+        const iguais = [
+          { id: randomUUID(), matricula: '2', origem: 'natural-a' },
+          { id: randomUUID(), matricula: '02', origem: 'natural-b' },
+        ];
+        const sufixos = [
+          { id: randomUUID(), matricula: '2-2', origem: 'natural-b' },
+          { id: randomUUID(), matricula: '2-10', origem: 'natural-b' },
+        ];
+        const finais = [
+          { id: randomUUID(), matricula: '9'.repeat(70), origem: 'natural-b' },
+          { id: randomUUID(), matricula: 'A2', origem: 'natural-b' },
+          { id: randomUUID(), matricula: 'A10', origem: 'natural-b' },
+        ];
+        for (const linha of [...naturais, ...iguais, ...sufixos, ...finais].reverse()) {
+          await cliente.query(`
+            INSERT INTO nucleo.vinculo (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem)
+            VALUES ($1::uuid, $2::uuid, $3, $3, $4, $1::text)
+          `, [linha.id, pessoaNatural, linha.matricula, linha.origem]);
+        }
+        const esperados = [
+          ...naturais.slice(0, 2), iguais[0],
+          ...[naturais[2], iguais[1]].sort((a, b) => a.id.localeCompare(b.id)),
+          ...sufixos, ...naturais.slice(3), ...finais,
+        ];
+        const listar = async (sessao: { cookie: string }, query = '') => {
+          const resposta = await requisitarApi(portaHttps, caPem, {
+            metodo: 'GET', rota: `/api/v1/servidores${query}`, cookie: sessao.cookie,
+          });
+          expect(resposta.status, resposta.corpo).toBe(200);
+          return paginaBuscaServidoresSchema.parse(JSON.parse(resposta.corpo));
+        };
+        for (const sessao of sessoes.values()) {
+          const inicial = await listar(sessao);
+          expect(inicial.itens).toHaveLength(50);
+          expect(inicial.proximoCursor).not.toBeNull();
+          const resultado = await listar(sessao, '?q=ordenacao%20natural%20ficticia&tipo=nome');
+          expect(resultado.itens).toHaveLength(50);
+          expect(resultado.itens.every((item) => item.cpf === cpfNatural)).toBe(true);
+          const continuacao = await listar(sessao,
+            `?q=ordenacao%20natural%20ficticia&tipo=nome&cursor=${resultado.proximoCursor}`);
+          expect(continuacao.proximoCursor).toBeNull();
+          expect([...resultado.itens, ...continuacao.itens].map((item) => item.vinculoId))
+            .toEqual(esperados.map((linha) => linha.id));
+          expect([...resultado.itens, ...continuacao.itens].map((item) => item.matricula))
+            .toEqual(esperados.map((linha) => linha.matricula));
+        }
+        const fronteira = await listar(analista, '?q=ordenacao%20natural%20ficticia&tipo=nome&limite=4');
+        const aposEmpate = await listar(analista,
+          `?q=ordenacao%20natural%20ficticia&tipo=nome&limite=2&cursor=${fronteira.proximoCursor}`);
+        expect(aposEmpate.itens.map((item) => item.vinculoId)).toEqual(esperados.slice(4, 6).map((linha) => linha.id));
+        const segundaInicial = await listar(analista,
+          `?cursor=${(await listar(analista)).proximoCursor}`);
+        expect(segundaInicial.itens).toHaveLength(50);
+        const detalheNatural = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/servidores/${pessoaNatural}?limite=50`, cookie: analista.cookie,
+        });
+        const primeiraNatural = detalheServidorSchema.parse(JSON.parse(detalheNatural.corpo));
+        const detalheNaturalSeguinte = await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: `/api/v1/servidores/${pessoaNatural}?limite=50&cursor=${primeiraNatural.proximoCursor}`,
+          cookie: analista.cookie,
+        });
+        const segundaNatural = detalheServidorSchema.parse(JSON.parse(detalheNaturalSeguinte.corpo));
+        expect([...primeiraNatural.vinculos, ...segundaNatural.vinculos].map((item) => item.id))
+          .toEqual(esperados.map((linha) => linha.id));
+        expect(segundaNatural.proximoCursor).toBeNull();
+        await cliente.query('BEGIN');
+        try {
+          expect(await SEQUENCIA_MIGRACOES.at(-1)?.aplicar(cliente, opcoes.banco.usuario)).toBe(false);
+        } finally {
+          await cliente.query('ROLLBACK');
+        }
         const auditoria = await cliente.query<{ acao: string; pessoa_id: string | null; detalhes: unknown }>(`
           SELECT acao, pessoa_id, detalhes FROM seguranca.auditoria
           WHERE acao IN ('servidores_pesquisados', 'servidor_consultado', 'eventos_consultados')
@@ -1812,6 +1893,7 @@ describe('fundação em recursos descartáveis', () => {
         expect(auditoria.rows.some((evento) => evento.acao === 'servidor_consultado' && evento.pessoa_id === primeira.id)).toBe(true);
         expect(auditoria.rows.some((evento) => evento.acao === 'eventos_consultados' && evento.pessoa_id === primeira.id)).toBe(true);
         expect(JSON.stringify(auditoria.rows)).not.toContain(primeira.cpf);
+        expect(JSON.stringify(auditoria.rows)).not.toContain(cpfNatural);
         expect(JSON.stringify(auditoria.rows)).not.toContain('1.000001-2');
         process.stdout.write(
           `Busca sintética HTTPS, máximos em ms: nome=${duracoes.nome.toFixed(1)}, CPF=${duracoes.cpf.toFixed(1)}, ` +

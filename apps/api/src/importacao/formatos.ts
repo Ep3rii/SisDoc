@@ -97,6 +97,19 @@ function chaveCabecalho(valor: string): string {
   return SINONIMOS[chave] ?? chave;
 }
 
+export function sugerirMapeamento(tipo: TipoImportacao, cabecalhos: string[]): Record<string, number | null> {
+  const resultado: Record<string, number | null> = {};
+  for (const coluna of COLUNAS[tipo]) {
+    const posicao = cabecalhos.findIndex((cabecalho) => chaveCabecalho(cabecalho) === chaveCabecalho(coluna));
+    resultado[coluna] = posicao < 0 ? null : posicao;
+  }
+  if (tipo === 'dados_funcionais' && resultado.EXPEDICAO === null) {
+    const admissoes = cabecalhos.flatMap((cabecalho, indice) => chaveCabecalho(cabecalho) === 'ADMISSAO' ? [indice] : []);
+    if (admissoes.length === 2) resultado.EXPEDICAO = admissoes[1];
+  }
+  return resultado;
+}
+
 function chaveCanonica(coluna: string): string {
   return coluna.replace(/_/g, '');
 }

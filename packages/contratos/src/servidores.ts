@@ -6,11 +6,15 @@ import { limitePaginaSchema } from './paginacao';
 const tipoBuscaSchema = z.enum(['nome', 'cpf', 'matricula']);
 
 export const buscarServidoresQuerySchema = z.strictObject({
-  q: z.string().trim().min(1).max(200).regex(/^[^\x00-\x1f\x7f]+$/),
+  q: z.string().trim().min(1).max(200).regex(/^[^\x00-\x1f\x7f]+$/).optional(),
   tipo: tipoBuscaSchema.optional(),
   cursor: z.uuid().optional(),
-  limite: limitePaginaSchema,
+  limite: limitePaginaSchema.prefault('50'),
 }).superRefine((dados, contexto) => {
+  if (!dados.q) {
+    if (dados.tipo) contexto.addIssue({ code: 'custom', path: ['q'], message: 'Informe o termo de busca.' });
+    return;
+  }
   if (dados.tipo === 'nome' && normalizarNomeBusca(dados.q).length < 3) {
     contexto.addIssue({ code: 'custom', path: ['q'], message: 'Informe ao menos três caracteres para buscar por nome.' });
   }
@@ -38,6 +42,7 @@ export const paginaBuscaServidoresSchema = z.strictObject({
     pessoaId: z.uuid(),
     vinculoId: z.uuid(),
     nome: z.string(),
+    cpf: cpfSchema,
     matricula: z.string(),
     orgao: z.string().nullable(),
     sistemaOrigem: z.string(),
@@ -47,7 +52,7 @@ export const paginaBuscaServidoresSchema = z.strictObject({
 });
 
 export const detalheServidorSchema = z.strictObject({
-  pessoa: z.strictObject({ id: z.uuid(), nome: z.string(), cpfMascarado: z.string().regex(/^\*\*\*\.\*\*\*\.\d{3}-\*\*$/) }),
+  pessoa: z.strictObject({ id: z.uuid(), nome: z.string(), cpf: cpfSchema }),
   vinculos: z.array(z.strictObject({
     id: z.uuid(),
     matricula: z.string(),

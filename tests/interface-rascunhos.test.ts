@@ -150,13 +150,13 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       }
       if (caminho === '/api/v1/servidores') {
         return responder(rota, 200, {
-          itens: [{ pessoaId, vinculoId, nome, matricula, orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false }],
+          itens: [{ pessoaId, vinculoId, nome, cpf: cpfSintetico(), matricula, orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false }],
           proximoCursor: null,
         });
       }
       if (caminho === `/api/v1/servidores/${pessoaId}`) {
         return responder(rota, 200, {
-          pessoa: { id: pessoaId, nome, cpfMascarado: '***.***.123-**' },
+          pessoa: { id: pessoaId, nome, cpf: cpfSintetico() },
           vinculos: [{
             id: vinculoId, matricula, sistemaOrigem: 'fixture', matriculaAnteriorId: null,
             regimeJuridico: 'ESTATUTARIO', cargo: 'Cargo fictício', classe: null, nivel: null,

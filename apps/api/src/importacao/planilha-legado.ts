@@ -76,20 +76,28 @@ export async function listarPlanilhasLegado(cliente: PoolClient): Promise<LotePl
 }
 
 export async function exportarPlanilhaLegado(cliente: PoolClient, protetor: ProtetorDados, loteId: string, formato: 'csv' | 'xlsx'): Promise<Buffer> {
-  const lote = await cliente.query<{ cabecalhos: unknown }>('SELECT cabecalhos FROM legado.planilha_lote WHERE id = $1', [loteId]);
-  if (!lote.rows[0]) throw new UnprocessableEntityException('Planilha legada não encontrada.');
-  const cabecalhos = linhaSchema.parse(lote.rows[0].cabecalhos);
-  const registros = await cliente.query<{ id: string; conteudo_cifrado: Buffer }>(
-    'SELECT id, conteudo_cifrado FROM legado.planilha_linha WHERE lote_id = $1 ORDER BY numero', [loteId],
-  );
-  const linhas = [cabecalhos, ...registros.rows.map((registro) => {
-    const texto = protetor.decifrar(registro.conteudo_cifrado, { schema: 'legado', tabela: 'planilha_linha', registroId: registro.id, campo: 'conteudo_cifrado' });
-    return linhaSchema.parse(JSON.parse(texto.toString('utf8')));
-  })];
+  const lote = await lerPlanilhaLegado(cliente, protetor, loteId);
+  const linhas = [lote.cabecalhos, ...lote.linhas];
   if (formato === 'csv' && linhas.some((linha) => linha.some((valor) => /^\s*[=+@\-\t\r]/.test(valor)))) {
     throw new UnprocessableEntityException('Há células interpretáveis como fórmula no CSV. Use XLSX.');
   }
   const arquivo = formato === 'csv' ? escreverCsv(linhas) : escreverXlsx(linhas, 'Legado');
   if (arquivo.length > LIMITE_ARQUIVO_BYTES) throw new UnprocessableEntityException('A exportação excede 64 MB.');
   return arquivo;
+}
+
+export async function lerPlanilhaLegado(cliente: PoolClient, protetor: ProtetorDados, loteId: string) {
+  const lote = await cliente.query<{ cabecalhos: unknown; origem: string; hash_arquivo: Buffer }>(
+    'SELECT cabecalhos, origem, hash_arquivo FROM legado.planilha_lote WHERE id = $1', [loteId],
+  );
+  if (!lote.rows[0]) throw new UnprocessableEntityException('Planilha legada não encontrada.');
+  const cabecalhos = linhaSchema.parse(lote.rows[0].cabecalhos);
+  const registros = await cliente.query<{ id: string; conteudo_cifrado: Buffer }>(
+    'SELECT id, conteudo_cifrado FROM legado.planilha_linha WHERE lote_id = $1 ORDER BY numero', [loteId],
+  );
+  const linhas = registros.rows.map((registro) => {
+    const texto = protetor.decifrar(registro.conteudo_cifrado, { schema: 'legado', tabela: 'planilha_linha', registroId: registro.id, campo: 'conteudo_cifrado' });
+    return linhaSchema.parse(JSON.parse(texto.toString('utf8')));
+  });
+  return { cabecalhos, linhas, origem: lote.rows[0].origem, hash: lote.rows[0].hash_arquivo };
 }

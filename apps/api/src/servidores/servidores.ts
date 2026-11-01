@@ -27,6 +27,7 @@ type LinhaBusca = {
   pessoa_id: string;
   vinculo_id: string;
   nome: string;
+  cpf_cifrado: Buffer;
   matricula: string;
   orgao_nome: string | null;
   sistema_origem: string;
@@ -346,32 +347,37 @@ export class ServidoresService {
   }
 
   async buscar(sessao: SessaoAutenticada, ip: string, consulta: BuscarServidoresQuery): Promise<PaginaBuscaServidores> {
-    const nome = normalizarNomeBusca(consulta.q);
+    const termo = consulta.q ?? '';
+    const nome = normalizarNomeBusca(termo);
     const cpf = cpfSchema.safeParse(consulta.q);
     const consultarNome = (consulta.tipo === 'nome' || !consulta.tipo) && nome.length >= 3;
-    const consultarMatricula = (consulta.tipo === 'matricula' || !consulta.tipo) && consulta.q.length <= 100;
+    const consultarMatricula = (consulta.tipo === 'matricula' || !consulta.tipo) && termo.length > 0 && termo.length <= 100;
     const consultarCpf = (consulta.tipo === 'cpf' || !consulta.tipo) && cpf.success;
     const padraoNome = consultarNome ? `%${nome.replace(/[#%_]/g, '#$&')}%` : null;
-    const matricula = consultarMatricula ? normalizarMatricula(consulta.q) : null;
+    const matricula = consultarMatricula ? normalizarMatricula(termo) : null;
     const cpfHash = consultarCpf && cpf.success ? this.protetor.hashCpf(cpf.data) : null;
     return transacao(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_pessoa'));
       const resultado = await cliente.query<LinhaBusca>(`
-        SELECT p.id AS pessoa_id, v.id AS vinculo_id, p.nome, v.matricula, v.orgao_nome,
+        SELECT p.id AS pessoa_id, v.id AS vinculo_id, p.nome, p.cpf_cifrado, v.matricula, v.orgao_nome,
           v.sistema_origem, v.removido_na_fonte_em IS NOT NULL AS removido
         FROM nucleo.vinculo v JOIN nucleo.pessoa p ON p.id = v.pessoa_id
-        WHERE ($4::uuid IS NULL OR v.id > $4::uuid)
-          AND (($1::text IS NOT NULL AND p.nome_busca LIKE $1 ESCAPE '#')
+        WHERE ($4::uuid IS NULL OR
+          (nucleo.chave_matricula_natural(v.matricula) COLLATE "C", v.sistema_origem COLLATE "C", v.id) >
+          (SELECT nucleo.chave_matricula_natural(c.matricula) COLLATE "C", c.sistema_origem COLLATE "C", c.id
+            FROM nucleo.vinculo c WHERE c.id = $4::uuid))
+          AND ($6::boolean OR ($1::text IS NOT NULL AND p.nome_busca LIKE $1 ESCAPE '#')
             OR ($2::text IS NOT NULL AND v.matricula_norm = $2)
             OR ($3::bytea IS NOT NULL AND p.cpf_hash = $3))
-        ORDER BY v.id LIMIT $5
-      `, [padraoNome, matricula, cpfHash, consulta.cursor ?? null, consulta.limite + 1]);
+        ORDER BY nucleo.chave_matricula_natural(v.matricula) COLLATE "C", v.sistema_origem COLLATE "C", v.id LIMIT $5
+      `, [padraoNome, matricula, cpfHash, consulta.cursor ?? null, consulta.limite + 1, !consulta.q]);
       await auditarConsultaFuncional(cliente, sessao, 'servidores_pesquisados', 'busca', null, null, ip);
       return {
         itens: resultado.rows.slice(0, consulta.limite).map((linha) => ({
           pessoaId: linha.pessoa_id,
           vinculoId: linha.vinculo_id,
           nome: linha.nome,
+          cpf: cpfSchema.parse(decifrarTexto(this.protetor, linha.pessoa_id, 'pessoa', 'cpf_cifrado', linha.cpf_cifrado)),
           matricula: linha.matricula,
           orgao: linha.orgao_nome,
           sistemaOrigem: linha.sistema_origem,
@@ -403,12 +409,15 @@ export class ServidoresService {
         SELECT id, matricula, sistema_origem, matricula_anterior_id, regime_juridico, cargo, classe,
           nivel, referencia, setor, orgao_nome, to_char(admissao, 'YYYY-MM-DD') AS admissao,
           to_char(desligamento, 'YYYY-MM-DD') AS desligamento, removido_na_fonte_em IS NOT NULL AS removido
-        FROM nucleo.vinculo WHERE pessoa_id = $1 AND ($2::uuid IS NULL OR id > $2::uuid)
-        ORDER BY id LIMIT $3
+        FROM nucleo.vinculo WHERE pessoa_id = $1 AND ($2::uuid IS NULL OR
+          (nucleo.chave_matricula_natural(matricula) COLLATE "C", sistema_origem COLLATE "C", id) >
+          (SELECT nucleo.chave_matricula_natural(c.matricula) COLLATE "C", c.sistema_origem COLLATE "C", c.id
+            FROM nucleo.vinculo c WHERE c.id = $2::uuid AND c.pessoa_id = $1))
+        ORDER BY nucleo.chave_matricula_natural(matricula) COLLATE "C", sistema_origem COLLATE "C", id LIMIT $3
       `, [pessoa.id, cursor ?? null, limite + 1]);
       await auditarConsultaFuncional(cliente, sessao, 'servidor_consultado', 'pessoa', pessoa.id, pessoa.id, ip);
       return {
-        pessoa: { id: pessoa.id, nome: pessoa.nome, cpfMascarado: `***.***.${cpf.slice(6, 9)}-**` },
+        pessoa: { id: pessoa.id, nome: pessoa.nome, cpf },
         vinculos: resultado.rows.slice(0, limite).map((linha) => ({
           id: linha.id,
           matricula: linha.matricula,

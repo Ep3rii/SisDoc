@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { anoCalculoSchema, linhaAnualSchema, totaisCalculoSchema } from './calculo';
 import { cpfSchema, dataFuncionalSchema } from './dominio';
 import { numeroProcessoSchema } from './processo';
-import { provaFonteDofSchema } from './rascunho-dof';
 
 const revisaoSchema = z.number().int().min(1).max(2147483647);
+export const provaFonteDtcSchema = z.string().regex(/^[0-9a-f]{64}$/);
 const motivoSchema = z.string().trim().min(1, 'Informe o motivo da alteração.').max(2000);
 const semControle = /^[^\x00-\x1f\x7f]*$/;
 const textoCurto = z.string().trim().min(1).max(200).regex(semControle, 'Remova caracteres de controle.');
@@ -219,7 +219,7 @@ export const resultadoCalculoDtcSchema = z.strictObject({
 export const fonteDtcSchema = z.strictObject({
   documentoId: z.uuid(),
   revisao: revisaoSchema,
-  provaFonte: provaFonteDofSchema,
+  provaFonte: provaFonteDtcSchema,
   consultadoEm: z.iso.datetime(),
   nome: z.string(),
   matricula: z.string(),
@@ -281,7 +281,7 @@ export const previaDtcSchema = z.strictObject({
 
 export const conferirDtcSchema = z.strictObject({
   revisao: revisaoSchema,
-  provaFonte: provaFonteDofSchema,
+  provaFonte: provaFonteDtcSchema,
   confirmar: z.literal(true),
 });
 
@@ -292,7 +292,7 @@ export const devolverDtcSchema = z.strictObject({
 
 export const emitirDtcSchema = z.strictObject({
   revisao: revisaoSchema,
-  provaFonte: provaFonteDofSchema,
+  provaFonte: provaFonteDtcSchema,
 });
 
 export const resultadoTransicaoDtcSchema = z.strictObject({

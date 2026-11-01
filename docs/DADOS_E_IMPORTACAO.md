@@ -128,8 +128,9 @@ espaços são normalizados; tipo desconhecido vira `outro` com anomalia).
 | `divergencia` | gravada com a primeira versão | mesmo CPF com dados diferentes |
 | `anomalia` | gravada; apenas sinalizada | referência sem hífen, desligamento anterior à admissão, regime desconhecido, nascimento improvável, mãe/endereço ausentes, data inválida em campo opcional |
 
-O relatório nunca mostra CPF completo (máscara `***.***.789-**`) nem nomes;
-a matrícula também é mascarada (só os três últimos caracteres aparecem). Nenhum dado pessoal vai para logs.
+Na aplicação, o relatório mostra referências completas (matrícula, nome e CPF
+quando disponíveis) para a conferência operacional autenticada. Relatórios
+da CLI continuam mascarados. Nenhum dado pessoal vai para logs.
 
 ## Execução
 
@@ -183,12 +184,27 @@ O campo **Schema de destino** seleciona schemas do banco local:
   sem normalização ou conversão automática para o núcleo. Cabeçalhos vazios
   ou repetidos e valores sem cabeçalho são erros.
 
-Use Legado para testar a leitura da planilha já pronta pela interface. A
-validação mostra colunas e linhas sem gravar. Depois de conferir, grave e
-exporte o lote para comparação. A carga no legado **não alimenta as
-declarações** até que os campos sejam mapeados para o núcleo.
-Veja o passo a passo na
-[decisão 027](decisoes/027-administracao-documentos-cadastro-legado.md).
+Use Legado para preservar a planilha original. Depois de guardar o lote, use
+**Disponibilizar Legado para DOF e DTC**: selecione lote/tipo, confira a prévia
+completa e mapeamento, valide a conversão e confirme **Aplicar no Núcleo**.
+Somente a aplicação das linhas aceitas disponibiliza os dados nas consultas
+e declarações. Veja o passo a passo na
+[decisão 028](decisoes/028-legado-operacional-e-conferencia.md).
+
+O assistente sugere as 18 colunas cadastrais e admite os cinco tipos já
+documentados. Colunas extras continuam no Legado. Dados cadastrais existentes
+e edições manuais são preservados; vazios podem ser completados. Divergências
+exigem revisão explícita, não substituição automática. Referências complementares
+existentes divergentes são preservadas integralmente.
+
+A validação simula e desfaz a gravação; não alimenta o Núcleo. A aplicação
+exige assinatura vinculada à sessão, lote, mapeamento e estado das fontes.
+Mudanças após validar exigem nova validação. Repetir um lote/mapeamento
+aplicado não cria duplicados. Quarentenas/rejeições não são aplicadas.
+
+A prévia mostra até 20 linhas completas e o relatório até mil ocorrências,
+com contagem explícita das demais. **Baixar todas as ocorrências em XLSX**
+inclui o relatório completo após nova validação sem gravar. Proteja o download.
 
 `POST /api/v1/admin/importacoes?destino=legado&origem=&modo=validar|gravar`
 recebe o arquivo bruto. `GET /api/v1/admin/importacoes/legado` lista os
@@ -196,6 +212,14 @@ recebe o arquivo bruto. `GET /api/v1/admin/importacoes/legado` lista os
 recebe `{loteId, formato}`. Todas as rotas são administrativas e auditadas
 nas consultas/exportações e gravações. A carga respeita 64 MB, 100 mil linhas
 e 256 colunas.
+
+`POST /api/v1/admin/importacoes/legado/previa` recebe `{loteId, tipo}`.
+`POST /api/v1/admin/importacoes/legado/promover` recebe
+`{loteId, tipo, mapeamento, modo, validacao?}`; mapeamento associa campo
+canônico à posição da coluna (zero-based) ou `null`. `validacao` é a assinatura
+retornada por `modo: validar`, obrigatória em `modo: gravar`.
+`POST /api/v1/admin/importacoes/legado/ocorrencias` recebe o mesmo mapeamento
+em modo validar e devolve XLSX completo. Todas exigem administrador e CSRF.
 
 ### Exportação pela tela
 
@@ -224,6 +248,9 @@ documentos emitidos ou PDFs.
   arquivo (mesmo tipo e origem) não grava nada e informa o lote anterior.
   Arquivos diferentes comparam um `hash_conteudo` (HMAC) por registro:
   registros iguais ficam inalterados; só mudanças são atualizadas.
+  Pela tela, mudanças cadastrais não substituem valores preenchidos:
+  preenchem vazios e reportam divergências. A CLI mantém sua política anterior
+  de atualizar campos alterados; não a use para contornar a revisão operacional.
 - **Transação por lote**: a importação inteira é uma transação; falha
   inesperada não deixa dados parciais e é registrada como lote `falhou`.
 - **Exclusão mútua**: um bloqueio consultivo impede importações e rollbacks

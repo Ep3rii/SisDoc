@@ -210,7 +210,11 @@ export function calcular(entrada: unknown): ResultadoCalculo {
           return erro(avisos, 'ano_parcial_nao_confirmado', 'Confirme os valores referentes ao intervalo parcial, sem rateio automático.', periodo.ordem, ano);
         }
         if (dados.tipo !== 'DOF' && (entradaAno.pb > 0 || entradaAno.pv > 0 || entradaAno.licencaPremio > 0)) {
-          return erro(avisos, 'incorporacao_nao_definida', 'Incorporações anuais para este documento dependem de regra aprovada.', periodo.ordem, ano);
+          avisos.push({
+            codigo: 'incorporacao_dtc_provisoria',
+            mensagem: 'Incorporações anuais informadas na DTC são provisórias e exigem validação documental e aprovação do modelo.',
+            periodo: periodo.ordem, ano,
+          });
         }
         const afastamentos = somaSegura(entradaAno.faltas, entradaAno.ts, entradaAno.pf, entradaAno.ip, entradaAno.outros);
         if (afastamentos > bruto) {
@@ -270,9 +274,7 @@ export function calcular(entrada: unknown): ResultadoCalculo {
         avisos.push({ codigo: 'deducoes_excedem_dias', mensagem: 'As deduções excedem os dias disponíveis.', periodo: periodo.ordem });
         return erro(avisos, 'deducoes_excedem_periodo', 'Revise as deduções antes de calcular.', periodo.ordem);
       }
-      if (dados.tipo === 'DOF') {
-        totais.totalContribuicao = somaSegura(totais.contribuicaoMunicipio, totais.pb, totais.pv, totais.licencaPremio);
-      }
+      totais.totalContribuicao = somaSegura(totais.contribuicaoMunicipio, totais.pb, totais.pv, totais.licencaPremio);
       anteriorTs = acumuladoTs;
       anteriorPf = acumuladoPf;
       saida.push({

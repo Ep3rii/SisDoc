@@ -9,6 +9,7 @@ import {
   type Configuracao, type RelatorioImportacao, type TipoImportacao,
   referenciaServidorSchema,
   relatorioPlanilhaLegadoSchema, planilhasLegadoSchema,
+  previaLegadoSchema, relatorioPromocaoLegadoSchema,
 } from '@sisdoc/contratos';
 import EmbeddedPostgres from 'embedded-postgres';
 import forge from 'node-forge';
@@ -605,6 +606,109 @@ describe('Importação de planilhas e base legada', () => {
     }
     const auditado = await banco().query("SELECT count(*)::int AS n FROM seguranca.auditoria WHERE acao = 'planilha_legado_importada'");
     expect(auditado.rows[0].n).toBe(1);
+  });
+
+  it('converte lote legado com validação assinada, conserva edições e disponibiliza dados completos', async () => {
+    const sessao = usuarios.get('admin')?.sessao;
+    const analista = usuarios.get('analista')?.sessao;
+    if (!sessao || !analista) throw new Error('Sessões ausentes.');
+    const origem = 'conversao-legado';
+    const original = funcional(720001, '00002', { CARGO: 'CARGO LOCAL', PISPASEP: '' });
+    await importar('dados_funcionais', planilha('dados_funcionais', [original]), origem);
+    const importadas = [
+      funcional(720001, '00002', { NOME: 'NOME DA FONTE', CARGO: 'CARGO DA FONTE', PISPASEP: 'PIS FICTICIO' }),
+      funcional(720002, '10'),
+      funcional(720003, '20', { CPF: '' }),
+    ];
+    const colunas = [...COLUNAS.dados_funcionais, 'FONTE'];
+    const xlsx = escreverXlsx(planilha('dados_funcionais', importadas.map((linha) => ({ ...linha, FONTE: 'metadado ficticio' })), colunas));
+    const salvo = await requisitar({ metodo: 'POST', rota: `admin/importacoes?destino=legado&origem=${origem}&modo=gravar`, corpo: xlsx, sessao });
+    expect(salvo.status).toBe(200);
+    const loteId = relatorioPlanilhaLegadoSchema.parse(JSON.parse(salvo.corpo)).loteId;
+    if (!loteId) throw new Error('Lote legado ausente.');
+    const post = (rota: string, corpo: unknown, usuario = sessao) => requisitar({
+      metodo: 'POST', rota: `admin/importacoes/legado/${rota}`, corpo: Buffer.from(JSON.stringify(corpo)),
+      tipoConteudo: 'application/json', sessao: usuario,
+    });
+    expect((await post('previa', { loteId }, analista)).status).toBe(403);
+    const previaHttp = await post('previa', { loteId });
+    expect(previaHttp.status).toBe(200);
+    const previa = previaLegadoSchema.parse(JSON.parse(previaHttp.corpo));
+    expect(previa.amostra[0][2]).toBe(cpfSintetico(720001));
+    expect(previa.cabecalhos).toEqual(colunas);
+    expect(previa.colunas).toHaveLength(18);
+    const dados = { loteId, tipo: 'dados_funcionais', mapeamento: previa.mapeamento };
+    expect((await post('promover', { ...dados, modo: 'gravar' })).status).toBe(400);
+    expect((await post('promover', { ...dados, modo: 'validar', mapeamento: { ...previa.mapeamento, CPF: 0 } })).status).toBe(422);
+    const validar = async () => {
+      const resposta = await post('promover', { ...dados, modo: 'validar' });
+      expect(resposta.status).toBe(200);
+      return relatorioPromocaoLegadoSchema.parse(JSON.parse(resposta.corpo));
+    };
+    const validado = await validar();
+    expect(validado.relatorio.contagens.quarentena).toBe(1);
+    expect(validado.relatorio.ocorrencias.some((item) => item.tipo === 'divergencia' && item.referencia.includes(cpfSintetico(720001)))).toBe(true);
+    expect(await contar('vinculo', origem)).toBe(1);
+    expect((await post('promover', { ...dados, modo: 'gravar', validacao: '0'.repeat(64) })).status).toBe(409);
+    await banco().query("UPDATE nucleo.vinculo SET cargo = 'EDICAO MANUAL' WHERE sistema_origem = $1 AND matricula = '00002'", [origem]);
+    expect((await post('promover', { ...dados, modo: 'gravar', validacao: validado.validacao })).status).toBe(409);
+    const atualizado = await validar();
+    await importar('periodos_ipam', planilha('periodos_ipam', [
+      { CPF: cpfSintetico(720001), MES_INICIO: '2000-01', MES_FIM: '2000-12' },
+    ]), origem);
+    expect((await post('promover', { ...dados, modo: 'gravar', validacao: atualizado.validacao })).status).toBe(409);
+    const comPeriodos = await validar();
+    const aplicado = await post('promover', { ...dados, modo: 'gravar', validacao: comPeriodos.validacao });
+    expect(aplicado.status).toBe(200);
+    const resultado = relatorioPromocaoLegadoSchema.parse(JSON.parse(aplicado.corpo));
+    expect(resultado.relatorio.loteId).not.toBeNull();
+    expect(await contar('vinculo', origem)).toBe(2);
+    const local = (await banco().query<{ id: string; nome: string; cargo: string; pis_pasep_cifrado: Buffer }>(`SELECT p.id, p.nome, v.cargo, p.pis_pasep_cifrado
+      FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id WHERE v.sistema_origem = $1 AND v.matricula = '00002'`, [origem])).rows[0];
+    expect(local.nome).toBe(original.NOME);
+    expect(local.cargo).toBe('EDICAO MANUAL');
+    expect(protetor.decifrar(local.pis_pasep_cifrado, { schema: 'nucleo', tabela: 'pessoa', registroId: local.id, campo: 'pis_pasep_cifrado' }).toString()).toBe('PIS FICTICIO');
+    const busca = await requisitar({ metodo: 'GET', rota: 'servidores?q=00002&tipo=matricula', sessao: analista });
+    expect(busca.status).toBe(200);
+    expect(JSON.parse(busca.corpo).itens.some((item: { nome: string; matricula: string }) => item.nome === original.NOME && item.matricula === '00002')).toBe(true);
+    const repetido = await validar();
+    expect(repetido.relatorio.loteExistente).toBe(resultado.relatorio.loteId);
+    const deNovo = await post('promover', { ...dados, modo: 'gravar', validacao: repetido.validacao });
+    expect(relatorioPromocaoLegadoSchema.parse(JSON.parse(deNovo.corpo)).relatorio.loteExistente).toBe(resultado.relatorio.loteId);
+    const auditoria = (await banco().query(`SELECT detalhes::text AS detalhes FROM seguranca.auditoria
+      WHERE entidade_id = $1 AND acao = 'importacao_concluida'`, [resultado.relatorio.loteId])).rows[0].detalhes as string;
+    expect(auditoria).toContain(loteId);
+    expect(auditoria).not.toContain(cpfSintetico(720001));
+    expect(auditoria).not.toContain(original.NOME);
+    expect((await banco().query('SELECT linhas FROM legado.planilha_lote WHERE id = $1', [loteId])).rows[0].linhas).toBe(3);
+  });
+
+  it('exporta todas as ocorrências do legado acima do limite da prévia sem gravar no núcleo', async () => {
+    const sessao = usuarios.get('admin')?.sessao;
+    if (!sessao) throw new Error('Sessão ausente.');
+    const origem = 'legado-ocorrencias-completas';
+    const linhas = [['MATRICULA', 'NOME', 'CPF'], ...Array.from({ length: 1005 }, (_, indice) => [
+      String(indice).padStart(5, '0'), `PESSOA FICTICIA ${indice}`, '',
+    ])];
+    const salvo = await requisitar({ metodo: 'POST', rota: `admin/importacoes?destino=legado&origem=${origem}&modo=gravar`,
+      corpo: escreverXlsx(linhas), sessao });
+    expect(salvo.status).toBe(200);
+    const loteId = relatorioPlanilhaLegadoSchema.parse(JSON.parse(salvo.corpo)).loteId;
+    const dados = { loteId, tipo: 'dados_funcionais', modo: 'validar', mapeamento: { MATRICULA: 0, NOME: 1, CPF: 2 } };
+    const solicitar = (rota: string) => requisitar({ metodo: 'POST', rota: `admin/importacoes/legado/${rota}`,
+      corpo: Buffer.from(JSON.stringify(dados)), tipoConteudo: 'application/json', sessao });
+    const validado = await solicitar('promover');
+    expect(validado.status).toBe(200);
+    const relatorio = relatorioPromocaoLegadoSchema.parse(JSON.parse(validado.corpo)).relatorio;
+    expect(relatorio.contagens.quarentena).toBe(1005);
+    expect(relatorio.ocorrencias).toHaveLength(1000);
+    expect(relatorio.ocorrenciasOmitidas).toBe(5);
+    const exportado = await solicitar('ocorrencias');
+    expect(exportado.status).toBe(200);
+    const completo = lerPlanilha(exportado.binario).linhas;
+    expect(completo).toHaveLength(1006);
+    expect(completo[1005][2]).toContain('PESSOA FICTICIA 1004');
+    expect(await contar('vinculo', origem)).toBe(0);
   });
 
   it('mostra referências pessoais completas ao Cadastro e administrador com paginação e auditoria', async () => {

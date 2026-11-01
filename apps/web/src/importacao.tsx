@@ -6,6 +6,7 @@ import {
   type ConferenciaImportacao, type LoteImportacao, type PaginaLotesImportacao, type RelatorioImportacao, type TipoImportacao,
 } from '@sisdoc/contratos';
 import { ErroApi, requisitar, validar } from './api';
+import { PromocaoLegado } from './promocao-legado';
 
 const LIMITE_BYTES = 64 * 1024 * 1024;
 
@@ -177,7 +178,7 @@ function Relatorio({ relatorio }: { relatorio: RelatorioImportacao }) {
       {relatorio.avisos.map((aviso) => <p key={aviso} className="aviso">{aviso}</p>)}
       {relatorio.ocorrencias.length > 0 && (
         <details open={relatorio.ocorrencias.length <= 20}>
-          <summary>{relatorio.ocorrencias.length + relatorio.ocorrenciasOmitidas} ocorrência(s) — CPF e matrícula mascarados</summary>
+          <summary>{relatorio.ocorrencias.length + relatorio.ocorrenciasOmitidas} ocorrência(s) — referências completas para conferência</summary>
           <div className="tabela">
             <table>
               <thead><tr><th scope="col">Linha</th><th scope="col">Tipo</th><th scope="col">Referência</th><th scope="col">Motivo</th></tr></thead>
@@ -188,7 +189,8 @@ function Relatorio({ relatorio }: { relatorio: RelatorioImportacao }) {
               </tbody>
             </table>
           </div>
-          {relatorio.ocorrenciasOmitidas > 0 && <p>Mais {relatorio.ocorrenciasOmitidas} ocorrência(s) omitidas; use a linha de comando com --relatorio para a lista completa.</p>}
+          {relatorio.ocorrenciasOmitidas > 0 && <p>Mais {relatorio.ocorrenciasOmitidas} ocorrência(s) fora desta prévia.
+            Na conversão do Legado, baixe todas as ocorrências em XLSX para revisar o lote completo.</p>}
         </details>
       )}
       <p className="discreta">Processado em {(relatorio.duracaoMs / 1000).toFixed(1)} s.</p>
@@ -213,6 +215,7 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   const [cursor, setCursor] = useState<string | undefined>();
   const [conferencia, setConferencia] = useState<ConferenciaImportacao | null>(null);
   const [versao, setVersao] = useState(0);
+  const [loteParaConverter, setLoteParaConverter] = useState<string | null>(null);
   const campoArquivo = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -244,6 +247,7 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
       if (modo === 'validar') setValidadoPara(assinatura);
       else {
         setValidadoPara(null);
+        if ('destino' in resultado) setLoteParaConverter(resultado.loteId ?? resultado.loteExistente);
         onMensagem(resultado.loteExistente ? 'Arquivo já importado anteriormente; nada foi alterado.' : 'Importação gravada com sucesso.');
         setCursor(undefined);
         setVersao((atual) => atual + 1);
@@ -258,7 +262,10 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   return (
     <section aria-labelledby="importacao-titulo">
       <h2 id="importacao-titulo">Importação e exportação de dados</h2>
-      <p>Selecione o schema local: legado preserva os cabeçalhos do XLSX/CSV; núcleo exige o formato canônico dos modelos. Importar no legado não alimenta automaticamente a busca ou as declarações. Valide antes de gravar.</p>
+      <p>Legado: guarde o XLSX/CSV original e use o assistente abaixo para disponibilizar os dados para DOF/DTC.
+        Núcleo: importação direta no formato canônico. Valide e confira o relatório antes de confirmar qualquer gravação.</p>
+      <p className="aviso">Dados existentes e edições manuais são preservados. Campos vazios podem ser completados;
+        divergências ficam indicadas para revisão, sem substituição automática.</p>
       <div className="painel">
         <form className="formulario-importacao" onSubmit={(evento) => { evento.preventDefault(); void processar('validar'); }}>
           <label>Schema de destino<select value={destino} onChange={(e) => {
@@ -293,6 +300,11 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
         {relatorioLegado.loteId && <p>Lote: {relatorioLegado.loteId}</p>}
         {relatorioLegado.loteExistente && <p>Arquivo já importado: {relatorioLegado.loteExistente}. Nenhuma alteração.</p>}
       </div>}
+      <PromocaoLegado key={`conversao-${loteParaConverter ?? 'selecionar'}`} csrf={csrf} loteInicial={loteParaConverter}
+        onErro={onErro} onAplicado={() => {
+          setCursor(undefined); setVersao((atual) => atual + 1);
+          onMensagem('Conversão do Legado aplicada ao Núcleo. Confira o relatório e os servidores antes de emitir documentos.');
+        }} renderRelatorio={(dados) => <Relatorio relatorio={dados} />} />
       <ExportacaoAdmin key={`exportacao-${versao}`} csrf={csrf} onErro={onErro} onMensagem={onMensagem} />
       {conferencia && (
         <div className="painel">

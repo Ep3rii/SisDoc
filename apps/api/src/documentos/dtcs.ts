@@ -1,4 +1,4 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { calcular, converterDias, REGRAS_PLANILHA, textoPeriodos, textoTempo } from '@sisdoc/calculo';
 import {
@@ -44,6 +44,7 @@ import { confirmarSessao } from '../seguranca/sessao-transacao';
 import { consultarSituacaoEmissao } from './emissoes';
 import { lerCpfDof, lerNomeMaeDof } from './identidade-fonte-dof';
 import { MENSAGEM_SEM_APROVACAO } from './rascunhos';
+import { assinarFonteDtc, lerPeriodosFonteDtc, provasDtcIguais, tentarBloqueioPeriodosDtc, type PeriodoFonteDtc } from './revisao-fonte-dtc';
 
 const TIPOS_DTC: readonly TipoDtc[] = ['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'];
 const REVISAO_MAXIMA = 2147483647;
@@ -74,7 +75,7 @@ type LinhaDtc = {
 
 type Falha = { tipo: 'invalido' | 'conflito' | 'nao_encontrado'; mensagem: string };
 type Tentativa<T> = { valor: T } | { falha: Falha };
-type RevisoesFonte = { pessoa_revisao: string; vinculo_revisao: string };
+type RevisoesFonte = { pessoa_revisao: string; vinculo_revisao: string; periodos: PeriodoFonteDtc[] };
 type Mudanca = { campo: string; anterior: unknown; novo: unknown };
 type LeituraFonte = { fonte: FonteDtc; fonteSelecionadaAlterada: boolean | null } | { erro: 'identidade' | 'fonte' };
 
@@ -89,7 +90,7 @@ async function tentarBloqueioFonte(cliente: PoolClient): Promise<boolean> {
   const bloqueio = await cliente.query<{ obtido: boolean }>(
     'SELECT pg_try_advisory_xact_lock_shared($1, $2) AS obtido', [...CHAVE_BLOQUEIO_FONTE_DOF],
   );
-  return bloqueio.rows[0].obtido;
+  return bloqueio.rows[0].obtido && await tentarBloqueioPeriodosDtc(cliente);
 }
 
 /** Ordena períodos por início e anos por ano, para que a ordem gravada coincida com a do cálculo. */
@@ -228,14 +229,14 @@ export class DtcService {
   }
 
   private assinarFonte(linha: LinhaDtc, revisoes: RevisoesFonte): Buffer {
-    return this.protetor.assinarRevisaoFonteDof({
+    return assinarFonteDtc(this.protetor, {
       documentoId: linha.id,
       documentoRevisao: linha.revisao,
       pessoaId: linha.pessoa_id,
       pessoaRevisao: revisoes.pessoa_revisao,
       vinculoId: linha.vinculo_id,
       vinculoRevisao: revisoes.vinculo_revisao,
-    });
+    }, revisoes.periodos);
   }
 
   private async consultarRevisoesFonte(cliente: PoolClient, linha: LinhaDtc): Promise<RevisoesFonte> {
@@ -245,13 +246,22 @@ export class DtcService {
       WHERE p.id = $1 AND v.id = $2
     `, [linha.pessoa_id, linha.vinculo_id]);
     if (!consulta.rows[0]) throw new Error('Pessoa ou vínculo da DTC deixou de existir.');
-    return consulta.rows[0];
+    return { ...consulta.rows[0], periodos: await lerPeriodosFonteDtc(cliente, linha.pessoa_id) };
   }
 
   private fonteCorresponde(linha: LinhaDtc, revisoes: RevisoesFonte, prova: string): boolean {
-    const recebida = Buffer.from(prova, 'hex');
-    const esperada = this.assinarFonte(linha, revisoes);
-    return recebida.length === esperada.length && timingSafeEqual(recebida, esperada);
+    return provasDtcIguais(prova, this.assinarFonte(linha, revisoes));
+  }
+
+  private async fonteConferidaCorresponde(cliente: PoolClient, linha: LinhaDtc, revisoes: RevisoesFonte): Promise<boolean> {
+    const campo = `dtc.provaFonte.${linha.revisao}`;
+    const consulta = await cliente.query<{ id: string; valor_novo_cifrado: Buffer }>(`
+      SELECT id, valor_novo_cifrado FROM documentos.ajuste_campo WHERE documento_id = $1 AND campo = $2
+    `, [linha.id, campo]);
+    if (consulta.rows.length !== 1) return false;
+    const registro = consulta.rows[0];
+    const prova = this.ler('ajuste_campo', registro.id, 'valor_novo_cifrado', registro.valor_novo_cifrado);
+    return typeof prova === 'string' && this.fonteCorresponde(linha, revisoes, prova);
   }
 
   private async linha(
@@ -354,11 +364,11 @@ export class DtcService {
     if (linha.status === 'conferido' && origem.fonte_selecionada_alterada === null) {
       throw new Error('DTC conferida sem registro correspondente.');
     }
-    const ipam = await cliente.query<{ inicio: string; fim: string }>(`
-      SELECT to_char(mes_inicio, 'YYYY-MM-DD') AS inicio, to_char(mes_fim, 'YYYY-MM-DD') AS fim
-      FROM nucleo.periodo_ipam WHERE pessoa_id = $1 AND removido_na_fonte_em IS NULL
-      ORDER BY mes_inicio, mes_fim LIMIT 50
-    `, [linha.pessoa_id]);
+    const periodos = await lerPeriodosFonteDtc(cliente, linha.pessoa_id);
+    const revisoes = { ...origem, periodos };
+    const ipam = periodos.filter((periodo) => periodo.removido_em === null)
+      .sort((a, b) => a.inicio.localeCompare(b.inicio) || a.fim.localeCompare(b.fim) || a.id.localeCompare(b.id))
+      .map(({ inicio, fim }) => ({ inicio, fim }));
     const cpf = lerCpfDof(this.protetor, linha.pessoa_id, origem.cpf_cifrado, origem.cpf_hash);
     const nomeMae = lerNomeMaeDof(this.protetor, linha.pessoa_id, origem.nome_mae_cifrado);
     if ('erro' in cpf || 'erro' in nomeMae) return { erro: 'identidade' };
@@ -380,7 +390,7 @@ export class DtcService {
     const fonte = fonteDtcSchema.safeParse({
       documentoId: linha.id,
       revisao: linha.revisao,
-      provaFonte: this.assinarFonte(linha, origem).toString('hex'),
+      provaFonte: this.assinarFonte(linha, revisoes).toString('hex'),
       consultadoEm: origem.consultado_em.toISOString(),
       nome: linha.nome,
       matricula: linha.matricula,
@@ -395,11 +405,12 @@ export class DtcService {
       referencia: origem.referencia,
       orgao: origem.orgao_nome,
       admissao: linha.admissao,
-      periodosIpam: ipam.rows,
+      periodosIpam: ipam,
       removidoNaFonte: origem.removido,
     });
     if (!fonte.success) return { erro: 'fonte' };
-    return { fonte: fonte.data, fonteSelecionadaAlterada: origem.fonte_selecionada_alterada };
+    return { fonte: fonte.data, fonteSelecionadaAlterada: linha.status === 'conferido'
+      ? !await this.fonteConferidaCorresponde(cliente, linha, revisoes) : null };
   }
 
   private async registrarAjustes(
@@ -669,6 +680,10 @@ export class DtcService {
         return { falha: { tipo: 'conflito', mensagem: 'Os dados da fonte não puderam ser validados ou o vínculo foi removido na fonte.' } };
       }
       const conferenciaId = randomUUID();
+      await this.registrarAjustes(cliente, id, sessao.usuario.id, 'Prova da fonte validada na conferência de DTC.', [{
+        campo: `dtc.provaFonte.${linha.revisao + 1}`, anterior: null,
+        novo: this.assinarFonte({ ...linha, revisao: linha.revisao + 1 }, revisoes).toString('hex'),
+      }]);
       await cliente.query(`
         INSERT INTO documentos.conferencia_dtc
           (id, documento_id, revisao_documento, revisao_pessoa, revisao_vinculo, conferido_por, avisos)
@@ -779,9 +794,9 @@ export class DtcService {
       `, [id, linha.revisao]);
       const conferido = conferencia.rows[0];
       if (!conferido) throw new Error('DTC conferida sem registro correspondente.');
-      if (conferido.revisao_pessoa !== revisoes.pessoa_revisao || conferido.revisao_vinculo !== revisoes.vinculo_revisao) {
+      if (!await this.fonteConferidaCorresponde(cliente, linha, revisoes)) {
         await auditarConsultaFuncional(cliente, sessao, 'emissao_dtc_fonte_alterada', 'documento', id, linha.pessoa_id, ip);
-        return { falha: { tipo: 'conflito', mensagem: 'A pessoa ou o vínculo mudou na fonte após a conferência. Devolva a DTC para nova conferência.' } };
+        return { falha: { tipo: 'conflito', mensagem: 'A fonte (pessoa, vínculo ou períodos IPAM) mudou após a conferência ou não possui prova completa. Devolva a DTC para nova conferência.' } };
       }
       const documento = this.apresentar(linha);
       if (documento.pendencias.length > 0 || !documento.conteudo.processo) {

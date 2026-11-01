@@ -308,6 +308,25 @@ describe('fronteiras e segurança do cálculo', () => {
     expect(calcular(entrada)).toMatchObject({ sucesso: true, totais: { totalContribuicao: 366, pb: 0 } });
   });
 
+  it.each(['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'] as const)(
+    'calcula incorporações anuais provisórias de %s sem alterar efetivo exercício',
+    (tipo) => {
+      const entrada = entradaSimples('2024-01-01', '2024-12-31');
+      const resultado = calcular({
+        ...entrada, tipo,
+        periodos: [{ ...entrada.periodos[0], anos: [{ ...entrada.periodos[0].anos[0], pb: 10, pv: 20, licencaPremio: 30 }] }],
+      });
+      expect(resultado).toMatchObject({
+        sucesso: true,
+        totais: { contribuicaoMunicipio: 366, efetivoExercicio: 366, totalContribuicao: 426, pb: 10, pv: 20, licencaPremio: 30 },
+        periodos: [{ totais: { totalContribuicao: 426 }, linhas: [{ pb: 10, pv: 20, licencaPremio: 30 }] }],
+      });
+      expect(resultado.avisos).toContainEqual(expect.objectContaining({
+        codigo: 'incorporacao_dtc_provisoria', periodo: 1, ano: 2024,
+      }));
+    },
+  );
+
   it('distribui intervalos exatos por ano sem ratear totais anuais', () => {
     expect(distribuirAfastamento({
       forma: 'intervalo', tipo: 'licenca_ts', intervalo: { inicio: '2020-12-30', fim: '2021-01-02' },

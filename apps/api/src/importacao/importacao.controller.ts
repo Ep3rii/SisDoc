@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Post, PayloadTooLargeException, Query, Req, Res, UnsupportedMediaTypeException } from '@nestjs/common';
-import { enviarImportacaoQuerySchema, exportarDadosSchema, paginaLotesImportacaoQuerySchema } from '@sisdoc/contratos';
+import { consultaPreviaLegadoSchema, promoverLegadoSchema, enviarImportacaoQuerySchema, exportarDadosSchema, paginaLotesImportacaoQuerySchema } from '@sisdoc/contratos';
 import type { ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } from '../seguranca/guarda';
@@ -34,6 +34,38 @@ export class ImportacaoController {
   @Get('legado')
   legado(@Req() req: RequisicaoAutenticada) {
     return this.importacao.listarLegado(exigirSessao(req), ipRequisicao(req));
+  }
+
+  @ExigirAcao('administrar_importacao')
+  @Post('legado/previa')
+  @HttpCode(200)
+  previaLegado(@Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = consultaPreviaLegadoSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Informe o lote legado e o tipo de dado para conferir.');
+    return this.importacao.previaLegado(exigirSessao(req), ipRequisicao(req), dados.data.loteId, dados.data.tipo);
+  }
+
+  @ExigirAcao('administrar_importacao')
+  @Post('legado/promover')
+  @HttpCode(200)
+  promoverLegado(@Body() corpo: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = promoverLegadoSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Confira lote, tipo, mapeamento e validação antes de aplicar no núcleo.');
+    return this.importacao.promoverLegado(exigirSessao(req), ipRequisicao(req), dados.data);
+  }
+
+  @ExigirAcao('administrar_importacao')
+  @Post('legado/ocorrencias')
+  @HttpCode(200)
+  async ocorrenciasLegado(@Body() corpo: unknown, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
+    const dados = promoverLegadoSchema.safeParse(corpo);
+    if (!dados.success || dados.data.modo !== 'validar') throw new BadRequestException('Informe lote e mapeamento para exportar as ocorrências sem gravar.');
+    const arquivo = await this.importacao.exportarOcorrenciasLegado(exigirSessao(req), ipRequisicao(req), dados.data);
+    resposta.setHeader('Cache-Control', 'no-store');
+    resposta.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    resposta.setHeader('Content-Disposition', `attachment; filename="ocorrencias-legado-${dados.data.loteId}.xlsx"`);
+    resposta.statusCode = 200;
+    resposta.end(arquivo);
   }
 
   @ExigirAcao('administrar_importacao')

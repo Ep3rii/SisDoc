@@ -6,7 +6,7 @@ import {
 import { DatabaseError, type ClientBase } from 'pg';
 import type { ProtetorDados } from '../seguranca/protecao-dados';
 import {
-  analisarLinhas,
+  analisarLinhas, sugerirMapeamento,
   type AfastamentoArquivo, type CamposPessoa, type CamposVinculo, type EventoArquivo, type IncorporacaoArquivo,
   type PeriodoIpamArquivo, type ResultadoAnalise,
 } from './formatos';
@@ -27,6 +27,12 @@ export type OpcoesImportacao = {
   progresso?: (feitos: number, total: number) => void;
   antes?: (cliente: ClientBase) => Promise<void>;
   ip?: string | null;
+  preservarExistentes?: boolean;
+  referenciasCompletas?: boolean;
+  preparar?: (cliente: ClientBase) => Promise<void>;
+  loteLegadoId?: string;
+  limiteOcorrencias?: number;
+  revalidarExistente?: boolean;
 };
 
 export class ErroImportacao extends Error {}
@@ -43,6 +49,7 @@ type Estado = {
   ocorrencias: OcorrenciaImportacao[];
   contagens: { inseridos: number; atualizados: number; inalterados: number; rejeitadosBanco: number };
   progresso: (avanco: number) => void;
+  preservarExistentes: boolean;
 };
 
 type Coluna = readonly [nome: string, tipo: string];
@@ -143,7 +150,7 @@ async function gravarDadosFuncionais(
   const idPorCpf = new Map<string, string>();
   const novasPessoas: unknown[][] = [];
   const novasOrigens: unknown[][] = [];
-  const verificar: Array<{ id: string; idOrigem: string; campos: CamposPessoa; hash: Buffer }> = [];
+  const verificar: Array<{ id: string; idOrigem: string; campos: CamposPessoa; hash: Buffer; linha: number }> = [];
   analise.pessoas.forEach((pessoa, indice) => {
     const idOrigem = hashes[indice].toString('hex');
     const hash = protetor.hashConteudo('importacao', 'pessoa', CAMPOS_PESSOA.map(({ campo }) => pessoa.campos[campo]));
@@ -164,11 +171,11 @@ async function gravarDadosFuncionais(
       return;
     }
     idPorCpf.set(pessoa.cpf, existente);
-    if (origens.has(idOrigem) && hashIgual(origens.get(idOrigem) ?? null, hash)) {
+    if (!estado.preservarExistentes && origens.has(idOrigem) && hashIgual(origens.get(idOrigem) ?? null, hash)) {
       estado.contagens.inalterados += 1;
       return;
     }
-    verificar.push({ id: existente, idOrigem, campos: pessoa.campos, hash });
+    verificar.push({ id: existente, idOrigem, campos: pessoa.campos, hash, linha: pessoa.linha });
   });
 
   await inserirEmBloco(estado, 'pessoa', [
@@ -182,7 +189,7 @@ async function gravarDadosFuncionais(
 
   for (const item of verificar) {
     const atual = (await cliente.query<Record<string, string | Buffer | null>>(
-      `SELECT ${CAMPOS_PESSOA.map(({ coluna, data }) => selecionarColuna(coluna, data)).join(', ')} FROM nucleo.pessoa WHERE id = $1`,
+      `SELECT ${CAMPOS_PESSOA.map(({ coluna, data }) => selecionarColuna(coluna, data)).join(', ')} FROM nucleo.pessoa WHERE id = $1 FOR UPDATE`,
       [item.id],
     )).rows[0];
     const alteracoes: Array<[string, unknown]> = [];
@@ -194,6 +201,12 @@ async function gravarDadosFuncionais(
         ? protetor.decifrar(bruto, { schema: 'nucleo', tabela: 'pessoa', registroId: item.id, campo: descritor.coluna }).toString('utf8')
         : bruto;
       if (valorAtual === novo) continue;
+      if (estado.preservarExistentes && valorAtual !== null && valorAtual !== '') {
+        estado.ocorrencias.push({ linha: item.linha, tipo: 'divergencia',
+          motivo: `Campo ${descritor.campo}: dado existente preservado; confira a origem e revise no cadastro local.`,
+          referencia: 'pessoa existente' });
+        continue;
+      }
       alteracoes.push([descritor.coluna, descritor.cifrado ? cifrar(novo, 'pessoa', item.id, descritor.coluna) : novo]);
       if (descritor.campo === 'nome') alteracoes.push(['nome_busca', normalizarNomeBusca(novo)]);
     }
@@ -232,7 +245,7 @@ async function gravarDadosFuncionais(
   for (let inicio = 0; inicio < matriculas.length; inicio += 5000) {
     const resultado = await cliente.query<VinculoBanco>(`
       SELECT id, pessoa_id, matricula_norm, hash_conteudo, ${CAMPOS_VINCULO.map(({ coluna, data }) => selecionarColuna(coluna, data)).join(', ')}
-      FROM nucleo.vinculo WHERE sistema_origem = $1 AND matricula_norm = ANY($2::text[])
+      FROM nucleo.vinculo WHERE sistema_origem = $1 AND matricula_norm = ANY($2::text[]) ORDER BY id FOR UPDATE
     `, [origem, matriculas.slice(inicio, inicio + 5000)]);
     for (const linha of resultado.rows) vinculosExistentes.set(linha.matricula_norm, linha);
   }
@@ -256,13 +269,20 @@ async function gravarDadosFuncionais(
         `matrícula ${mascararMatricula(c.matricula)} / CPF ${mascararCpf(vinculo.cpf)}`);
       continue;
     }
-    if (hashIgual(existente.hash_conteudo, hash)) {
+    if (!estado.preservarExistentes && hashIgual(existente.hash_conteudo, hash)) {
       estado.contagens.inalterados += 1;
       continue;
     }
     const alteracoes: Array<[string, unknown]> = [];
     for (const descritor of CAMPOS_VINCULO) {
       const novo = c[descritor.campo];
+      if (novo !== null && existente[descritor.coluna] !== novo && estado.preservarExistentes
+        && existente[descritor.coluna] !== null && existente[descritor.coluna] !== '') {
+        estado.ocorrencias.push({ linha: vinculo.linha, tipo: 'divergencia',
+          motivo: `Campo ${descritor.campo}: dado existente preservado; confira a origem e revise no cadastro local.`,
+          referencia: `matrícula ${mascararMatricula(c.matricula)}` });
+        continue;
+      }
       if (novo !== null && existente[descritor.coluna] !== novo) alteracoes.push([descritor.coluna, novo]);
     }
     if (alteracoes.length === 0) {
@@ -357,6 +377,12 @@ async function gravarDependentes(estado: Estado, definicao: Dependente, itens: I
       continue;
     }
     if (hashIgual(existente.hash_conteudo, hash)) {
+      estado.contagens.inalterados += 1;
+      continue;
+    }
+    if (estado.preservarExistentes) {
+      estado.ocorrencias.push({ linha: item.linha, tipo: 'divergencia', referencia: item.referencia,
+        motivo: 'Registro existente preservado; confira a origem e revise a referência antes de substituir.' });
       estado.contagens.inalterados += 1;
       continue;
     }
@@ -501,9 +527,20 @@ function montarContagens(resultado: ResultadoAnalise, ocorrencias: OcorrenciaImp
 
 function relatorio(
   resultado: ResultadoAnalise, opcoes: OpcoesImportacao, loteId: string | null, loteExistente: string | null,
-  ocorrencias: OcorrenciaImportacao[], banco: Estado['contagens'] | null, inicio: number,
+  ocorrencias: OcorrenciaImportacao[], banco: Estado['contagens'] | null, inicio: number, linhas: string[][],
 ): RelatorioImportacao {
-  const ordenadas = [...ocorrencias].sort((a, b) => a.linha - b.linha);
+  const cabecalho = linhas.find((linha) => linha.some((valor) => valor.trim()));
+  const mapeamento = cabecalho ? sugerirMapeamento(opcoes.tipo, cabecalho) : {};
+  const ordenadas = [...ocorrencias].sort((a, b) => a.linha - b.linha).map((item) => {
+    if (!opcoes.referenciasCompletas) return item;
+    const linha = linhas[item.linha - 1];
+    const campos = ['MATRICULA', 'NOME', 'CPF'].flatMap((campo) => {
+      const indice = mapeamento[campo];
+      return indice !== null && indice !== undefined && linha?.[indice] ? [`${campo}: ${linha[indice]}`] : [];
+    });
+    return campos.length ? { ...item, referencia: campos.join(' / ') } : item;
+  });
+  const limite = opcoes.limiteOcorrencias ?? LIMITE_OCORRENCIAS;
   return {
     loteId,
     tipo: opcoes.tipo,
@@ -511,8 +548,8 @@ function relatorio(
     modo: opcoes.gravar ? 'gravacao' : 'validacao',
     loteExistente,
     contagens: montarContagens(resultado, ocorrencias, banco),
-    ocorrencias: ordenadas.slice(0, LIMITE_OCORRENCIAS),
-    ocorrenciasOmitidas: Math.max(0, ordenadas.length - LIMITE_OCORRENCIAS),
+    ocorrencias: ordenadas.slice(0, limite),
+    ocorrenciasOmitidas: Math.max(0, ordenadas.length - limite),
     avisos: resultado.avisos,
     duracaoMs: Math.round(performance.now() - inicio),
   };
@@ -527,7 +564,7 @@ export async function importarLinhas(
   const total = Math.max(1, totalRegistros(resultado));
   let feitos = 0;
   const estado: Estado = {
-    cliente, protetor, loteId: randomUUID(), origem,
+    cliente, protetor, loteId: randomUUID(), origem, preservarExistentes: opcoes.preservarExistentes ?? false,
     ocorrencias: [...resultado.ocorrencias],
     contagens: { inseridos: 0, atualizados: 0, inalterados: 0, rejeitadosBanco: 0 },
     progresso: (avanco) => {
@@ -540,6 +577,7 @@ export async function importarLinhas(
   try {
     if (opcoes.antes) await opcoes.antes(cliente);
     await cliente.query('SELECT pg_advisory_xact_lock($1, $2)', [...CHAVE_BLOQUEIO_IMPORTACAO]);
+    if (opcoes.preparar) await opcoes.preparar(cliente);
     const usuario = await cliente.query("SELECT 1 FROM seguranca.usuario WHERE id = $1 AND ativo AND papel = 'admin'", [opcoes.usuarioId]);
     if (usuario.rowCount !== 1) throw new ErroImportacao('A importação exige um usuário administrador ativo.');
     const anterior = await cliente.query<{ id: string }>(`
@@ -547,11 +585,11 @@ export async function importarLinhas(
       WHERE tipo = $1 AND sistema_origem = $2 AND hash_arquivo = $3 AND status = 'concluido'
       ORDER BY iniciado_em DESC LIMIT 1
     `, [opcoes.tipo, origem, opcoes.hashArquivo]);
-    if (anterior.rows[0]) {
+    if (anterior.rows[0] && !(opcoes.revalidarExistente && !opcoes.gravar)) {
       await cliente.query('ROLLBACK');
       aberta = false;
       const banco = { inseridos: 0, atualizados: 0, inalterados: totalRegistros(resultado), rejeitadosBanco: 0 };
-      return relatorio(resultado, opcoes, null, anterior.rows[0].id, resultado.ocorrencias, banco, inicio);
+      return relatorio(resultado, opcoes, null, anterior.rows[0].id, resultado.ocorrencias, banco, inicio, linhas);
     }
     await cliente.query(`
       INSERT INTO nucleo.importacao_lote (id, origem, hash_arquivo, usuario_id, status, tipo, sistema_origem, canal)
@@ -564,7 +602,7 @@ export async function importarLinhas(
     else if (analise.tipo === 'periodos_ipam') await gravarPeriodosIpam(estado, analise.registros);
     else await gravarEventos(estado, analise.registros);
     opcoes.progresso?.(total, total);
-    const final = relatorio(resultado, opcoes, opcoes.gravar ? estado.loteId : null, null, estado.ocorrencias, estado.contagens, inicio);
+    const final = relatorio(resultado, opcoes, opcoes.gravar ? estado.loteId : null, anterior.rows[0]?.id ?? null, estado.ocorrencias, estado.contagens, inicio, linhas);
     if (!opcoes.gravar) {
       await cliente.query('ROLLBACK');
       aberta = false;
@@ -578,6 +616,7 @@ export async function importarLinhas(
       VALUES ($1, 'importacao_concluida', 'importacao_lote', $2, $3, $4::jsonb)
     `, [opcoes.usuarioId, estado.loteId, opcoes.ip ?? null, JSON.stringify({
       tipo: opcoes.tipo, origem, canal: opcoes.canal, contagens: final.contagens,
+      ...(opcoes.loteLegadoId ? { loteLegadoId: opcoes.loteLegadoId, politica: 'preencher_vazios' } : {}),
     })]);
     await cliente.query('COMMIT');
     aberta = false;

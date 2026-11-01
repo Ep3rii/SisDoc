@@ -92,6 +92,30 @@ automaticamente), cargos ou dados INSS, processo, prévia em iframe,
 conferência, devolução e emissão (coordenador) com painel de PDF. O
 histórico exibe o tipo e copia DTCs pela rota própria.
 
+O editor permite PB/PV/licença-prêmio anuais e preserva todos os lançamentos
+ao editar datas, regenerar anos e salvar. O cálculo soma essas incorporações
+ao tempo de contribuição, sem alterar o efetivo exercício, com aviso
+`incorporacao_dtc_provisoria`; as linhas continuam marcadas como provisórias.
+Conteúdo, demonstrativo e totais são preservados no snapshot cifrado.
+
+A prova específica DTC inclui revisões pessoa/vínculo e todos os períodos
+IPAM (inclusive removidos, versão MVCC e metadados), sem truncar a fonte
+para assinar. Mais de 50 períodos ativos tornam a fonte inválida, em vez de
+imprimir uma seleção silenciosa. A prova da revisão conferida fica cifrada
+em `ajuste_campo`, no campo `dtc.provaFonte.<revisao>`, evento imutável
+gravado na mesma transação da conferência. A migração
+`021-revisao-periodos-ipam` instala `documentos.bloquear_periodos_ipam()`,
+SECURITY DEFINER com `search_path = pg_catalog`, objetos qualificados,
+REVOKE PUBLIC e EXECUTE somente para o aplicativo. Não amplia UPDATE.
+Setup aplica 021 e a API exige esse gate antes de iniciar.
+Prévia/conferência/emissão mantêm o bloqueio compartilhado pessoa/vínculo
+e `LOCK TABLE nucleo.periodo_ipam IN SHARE MODE NOWAIT` até o commit,
+protegendo também inserções, remoções, exclusões lógicas e truncamentos
+concorrentes. Fonte ocupada retorna conflito sem esperar a importação.
+Fonte diferente após conferência bloqueia emissão mesmo com prévia nova;
+conferências antigas sem prova completa exigem devolução e reconferência.
+O administrador continua proibido de criar/copiar, mas opera existentes.
+
 ## Itens provisórios e pendências
 
 1. **Template INSS integralmente provisório**: títulos, cabeçalho, ordem dos
@@ -101,13 +125,13 @@ histórico exibe o tipo e copia DTCs pela rota própria.
 2. **Totais do Comissionado e do INSS inferidos**: as seis linhas seguem a
    estrutura do IPAM e saem marcadas com `*`.
 3. **Linhas de PB, PV, PB/PV e licença-prêmio** sempre provisórias nas DTCs
-   (não há regra aprovada; os valores vêm de lançamentos anuais, hoje zero).
+   (não há regra aprovada; os valores vêm de lançamentos anuais documentados).
 4. **Numeração das DTCs** sem sufixo e independente por tipo; confirmar o
    formato oficial.
 5. **Cargo/função por período na DTC INSS** é campo da declaração (não lido
    da fonte).
-6. Os períodos IPAM impressos vêm de `nucleo.periodo_ipam` e não entram na
-   prova de fonte da conferência.
+6. Os períodos IPAM impressos vêm de `nucleo.periodo_ipam` e entram na
+   prova de fonte específica da conferência e emissão.
 7. Nenhuma aprovação de DTC foi registrada na instalação local; as emissões
    ficam bloqueadas até a validação formal de cada tipo.
 

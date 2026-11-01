@@ -6,7 +6,6 @@ import {
   ROTULOS_CATEGORIA_INSS,
   ROTULOS_DTC,
   validarConteudoDtc,
-  type AnoCalculo,
   type CargoComissionado,
   type CategoriaFuncionalInss,
   type ConteudoDtc,
@@ -24,6 +23,7 @@ import { renderizarPreviaDtc } from '@sisdoc/templates';
 import { api, ErroApi } from './api';
 import { PainelEmissao } from './emissao';
 import { ExclusaoDocumento } from './exclusao-documento';
+import { anosDoPeriodo } from './anos-dtc';
 
 type Papel = RespostaSessao['usuario']['papel'];
 type Servidor = { pessoaId: string; vinculoId: string; nome: string; matricula: string };
@@ -50,32 +50,6 @@ const DESCRICOES: Record<TipoDtc, string> = {
 
 function diasNoAno(ano: number): number {
   return (ano % 4 === 0 && ano % 100 !== 0) || ano % 400 === 0 ? 366 : 365;
-}
-
-/** Gera uma linha por ano coberto; anos parciais usam 'intervalo_declarado' e preservam valores já digitados. */
-export function anosDoPeriodo(inicio: string, fim: string, existentes: AnoCalculo[]): AnoCalculo[] {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fim) || fim < inicio) return existentes;
-  const primeiro = Number(inicio.slice(0, 4));
-  const ultimo = Number(fim.slice(0, 4));
-  if (ultimo - primeiro > 199) return existentes;
-  const linhas: AnoCalculo[] = [];
-  for (let ano = primeiro; ano <= ultimo; ano += 1) {
-    const anterior = existentes.find((linha) => linha.ano === ano);
-    const completo = (ano > primeiro || inicio.endsWith('-01-01')) && (ano < ultimo || fim.endsWith('-12-31'));
-    linhas.push({
-      ano,
-      abrangencia: completo ? 'ano_civil' : 'intervalo_declarado',
-      faltas: anterior?.faltas ?? 0,
-      ts: anterior?.ts ?? 0,
-      pf: anterior?.pf ?? 0,
-      ip: anterior?.ip ?? 0,
-      outros: anterior?.outros ?? 0,
-      pb: 0,
-      pv: 0,
-      licencaPremio: 0,
-    });
-  }
-  return linhas;
 }
 
 function periodoVazio(tipo: TipoDtc): PeriodoDtc {
@@ -141,12 +115,13 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
     const periodos = conteudo.periodos.map((periodo, posicao) => {
       if (posicao !== indice) return periodo;
       const atualizado = { ...periodo, ...mudanca };
-      return { ...atualizado, anos: anosDoPeriodo(atualizado.inicio, atualizado.fim, periodo.anos) };
+      return { ...atualizado, anos: anosDoPeriodo(atualizado.inicio, atualizado.fim, atualizado.anos) };
     });
     alterar({ ...conteudo, periodos });
   }
-  function alterarAno(indice: number, ano: number, campo: 'faltas' | 'ts' | 'pf' | 'ip' | 'outros', valor: string) {
-    const numero = Math.max(0, Math.min(366, Number.parseInt(valor, 10) || 0));
+  function alterarAno(indice: number, ano: number, campo: 'faltas' | 'ts' | 'pf' | 'ip' | 'outros' | 'pb' | 'pv' | 'licencaPremio', valor: string) {
+    const limite = ['pb', 'pv', 'licencaPremio'].includes(campo) ? Number.MAX_SAFE_INTEGER : 366;
+    const numero = Math.max(0, Math.min(limite, Number.parseInt(valor, 10) || 0));
     alterarPeriodo(indice, {
       anos: conteudo.periodos[indice].anos.map((linha) => linha.ano === ano ? { ...linha, [campo]: numero } : linha),
     });
@@ -203,17 +178,20 @@ function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar,
             {periodo.anos.length > 0 && <div className="tabela"><table>
               <caption className="sr-only">Ocorrências anuais do {indice + 1}º período</caption>
               <thead><tr><th scope="col">Ano</th><th scope="col">Faltas</th><th scope="col">TS</th><th scope="col">PF</th>
-                <th scope="col">IP</th><th scope="col">Outros</th></tr></thead>
+                <th scope="col">IP</th><th scope="col">Outros</th><th scope="col">PB *</th>
+                <th scope="col">PV *</th><th scope="col">Licença-prêmio *</th></tr></thead>
               <tbody>{periodo.anos.map((linha) => (
                 <tr key={linha.ano}><th scope="row">{linha.ano}{linha.abrangencia === 'intervalo_declarado' ? ' (parcial)' : ''}</th>
-                  {(['faltas', 'ts', 'pf', 'ip', 'outros'] as const).map((campo) => (
-                    <td key={campo}><label className="sr-only" htmlFor={`p${indice}-${linha.ano}-${campo}`}>{campo} em {linha.ano}</label>
-                      <input id={`p${indice}-${linha.ano}-${campo}`} className="dias-anuais" type="number" min={0} max={366}
+                  {(['faltas', 'ts', 'pf', 'ip', 'outros', 'pb', 'pv', 'licencaPremio'] as const).map((campo) => (
+                    <td key={campo}><label className="sr-only" htmlFor={`p${indice}-${linha.ano}-${campo}`}>
+                      {campo === 'licencaPremio' ? 'Licença-prêmio' : campo.toUpperCase()} em {linha.ano}</label>
+                      <input id={`p${indice}-${linha.ano}-${campo}`} className="dias-anuais" type="number" min={0}
+                        max={['pb', 'pv', 'licencaPremio'].includes(campo) ? Number.MAX_SAFE_INTEGER : 366}
                         value={linha[campo]} onChange={(evento) => alterarAno(indice, linha.ano, campo, evento.target.value)} /></td>
                   ))}
                 </tr>
               ))}</tbody>
-            </table></div>}
+            </table><p>* Incorporações provisórias; informe os dias anuais conforme documentação conferida.</p></div>}
             {conteudo.periodos.length > 1 && <button type="button" className="secundario"
               onClick={() => alterar({ ...conteudo, periodos: conteudo.periodos.filter((_, posicao) => posicao !== indice) })}>
               Remover {indice + 1}º período</button>}

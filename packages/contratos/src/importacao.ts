@@ -43,6 +43,32 @@ export const relatorioPlanilhaLegadoSchema = z.strictObject({
 export type RelatorioPlanilhaLegado = z.infer<typeof relatorioPlanilhaLegadoSchema>;
 export type LotePlanilhaLegado = z.infer<typeof lotePlanilhaLegadoSchema>;
 
+export const consultaPreviaLegadoSchema = z.strictObject({
+  loteId: z.uuid(),
+  tipo: tipoImportacaoSchema.default('dados_funcionais'),
+});
+export const previaLegadoSchema = z.strictObject({
+  loteId: z.uuid(),
+  origem: origemImportacaoSchema,
+  tipo: tipoImportacaoSchema,
+  cabecalhos: z.array(z.string()),
+  linhas: z.number().int().nonnegative(),
+  amostra: z.array(z.array(z.string())),
+  colunas: z.array(z.string()),
+  mapeamento: z.record(z.string(), z.number().int().min(0).max(255).nullable()),
+});
+export const promoverLegadoSchema = consultaPreviaLegadoSchema.extend({
+  mapeamento: z.record(z.string(), z.number().int().min(0).max(255).nullable()),
+  modo: z.enum(['validar', 'gravar']).default('validar'),
+  validacao: z.string().regex(/^[0-9a-f]{64}$/).optional(),
+}).superRefine((dados, contexto) => {
+  if (dados.modo === 'gravar' && !dados.validacao) {
+    contexto.addIssue({ code: 'custom', path: ['validacao'], message: 'Valide a conversão antes de aplicar.' });
+  }
+});
+export type PromoverLegado = z.infer<typeof promoverLegadoSchema>;
+export type PreviaLegado = z.infer<typeof previaLegadoSchema>;
+
 export const tipoOcorrenciaImportacaoSchema = z.enum(['rejeitada', 'quarentena', 'duplicada', 'divergencia', 'anomalia']);
 
 export const ocorrenciaImportacaoSchema = z.strictObject({
@@ -79,6 +105,13 @@ export const relatorioImportacaoSchema = z.strictObject({
   duracaoMs: z.number().int().min(0),
 });
 export type RelatorioImportacao = z.infer<typeof relatorioImportacaoSchema>;
+
+export const relatorioPromocaoLegadoSchema = z.strictObject({
+  loteLegadoId: z.uuid(),
+  validacao: z.string().regex(/^[0-9a-f]{64}$/),
+  relatorio: relatorioImportacaoSchema,
+});
+export type RelatorioPromocaoLegado = z.infer<typeof relatorioPromocaoLegadoSchema>;
 
 export const statusLoteImportacaoSchema = z.enum(['processando', 'concluido', 'falhou', 'desfeito']);
 

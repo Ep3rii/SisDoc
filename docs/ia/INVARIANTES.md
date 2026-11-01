@@ -28,6 +28,12 @@
   autoriza exclusão física controlada e edição do cadastro local; auditoria e
   numeração preservada continuam obrigatórias. Os demais perfis mantêm seus limites. Consultas e ações sensíveis são
   auditadas; a aplicação não altera ou apaga registros de auditoria.
+  Dados de trabalho são exibidos completos a todos os perfis autenticados,
+  sem alterar os limites de ações de cada perfil (decisão 028).
+- Conversão do Legado para o Núcleo exige mapeamento validado e confirmação;
+  dados existentes/edições manuais são preservados e vazios são completados.
+  Divergências são explícitas, sem sobrescrita silenciosa. A validação é
+  vinculada à sessão e estado da fonte; testes não aplicam planilhas reais.
 - Entrada é validada no servidor; HTML é escapado e prévia não executa scripts.
   Dados pessoais não são guardados em `localStorage` ou `sessionStorage`.
 - Banco e backend escutam apenas em loopback; acesso operacional é HTTPS

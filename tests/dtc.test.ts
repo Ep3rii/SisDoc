@@ -19,6 +19,7 @@ import {
   resultadoCopiaEmitidoSchema,
   resultadoTransicaoDtcSchema,
   situacaoEmissaoSchema,
+  snapshotEmissaoDtcSchema,
   type Configuracao,
   type SituacaoEmissao,
   type TipoDtc,
@@ -32,6 +33,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { criarAplicacao } from '../apps/api/dist/aplicacao.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { MENSAGEM_SEM_APROVACAO } from '../apps/api/dist/documentos/rascunhos.js';
+import { tentarBloqueioPeriodosDtc } from '../apps/api/dist/documentos/revisao-fonte-dtc.js';
 import { WorkerPdfEmissao } from '../apps/api/dist/documentos/worker-pdf-emissao.js';
 import { SEQUENCIA_MIGRACOES } from '../apps/api/dist/migracoes/sequencia.js';
 import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
@@ -160,7 +162,8 @@ function periodo(inicio: string, fim: string, tipo: TipoDtc, indice: number) {
     inicio, fim,
     anos: Array.from({ length: anoFim - anoInicio + 1 }, (_, posicao) => ({
       ano: anoInicio + posicao, abrangencia: 'intervalo_declarado',
-      faltas: posicao === 1 ? 3 : 0, ts: 0, pf: 0, ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
+      faltas: posicao === 1 ? 3 : 0, ts: 0, pf: 0, ip: 0, outros: 0,
+      pb: posicao === 0 ? 2 : 0, pv: posicao === 0 ? 3 : 0, licencaPremio: posicao === 0 ? 4 : 0,
     })),
     categoria: tipo === 'DTC_INSS' ? CATEGORIAS[indice % CATEGORIAS.length] : null,
     cargo: tipo === 'DTC_INSS' ? `Cargo fictício de período ${indice + 1} com denominação extensa para quebra de linha` : null,
@@ -548,6 +551,9 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
         'total_contribuicao', 'efetivo_exercicio', 'incorporacao_pb', 'incorporacao_pv', 'incorporacao_pb_pv', 'licenca_premio',
       ]);
       expect(criado.resultado.linhasTotais[0].dias).toBe(criado.resultado.totais.totalContribuicao);
+      expect(criado.resultado.totais).toMatchObject({ pb: 8, pv: 12, licencaPremio: 16 });
+      expect(criado.resultado.totais.totalContribuicao).toBe(criado.resultado.totais.contribuicaoMunicipio + 36);
+      expect(criado.resultado.avisos.some((aviso) => aviso.codigo === 'incorporacao_dtc_provisoria')).toBe(true);
       expect(criado.conteudo.cargos).toHaveLength(tipo === 'DTC_COMISSIONADO' ? 3 : 0);
       if (tipo !== 'DTC_IPAM') {
         expect(criado.resultado.avisos.some((aviso) => aviso.codigo === 'perfil_inferido')).toBe(true);
@@ -672,6 +678,15 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       expect(repetida.status, repetida.corpo).toBe(200);
       expect(situacaoEmissaoSchema.parse(JSON.parse(repetida.corpo)).emissaoId).toBe(emitida.emissaoId);
       expect(await auditorias('dtc_emitida', alvo.documentoId)).toBe(1);
+      const gravado = await banco().query<{ snapshot_cifrado: Buffer }>(
+        'SELECT snapshot_cifrado FROM documentos.emissao WHERE id = $1', [emitida.emissaoId],
+      );
+      const snapshot = snapshotEmissaoDtcSchema.parse(JSON.parse(protetor.decifrar(gravado.rows[0].snapshot_cifrado, {
+        schema: 'documentos', tabela: 'emissao', registroId: emitida.emissaoId, campo: 'snapshot_cifrado',
+      }).toString('utf8')));
+      expect(snapshot.conteudo).toEqual(dados.documento.conteudo);
+      expect(snapshot.resultado).toEqual(dados.documento.resultado);
+      expect(snapshot.resultado.totais).toMatchObject({ pb: 8, pv: 12, licencaPremio: 16 });
       emitidas.set(tipo, emitida);
     }
     const numeracao = await banco().query<{ tipo: string; ultimo_numero: string; sufixo: string }>(
@@ -885,11 +900,11 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       expect(await migrar(provisionamento)).toEqual({
         aplicadas: [
           '014-dtc', '015-importacao', '016-acesso-admin', '017-documentos-admin',
-          '018-edicao-cadastro', '019-planilhas-legado',
+          '018-edicao-cadastro', '019-planilhas-legado', '020-listagem-servidores', '021-revisao-periodos-ipam',
         ],
-        versaoAtual: '019-planilhas-legado',
+        versaoAtual: '021-revisao-periodos-ipam',
       });
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '019-planilhas-legado' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '021-revisao-periodos-ipam' });
       const privilegios = await anterior.query<{ conferencia: boolean; tabela: boolean; categoria: boolean; apagar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'conferido_por', 'INSERT') AS conferencia,
           has_table_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'INSERT') AS tabela,
@@ -958,6 +973,167 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       });
       expect(cancelada.status, cancelada.corpo).toBe(200);
       expect(await auditorias('dtc_emitida', criado.id)).toBe(1);
+    }
+  });
+
+  it.each(['insercao', 'alteracao', 'remocao', 'exclusao_logica'] as const)(
+    '%s de período IPAM invalida prova antiga e emissão mesmo com prévia nova',
+    async (mudanca) => {
+      const criado = await criarDtc('DTC_IPAM', `Pessoa revisão IPAM ${mudanca} fictícia`, 1);
+      const periodoId = randomUUID();
+      await banco().query(`
+        INSERT INTO nucleo.periodo_ipam (id, pessoa_id, mes_inicio, mes_fim, fonte)
+        VALUES ($1, $2, '1980-01-01', '1984-12-01', 'Fonte fictícia')
+      `, [periodoId, criado.pessoaId]);
+      const antiga = await previa(criado.id);
+      expect(antiga.fonte.periodosIpam).toEqual([{ inicio: '1980-01-01', fim: '1984-12-01' }]);
+      if (mudanca === 'insercao') {
+        await banco().query(`
+          INSERT INTO nucleo.periodo_ipam (pessoa_id, mes_inicio, mes_fim, fonte)
+          VALUES ($1, '1986-01-01', '1990-12-01', 'Fonte fictícia')
+        `, [criado.pessoaId]);
+      } else if (mudanca === 'alteracao') {
+        await banco().query("UPDATE nucleo.periodo_ipam SET mes_fim = '1983-12-01' WHERE id = $1", [periodoId]);
+      } else if (mudanca === 'remocao') {
+        await banco().query('DELETE FROM nucleo.periodo_ipam WHERE id = $1', [periodoId]);
+      } else {
+        await banco().query('UPDATE nucleo.periodo_ipam SET removido_na_fonte_em = now() WHERE id = $1', [periodoId]);
+      }
+      const atual = await previa(criado.id);
+      expect(atual.fonte.provaFonte).not.toBe(antiga.fonte.provaFonte);
+      const conflito = await requisitar({
+        metodo: 'POST', rota: `dtc/${criado.id}/conferir`, sessao: sessao('coordenador'),
+        corpo: { revisao: antiga.documento.revisao, provaFonte: antiga.fonte.provaFonte, confirmar: true },
+      });
+      expect(conflito.status, conflito.corpo).toBe(409);
+      expect(await auditorias('conferencia_dtc_fonte_alterada', criado.id)).toBe(1);
+      await conferir(criado.id);
+      const conferida = await previa(criado.id);
+      expect(conferida.fonteSelecionadaAlterada).toBe(false);
+      await banco().query(`
+        INSERT INTO nucleo.periodo_ipam (pessoa_id, mes_inicio, mes_fim, fonte)
+        VALUES ($1, '1992-01-01', '1996-12-01', 'Nova fonte fictícia')
+      `, [criado.pessoaId]);
+      const renovada = await previa(criado.id);
+      expect(renovada.fonteSelecionadaAlterada).toBe(true);
+      for (const provaFonte of [conferida.fonte.provaFonte, renovada.fonte.provaFonte]) {
+        const emissao = await requisitar({
+          metodo: 'POST', rota: `dtc/${criado.id}/emitir`, sessao: sessao('admin'), chave: randomUUID(),
+          corpo: { revisao: renovada.documento.revisao, provaFonte },
+        });
+        expect(emissao.status, emissao.corpo).toBe(409);
+      }
+      expect((await banco().query('SELECT count(*)::int AS total FROM documentos.emissao WHERE documento_id = $1',
+        [criado.id])).rows[0].total).toBe(0);
+      const devolvida = await requisitar({
+        metodo: 'POST', rota: `dtc/${criado.id}/devolver`, sessao: sessao('admin'),
+        corpo: { revisao: renovada.documento.revisao, motivo: 'Reconferência dos períodos IPAM fictícios' },
+      });
+      expect(devolvida.status, devolvida.corpo).toBe(200);
+      await conferir(criado.id, 'admin');
+      expect((await previa(criado.id, 'admin')).fonteSelecionadaAlterada).toBe(false);
+      const emitida = await emitirDtc(criado.id, 'admin');
+      expect(emitida.status, emitida.corpo).toBe(200);
+      const resultado = situacaoEmissaoSchema.parse(JSON.parse(emitida.corpo));
+      const gravado = await banco().query('SELECT snapshot_cifrado FROM documentos.emissao WHERE id = $1', [resultado.emissaoId]);
+      const snapshot = snapshotEmissaoDtcSchema.parse(JSON.parse(protetor.decifrar(gravado.rows[0].snapshot_cifrado, {
+        schema: 'documentos', tabela: 'emissao', registroId: resultado.emissaoId, campo: 'snapshot_cifrado',
+      }).toString('utf8')));
+      expect(snapshot.fonte.periodosIpam).toEqual(renovada.fonte.periodosIpam);
+    },
+  );
+
+  it.each(['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'] as const)(
+    'retorna conflito na conferência e emissão durante %s concorrente de períodos IPAM',
+    async (operacao) => {
+      const rascunho = await criarDtc('DTC_IPAM', `Pessoa concorrência ${operacao} fictícia`, 1);
+      const alvo = await criarDtc('DTC_IPAM', `Pessoa emissão concorrência ${operacao} fictícia`, 1);
+      await banco().query(`
+        INSERT INTO nucleo.periodo_ipam (pessoa_id, mes_inicio, mes_fim, fonte)
+        VALUES ($1, '1980-01-01', '1984-12-01', 'Fonte fictícia')
+      `, [rascunho.pessoaId]);
+      const antiga = await previa(rascunho.id);
+      await conferir(alvo.id);
+      const conferida = await previa(alvo.id);
+      const escritor = new Client({
+        host: '127.0.0.1', port: portaBanco, database: 'sisdoc_dtc', user: 'sisdoc_migrador', password: senhaMigrador,
+      });
+      await escritor.connect();
+      try {
+        await escritor.query('BEGIN');
+        if (operacao === 'INSERT') {
+          await escritor.query(`
+            INSERT INTO nucleo.periodo_ipam (pessoa_id, mes_inicio, mes_fim, fonte)
+            VALUES ($1, '1986-01-01', '1990-12-01', 'Fonte fictícia')
+          `, [rascunho.pessoaId]);
+        } else if (operacao === 'UPDATE') {
+          await escritor.query("UPDATE nucleo.periodo_ipam SET mes_fim = '1983-12-01' WHERE pessoa_id = $1", [rascunho.pessoaId]);
+        } else if (operacao === 'DELETE') {
+          await escritor.query('DELETE FROM nucleo.periodo_ipam WHERE pessoa_id = $1', [rascunho.pessoaId]);
+        } else {
+          await escritor.query('TRUNCATE nucleo.periodo_ipam');
+        }
+        const conflito = await requisitar({
+          metodo: 'POST', rota: `dtc/${rascunho.id}/conferir`, sessao: sessao('coordenador'),
+          corpo: { revisao: antiga.documento.revisao, provaFonte: antiga.fonte.provaFonte, confirmar: true },
+        });
+        expect(conflito.status, conflito.corpo).toBe(409);
+        const emissao = await requisitar({
+          metodo: 'POST', rota: `dtc/${alvo.id}/emitir`, sessao: sessao('admin'), chave: randomUUID(),
+          corpo: { revisao: conferida.documento.revisao, provaFonte: conferida.fonte.provaFonte },
+        });
+        expect(emissao.status, emissao.corpo).toBe(409);
+      } finally {
+        await escritor.query('ROLLBACK');
+        await escritor.end();
+      }
+      await conferir(rascunho.id);
+      expect((await previa(alvo.id)).fonteSelecionadaAlterada).toBe(false);
+    },
+  );
+
+  it('mantém bloqueio dos períodos até o commit com privilégios reais da aplicação', async () => {
+    if (!poolAplicativo) throw new Error('Conexão da aplicação indisponível.');
+    const protecao = await banco().query<{
+      definidor: boolean; configuracao: string[]; retorno: string; publico: boolean; aplicativo: boolean; update_amplo: boolean;
+    }>(`
+      SELECT p.prosecdef AS definidor, p.proconfig AS configuracao, p.prorettype::regtype::text AS retorno,
+        EXISTS (SELECT 1 FROM aclexplode(p.proacl) a WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS publico,
+        has_function_privilege($1, p.oid, 'EXECUTE') AS aplicativo,
+        has_table_privilege($1, 'nucleo.periodo_ipam', 'UPDATE') AS update_amplo
+      FROM pg_proc p WHERE p.oid = 'documentos.bloquear_periodos_ipam()'::regprocedure
+    `, [config.banco.usuario]);
+    expect(protecao.rows[0]).toEqual({
+      definidor: true, configuracao: ['search_path=pg_catalog'], retorno: 'void',
+      publico: false, aplicativo: true, update_amplo: false,
+    });
+    const leitor = await poolAplicativo.connect();
+    const escritor = new Client({
+      host: '127.0.0.1', port: portaBanco, database: 'sisdoc_dtc', user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await escritor.connect();
+    let alteracao: Promise<unknown> | undefined;
+    try {
+      await leitor.query('BEGIN');
+      expect(await tentarBloqueioPeriodosDtc(leitor)).toBe(true);
+      const pid = (await escritor.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+      alteracao = escritor.query("UPDATE nucleo.periodo_ipam SET fonte = fonte WHERE false");
+      let aguardando = false;
+      for (let tentativa = 0; tentativa < 100; tentativa += 1) {
+        aguardando = (await banco().query<{ esperando: boolean }>(
+          "SELECT wait_event_type = 'Lock' AS esperando FROM pg_stat_activity WHERE pid = $1", [pid],
+        )).rows[0].esperando;
+        if (aguardando) break;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(aguardando).toBe(true);
+      await leitor.query('COMMIT');
+      await alteracao;
+    } finally {
+      await leitor.query('ROLLBACK');
+      if (alteracao) await alteracao;
+      leitor.release();
+      await escritor.end();
     }
   });
 });

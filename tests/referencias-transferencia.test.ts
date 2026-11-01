@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, beforeAll, expect, it } from 'vitest';
+import { cpfSintetico } from './dados-sinteticos.js';
 
 let browser: Browser;
 let servidor: http.Server;
@@ -47,9 +48,10 @@ async function simular(page: Page, papel: 'admin' | 'analista') {
     else if (endpoint === 'admin/sincronizacoes') dados = { situacao, falhasConsecutivas: 0, disjuntorAbertoAte: null, itens: [], proximoCursor: null };
     else if (endpoint === 'admin/importacoes') dados = { itens: [], proximoCursor: null };
     else if (endpoint === 'admin/importacoes/conferencia') dados = { origens: [], totais: { pessoas: 0, vinculos: 0 } };
-    else if (endpoint === 'servidores') dados = { itens: [{ pessoaId, vinculoId, nome: 'Pessoa fictícia', matricula: 'F-1',
+    else if (endpoint === 'admin/importacoes/legado') dados = [];
+    else if (endpoint === 'servidores') dados = { itens: [{ pessoaId, vinculoId, nome: 'Pessoa fictícia', cpf: cpfSintetico(), matricula: 'F-1',
       orgao: 'Setor fictício', sistemaOrigem: 'planilha', removidoNaFonte: false }], proximoCursor: null };
-    else if (endpoint === `servidores/${pessoaId}`) dados = { pessoa: { id: pessoaId, nome: 'Pessoa fictícia', cpfMascarado: '***.***.123-**' },
+    else if (endpoint === `servidores/${pessoaId}`) dados = { pessoa: { id: pessoaId, nome: 'Pessoa fictícia', cpf: cpfSintetico() },
       vinculos: [{ id: vinculoId, matricula: 'F-1', sistemaOrigem: 'planilha', matriculaAnteriorId: null, regimeJuridico: 'ESTATUTARIO',
         cargo: 'Cargo fictício', classe: null, nivel: null, referencia: 'A-1', setor: null, orgao: null, admissao: '2000-01-01',
         desligamento: null, removidoNaFonte: false }], proximoCursor: null };
@@ -70,6 +72,65 @@ async function simular(page: Page, papel: 'admin' | 'analista') {
     await rota.fulfill({ contentType: 'application/json', body: JSON.stringify(dados) });
   });
 }
+
+it('confere prévia completa, invalida mapeamento alterado e confirma conversão do legado', async () => {
+  const page = await browser.newPage({ acceptDownloads: true });
+  const loteId = randomUUID();
+  const mapeamento = { MATRICULA: 0, NOME: 1, CPF: 2 };
+  const modos: string[] = [];
+  try {
+    await simular(page, 'admin');
+    await page.route('**/api/v1/admin/importacoes/legado', (rota) => rota.fulfill({
+      contentType: 'application/json', body: JSON.stringify([{
+        id: loteId, origem: 'legado-ficticio', cabecalhos: ['MATRICULA', 'NOME', 'CPF', 'FONTE'],
+        linhas: 1, importadoEm: new Date().toISOString(),
+      }]),
+    }));
+    await page.route('**/api/v1/admin/importacoes/legado/previa', (rota) => rota.fulfill({
+      contentType: 'application/json', body: JSON.stringify({
+        loteId, origem: 'legado-ficticio', tipo: 'dados_funcionais',
+        cabecalhos: ['MATRICULA', 'NOME', 'CPF', 'FONTE'], linhas: 1,
+        amostra: [['00002', 'PESSOA FICTICIA', '52998224725', 'metadado ficticio']],
+        colunas: ['MATRICULA', 'NOME', 'CPF'], mapeamento,
+      }),
+    }));
+    await page.route('**/api/v1/admin/importacoes/legado/promover', async (rota) => {
+      const dados = rota.request().postDataJSON();
+      modos.push(dados.modo);
+      expect(dados.mapeamento).toEqual(mapeamento);
+      if (dados.modo === 'gravar') expect(dados.validacao).toBe('1'.repeat(64));
+      await rota.fulfill({ contentType: 'application/json', body: JSON.stringify({
+        loteLegadoId: loteId, validacao: '1'.repeat(64),
+        relatorio: {
+          loteId: dados.modo === 'gravar' ? randomUUID() : null, loteExistente: null,
+          tipo: 'dados_funcionais', origem: 'legado-ficticio', modo: dados.modo === 'gravar' ? 'gravacao' : 'validacao',
+          contagens: { lidos: 1, validos: 1, rejeitados: 0, duplicados: 0, quarentena: 0, anomalias: 0, inseridos: 2, atualizados: 0, inalterados: 0 },
+          ocorrencias: [], ocorrenciasOmitidas: 0, avisos: [], duracaoMs: 1,
+        },
+      }) });
+    });
+    await page.goto(origem);
+    await page.getByRole('button', { name: /^Importação/ }).click();
+    await page.getByLabel('Lote para disponibilizar').selectOption(loteId);
+    await page.getByRole('heading', { name: /Prévia completa/ }).waitFor();
+    expect(await page.getByRole('cell', { name: '52998224725', exact: true }).count()).toBe(1);
+    expect(await page.getByRole('button', { name: 'Aplicar no Núcleo', exact: true }).isDisabled()).toBe(true);
+    await page.getByRole('button', { name: 'Validar conversão', exact: true }).click();
+    await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Aplicar no Núcleo')?.disabled);
+    await page.getByRole('combobox', { name: 'Coluna de origem para CPF', exact: true }).selectOption('');
+    expect(await page.getByRole('button', { name: 'Aplicar no Núcleo', exact: true }).isDisabled()).toBe(true);
+    await page.getByRole('combobox', { name: 'Coluna de origem para CPF', exact: true }).selectOption('2');
+    await page.getByRole('button', { name: 'Validar conversão', exact: true }).click();
+    await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Aplicar no Núcleo')?.disabled);
+    page.once('dialog', (dialog) => void dialog.dismiss());
+    await page.getByRole('button', { name: 'Aplicar no Núcleo', exact: true }).click();
+    expect(modos).toEqual(['validar', 'validar']);
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.getByRole('button', { name: 'Aplicar no Núcleo', exact: true }).click();
+    await page.getByText('Conversão aplicada. Consulte os servidores por matrícula', { exact: false }).waitFor();
+    expect(modos).toEqual(['validar', 'validar', 'gravar']);
+  } finally { await page.close(); }
+});
 
 it('separa sincronização de importação/exportação e baixa dados mediante confirmação', async () => {
   const page = await browser.newPage({ acceptDownloads: true });
@@ -153,5 +214,41 @@ it('permite ao Cadastro consultar os dados completos e alternar as referências'
     await page.getByLabel('Referências').selectOption('incorporacoes');
     await page.getByText('incorporacoes', { exact: true }).waitFor();
     expect(await page.getByRole('button', { name: /^Sincronização/ }).count()).toBe(0);
+  } finally { await page.close(); }
+});
+
+it('lista vínculos previamente e solicita páginas de 50 sem ordenar somente na interface', async () => {
+  const page = await browser.newPage();
+  const itens = Array.from({ length: 52 }, (_, indice) => ({
+    pessoaId, vinculoId: randomUUID(), nome: `Pessoa fictícia ${indice}`, cpf: cpfSintetico(indice + 910),
+    matricula: indice === 2 ? '002' : String(indice), orgao: null, sistemaOrigem: 'fixture',
+    removidoNaFonte: false,
+  }));
+  try {
+    await simular(page, 'analista');
+    await page.route('**/api/v1/servidores?**', async (rota) => {
+      const query = new URL(rota.request().url()).searchParams;
+      expect(query.get('limite')).toBe('50');
+      expect(query.has('q')).toBe(false);
+      expect(query.has('tipo')).toBe(false);
+      const segunda = query.has('cursor');
+      if (segunda) expect(query.get('cursor')).toBe(itens[49].vinculoId);
+      await rota.fulfill({ contentType: 'application/json', body: JSON.stringify({
+        itens: segunda ? itens.slice(50) : itens.slice(0, 50),
+        proximoCursor: segunda ? null : itens[49].vinculoId,
+      }) });
+    });
+    await page.goto(origem);
+    await page.getByRole('button', { name: /^Ver vínculos/ }).first().waitFor();
+    expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(50);
+    expect(await page.locator('tbody tr').nth(2).locator('td').nth(2).innerText()).toBe('002');
+    expect(await page.locator('tbody tr').first().locator('td').nth(1).innerText()).toBe(itens[0].cpf);
+    await page.getByRole('button', { name: 'Próxima página de resultados' }).click();
+    await page.getByText('Pessoa fictícia 50', { exact: true }).waitFor();
+    expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(2);
+    expect(await page.getByRole('button', { name: 'Próxima página de resultados' }).isDisabled()).toBe(true);
+    await page.getByRole('button', { name: 'Primeira página de resultados' }).click();
+    await page.getByText('Pessoa fictícia 0', { exact: true }).waitFor();
+    expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(50);
   } finally { await page.close(); }
 });

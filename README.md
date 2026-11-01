@@ -11,6 +11,12 @@ schema Núcleo/Legado; Sincronização é separada. O cadastro é editado no
 núcleo local com auditoria
 ([decisão 027](docs/decisoes/027-administracao-documentos-cadastro-legado.md)).
 
+O assistente de Legado permite conferir colunas/valores, validar a conversão e
+aplicar dados aceitos ao Núcleo para DOF/DTC, preservando valores existentes e
+edições manuais. Dados de trabalho são exibidos completos a todos os perfis
+autenticados; permissões de alteração/exportação permanecem separadas.
+Veja [decisão 028](docs/decisoes/028-legado-operacional-e-conferencia.md).
+
 **Autorizado para uso operacional local em 31/10/2026** ([decisão 021](docs/decisoes/021-autorizacao-operacional.md)),
 nas funções existentes: consulta de servidores, cálculo, rascunhos, prévia e
 conferência da DOF. A emissão da DOF e das DTCs IPAM, Comissionado e INSS
@@ -30,6 +36,8 @@ automático da aplicação ainda não estão implementados.
 - Administrador inicial com troca obrigatória de senha; dados reais ainda
   não importados (use `npm run importacao` ou a tela **Importação**).
 - Autenticação, usuários, auditoria, busca e fluxo provisório de rascunhos DOF.
+- Lista inicial de servidores por matrícula em ordem natural crescente,
+  50 vínculos por página, com CPF completo e busca por nome/CPF/matrícula.
 - Layout inspirado no [protótipo](Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg):
   menu lateral, busca global, abas, editor com prévia à direita e totais fixos.
 - Emissão da DOF e das DTCs aprovada formalmente por tipo (o INSS com

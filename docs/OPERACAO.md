@@ -206,6 +206,32 @@ afastamentos, incorporações e períodos IPAM, pela tela **Importação** ou po
 Repetir o mesmo arquivo não altera nada. Documentos emitidos mantêm seu
 snapshot e não mudam com novas importações.
 
+### Disponibilizar planilhas do Legado
+
+Após guardar o arquivo no schema Legado, use **Disponibilizar Legado para DOF
+e DTC** na mesma tela. Selecione lote e conteúdo, confira os valores completos
+da prévia e o mapeamento, clique **Validar conversão** e revise o relatório.
+Baixe todas as ocorrências em XLSX para conferir lotes maiores. Somente depois
+da autorização da carga real use **Aplicar no Núcleo** e confirme.
+
+Valores cadastrais existentes, inclusive edições manuais, não são sobrescritos.
+Campos vazios podem ser completados; divergências exigem revisão no cadastro
+local com motivo. A assinatura de validação é invalidada por alterações de
+dados, mapeamento ou sessão. Os dados aceitos entram na busca e no preenchimento
+das declarações; a planilha original permanece no Legado. As 18 colunas
+cadastrais não fornecem automaticamente frequência ou períodos contributivos.
+Veja [decisão 028](decisoes/028-legado-operacional-e-conferencia.md).
+
+### Revisão de períodos e incorporações na DTC
+
+O editor DTC permite informar incorporações PB/PV/licença-prêmio por ano.
+Períodos IPAM fazem parte da prova de revisão, incluindo alterações,
+inserções e exclusões; mudanças exigem nova conferência antes da emissão.
+A migração `021-revisao-periodos-ipam` habilita o lock restrito necessário,
+sem conceder UPDATE amplo à aplicação. Após atualizar, reconfira DTCs
+conferidas com a prova antiga antes de emitir; emissões existentes não mudam.
+O modelo INSS permanece explicitamente provisório.
+
 ## Administrador: documentos e cadastro
 
 O administrador não cria DOF/DTC nem cópias. Pode visualizar, editar,

@@ -11,6 +11,7 @@ import {
   detalheServidorSchema,
   eventosServidorQuerySchema,
   incorporacaoSchema,
+  paginaBuscaServidoresSchema,
   atualizarRascunhoDofSchema,
   solicitarCalculoDofSchema,
 } from '../packages/contratos/dist/index.js';
@@ -42,7 +43,8 @@ describe('contratos de domínio', () => {
   it('valida consultas e paginação de servidores sem aceitar parâmetros ambíguos', () => {
     const cpf = cpfSintetico();
     expect(buscarServidoresQuerySchema.parse({ q: '  Árvore  ', tipo: 'nome' }))
-      .toEqual({ q: 'Árvore', tipo: 'nome', limite: 25 });
+      .toEqual({ q: 'Árvore', tipo: 'nome', limite: 50 });
+    expect(buscarServidoresQuerySchema.parse({})).toEqual({ limite: 50 });
     expect(buscarServidoresQuerySchema.parse({ q: cpf, tipo: 'cpf', limite: '50' }).limite).toBe(50);
     expect(buscarServidoresQuerySchema.safeParse({ q: '1.000001-2', tipo: 'matricula' }).success).toBe(true);
     for (const entrada of [
@@ -50,7 +52,7 @@ describe('contratos de domínio', () => {
       { q: '00000000000', tipo: 'cpf' }, { q: 'x'.repeat(101), tipo: 'matricula' },
       { q: 'nome', tipo: 'nome', limite: '0' }, { q: 'nome', tipo: 'nome', limite: '51' },
       { q: 'nome', tipo: 'nome', cursor: 'inválido' }, { q: 'nome', tipo: 'outro' },
-      { q: 'nome', tipo: 'nome', campoExtra: true },
+      { q: 'nome', tipo: 'nome', campoExtra: true }, { tipo: 'nome' }, { q: '' },
     ]) {
       expect(buscarServidoresQuerySchema.safeParse(entrada).success).toBe(false);
     }
@@ -58,15 +60,23 @@ describe('contratos de domínio', () => {
     expect(eventosServidorQuerySchema.safeParse({ vinculoId: 'inválido' }).success).toBe(false);
   });
 
-  it('exige CPF mascarado na resposta de detalhes', () => {
-    const pessoa = { id: randomUUID(), nome: 'Pessoa fictícia', cpfMascarado: '***.***.123-**' };
+  it('exige CPF completo válido na resposta de detalhes', () => {
+    const pessoa = { id: randomUUID(), nome: 'Pessoa fictícia', cpf: cpfSintetico() };
     const detalhe = { pessoa, vinculos: [], proximoCursor: null };
     expect(detalheServidorSchema.safeParse(detalhe).success).toBe(true);
     expect(detalheServidorSchema.safeParse({
-      ...detalhe, pessoa: { ...pessoa, cpfMascarado: cpfSintetico() },
+      ...detalhe, pessoa: { ...pessoa, cpf: '***.***.123-**' },
     }).success).toBe(false);
     expect(detalheServidorSchema.safeParse({
-      ...detalhe, pessoa: { ...pessoa, cpfMascarado: '***.***.12-**' },
+      ...detalhe, pessoa: { ...pessoa, cpf: '00000000000' },
+    }).success).toBe(false);
+    const item = {
+      pessoaId: pessoa.id, vinculoId: randomUUID(), nome: pessoa.nome, cpf: pessoa.cpf,
+      matricula: '0002', orgao: null, sistemaOrigem: 'sintetica', removidoNaFonte: false,
+    };
+    expect(paginaBuscaServidoresSchema.safeParse({ itens: [item], proximoCursor: null }).success).toBe(true);
+    expect(paginaBuscaServidoresSchema.safeParse({
+      itens: [{ ...item, cpf: '***.***.123-**' }], proximoCursor: null,
     }).success).toBe(false);
   });
 

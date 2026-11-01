@@ -1,7 +1,7 @@
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import type {
   ConferenciaImportacao, Configuracao, EnviarImportacaoQuery, ExportarDados, PaginaLotesImportacao, RelatorioImportacao,
-  RelatorioPlanilhaLegado,
+  RelatorioPlanilhaLegado, PromoverLegado, PreviaLegado, TipoImportacao, RelatorioPromocaoLegado,
 } from '@sisdoc/contratos';
 import type { Pool, PoolClient } from 'pg';
 import { transacao } from '../banco';
@@ -9,11 +9,12 @@ import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
-import { ErroFormato } from './formatos';
+import { ErroFormato, sugerirMapeamento } from './formatos';
 import { conferenciaGeral, ErroImportacao, hashArquivo, importarLinhas } from './importador';
-import { ErroPlanilha, lerPlanilha } from './planilhas';
+import { ErroPlanilha, escreverXlsx, lerPlanilha, LIMITE_ARQUIVO_BYTES } from './planilhas';
 import { gerarExportacao } from './exportador';
-import { exportarPlanilhaLegado, importarPlanilhaLegado, listarPlanilhasLegado } from './planilha-legado';
+import { exportarPlanilhaLegado, importarPlanilhaLegado, listarPlanilhasLegado, lerPlanilhaLegado } from './planilha-legado';
+import { assinarValidacaoLegado, colunasConversaoLegado, mapearPlanilhaLegado } from './promocao-legado';
 
 export class ImportacaoService {
   private readonly protetor: ProtetorDados;
@@ -56,6 +57,74 @@ export class ImportacaoService {
     });
   }
 
+  async previaLegado(sessao: SessaoAutenticada, ip: string, loteId: string, tipo: TipoImportacao): Promise<PreviaLegado> {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+      const lote = await lerPlanilhaLegado(cliente, this.protetor, loteId);
+      await cliente.query(`INSERT INTO seguranca.auditoria (usuario_id, acao, entidade, entidade_id, ip)
+        VALUES ($1, 'previa_legado_consultada', 'planilha_lote', $2, $3)`, [sessao.usuario.id, loteId, ip]);
+      const colunas = colunasConversaoLegado(tipo);
+      const mapeamento = sugerirMapeamento(tipo, lote.cabecalhos);
+      if (tipo === 'afastamentos') {
+        const intervalo = sugerirMapeamento('incorporacoes', lote.cabecalhos);
+        for (const campo of ['TIPO', 'DT_INICIO', 'DT_FIM']) mapeamento[campo] = intervalo[campo];
+      }
+      return { loteId, tipo, origem: lote.origem, cabecalhos: lote.cabecalhos, linhas: lote.linhas.length,
+        amostra: lote.linhas.slice(0, 20), colunas, mapeamento };
+    });
+  }
+
+  async exportarOcorrenciasLegado(sessao: SessaoAutenticada, ip: string, dados: PromoverLegado): Promise<Buffer> {
+    const resultado = await this.promoverLegado(sessao, ip, { ...dados, modo: 'validar' }, true);
+    const arquivo = escreverXlsx([
+      ['LINHA', 'TIPO', 'REFERENCIA', 'MOTIVO'],
+      ...resultado.relatorio.ocorrencias.map((item) => [String(item.linha), item.tipo, item.referencia, item.motivo]),
+    ], 'Ocorrencias');
+    if (arquivo.length > LIMITE_ARQUIVO_BYTES) throw new UnprocessableEntityException('O relatório excede 64 MB.');
+    await transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+      await cliente.query(`INSERT INTO seguranca.auditoria (usuario_id, acao, entidade, entidade_id, ip)
+        VALUES ($1, 'ocorrencias_legado_exportadas', 'planilha_lote', $2, $3)`, [sessao.usuario.id, dados.loteId, ip]);
+    });
+    return arquivo;
+  }
+
+  async promoverLegado(sessao: SessaoAutenticada, ip: string, dados: PromoverLegado, todasOcorrencias = false): Promise<RelatorioPromocaoLegado> {
+    const lote = await transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+      return lerPlanilhaLegado(cliente, this.protetor, dados.loteId);
+    });
+    let linhas: string[][];
+    try {
+      linhas = mapearPlanilhaLegado(lote.cabecalhos, lote.linhas, dados);
+    } catch (erro) {
+      if (erro instanceof ErroFormato) throw new UnprocessableEntityException(erro.message);
+      throw erro;
+    }
+    const cliente = await this.banco.connect();
+    let validacao = '';
+    try {
+      const relatorio = await importarLinhas(cliente, this.protetor, linhas, {
+        tipo: dados.tipo, origem: lote.origem, canal: 'legado', usuarioId: sessao.usuario.id,
+        gravar: dados.modo === 'gravar', preservarExistentes: true, referenciasCompletas: true, loteLegadoId: dados.loteId,
+        revalidarExistente: true,
+        ...(todasOcorrencias ? { limiteOcorrencias: Number.MAX_SAFE_INTEGER } : {}),
+        hashArquivo: this.protetor.hashConteudo('importacao', 'promocao_legado', {
+          loteId: dados.loteId, hash: lote.hash.toString('hex'), tipo: dados.tipo, mapeamento: dados.mapeamento, politica: 'preencher_vazios_v1',
+        }),
+        antes: (atual) => confirmarSessao(atual as PoolClient, sessao, papeisPermitidos('administrar_importacao')),
+        preparar: async (atual) => { validacao = await assinarValidacaoLegado(atual, this.protetor, linhas, dados, lote.origem, sessao.hash); },
+        ip,
+      });
+      return { loteLegadoId: dados.loteId, validacao, relatorio };
+    } catch (erro) {
+      if (erro instanceof ErroImportacao || erro instanceof ErroFormato) throw new UnprocessableEntityException(erro.message);
+      throw erro;
+    } finally {
+      cliente.release();
+    }
+  }
+
   async enviar(sessao: SessaoAutenticada, ip: string, consulta: EnviarImportacaoQuery, conteudo: Buffer): Promise<RelatorioImportacao | RelatorioPlanilhaLegado> {
     if (conteudo.length === 0) throw new BadRequestException('Envie um arquivo CSV ou XLSX com conteúdo.');
     let linhas: string[][];
@@ -82,6 +151,8 @@ export class ImportacaoService {
         hashArquivo: hashArquivo(conteudo),
         antes: (transacaoAtual) => confirmarSessao(transacaoAtual as PoolClient, sessao, papeisPermitidos('administrar_importacao')),
         ip,
+        referenciasCompletas: true,
+        preservarExistentes: true,
       });
     } catch (erro) {
       if (erro instanceof ErroImportacao || erro instanceof ErroFormato || erro instanceof ErroPlanilha) {
