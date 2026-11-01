@@ -4783,10 +4783,23 @@ describe('fundação em recursos descartáveis', () => {
         INSERT INTO documentos.documento_periodo (documento_id, ordem, inicio, fim)
         VALUES ($1, 1, '2020-01-01', '2020-12-31')
       `, [documentoDtc]);
+      const conferenciaDtc = randomUUID();
       await cliente.query(`
-        UPDATE documentos.documento SET status = 'conferido', conferido_por = $2, conferido_em = clock_timestamp()
-        WHERE id = $1
-      `, [documentoDtc, usuario]);
+        INSERT INTO documentos.conferencia_dtc (
+          id, documento_id, revisao_documento, revisao_pessoa, revisao_vinculo, conferido_por, avisos
+        )
+        SELECT $1, d.id, d.revisao + 1, p.revisao_fonte, v.revisao_fonte, $3, '{}'
+        FROM documentos.documento d
+        JOIN nucleo.pessoa p ON p.id = d.pessoa_id
+        JOIN nucleo.vinculo v ON v.id = d.vinculo_id
+        WHERE d.id = $2
+      `, [conferenciaDtc, documentoDtc, usuario]);
+      await cliente.query(`
+        UPDATE documentos.documento d SET status = 'conferido', revisao = d.revisao + 1,
+          conferido_por = c.conferido_por, conferido_em = c.conferido_em
+        FROM documentos.conferencia_dtc c
+        WHERE d.id = $1 AND c.id = $2
+      `, [documentoDtc, conferenciaDtc]);
       await cliente.query(`
         INSERT INTO documentos.emissao (
           id, documento_id, tipo, ano, numero, numero_formatado, chave_idempotencia, snapshot_cifrado, emitido_por

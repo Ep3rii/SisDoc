@@ -12,8 +12,10 @@ e [protótipo visual](../Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg)
 | 2 — cálculo | gate técnico verificado | GT-01, GT-REF e GT-02 a GT-11 em JSON; propriedades, regras provisórias e bundle de navegador |
 | 3 — autenticação e perfis | gate técnico verificado | matriz negativa nas rotas existentes e criação de administrador por setup; revisão humana e navegador integrado a HTTPS pendentes |
 | 4 — consulta de servidores | gate técnico verificado | busca em HTTPS e PostgreSQL descartável com 17.700 vínculos fictícios; interface exercitada com API simulada |
-| 5 — DOF | parcial | cálculo, rascunhos cifrados, processo, blocos, prévia, encaminhamento e conferência provisórios; renderização e processamento experimental de PDF em testes; sem emissão, snapshot oficial, download ou histórico |
-| 6 a 9 — demais documentos e operação | não iniciadas | — |
+| 5 — DOF | gate técnico verificado | fluxo completo até PDF, histórico, cópia e cancelamento com aprovação sintética e caso de mais de 41 anos (`tests/emissao.test.ts`); emissão operacional bloqueada até aprovação formal |
+| 6 — DTCs | gate técnico verificado | DTC IPAM, Comissionado e INSS com PDFs dos quatro tipos sem corte nos máximos (4 períodos, 3 cargos) em `tests/dtc.test.ts`; template INSS provisório |
+| 7 — importação e sincronização | em andamento | — |
+| 8 e 9 — operação | pacote extra | somente após autorização do responsável |
 
 O checkout inicial contém as referências e não contém a aplicação demonstrativa
 citada no prompt. Node 24.20.0 e npm 11.19.0 foram encontrados; PostgreSQL e
@@ -484,3 +486,22 @@ emissão operacional permanece bloqueada até a validação formal pela área
 responsável. A instalação local precisa de `npm run build` e
 `npm run migrar` antes de reiniciar com esta versão. DTCs, importação, backup
 e serviço Windows continuam pendentes.
+## Fatia 6 concluída — DTC IPAM, Comissionado e INSS — 31/10/2026
+
+As três DTCs funcionam de ponta a ponta, do rascunho ao PDF, ao histórico, à
+cópia e ao cancelamento. A migração `014-dtc` e a
+[decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md) registram o desenho.
+Cada tipo exige aprovação formal própria. O template INSS sai marcado como
+**MODELO PROVISÓRIO** até o recebimento dos textos oficiais.
+
+Na finalização, dois testes antigos foram ajustados ao novo comportamento:
+
+- o job de PDF de DTC agora registra o evento `conferencia_dtc` antes de
+  passar o documento a conferido;
+- o item **DTC IPAM** do menu passou a ficar habilitado.
+
+`npm test` passou com **148 testes em 19 arquivos**.
+
+A instalação local foi atualizada, com backup `pg_dump` prévio, por
+`npm run migrar`, que aplicou `014-dtc`. A aplicação foi reiniciada em
+`https://localhost:3443/`. Nenhuma aprovação de DTC foi registrada.

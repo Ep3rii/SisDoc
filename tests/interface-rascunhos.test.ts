@@ -552,7 +552,7 @@ describe('interface de rascunhos com API sintética', () => {
     if (!conferencia) throw new Error('A aba de conferência não está visível.');
     expect(conferencia.x + conferencia.width).toBeLessThanOrEqual(editor.x + editor.width);
     expect(await pagina.getByRole('button', { name: /Emitir PDF/ }).isDisabled()).toBe(true);
-    expect(await pagina.getByRole('button', { name: /DTC IPAM/ }).isDisabled()).toBe(true);
+    expect(await pagina.getByRole('button', { name: /DTC IPAM/ }).isDisabled()).toBe(false);
     expect(await pagina.getByRole('button', { name: /Histórico/ }).isDisabled()).toBe(false);
     const dados = pagina.getByRole('tab', { name: 'Dados do servidor', exact: true });
     await dados.focus();
