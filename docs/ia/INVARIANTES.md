@@ -22,8 +22,9 @@
   senhas comuns; cinco falhas bloqueiam por 15 minutos. Mensagem de falha é
   única. Sessões são mantidas no servidor, revogáveis, com cookie `__Host-`
   seguro e CSRF nas escritas autenticadas.
-- Permissões são verificadas no servidor pela matriz do prompt; admin técnico
-  não recebe acesso funcional por hierarquia. Consultas e ações sensíveis são
+- Permissões são verificadas no servidor. A decisão 026 amplia explicitamente
+  o administrador de Informática para consulta e operação funcional, inclusive
+  documentos de terceiros; os demais perfis mantêm seus limites. Consultas e ações sensíveis são
   auditadas; a aplicação não altera ou apaga registros de auditoria.
 - Entrada é validada no servidor; HTML é escapado e prévia não executa scripts.
   Dados pessoais não são guardados em `localStorage` ou `sessionStorage`.

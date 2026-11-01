@@ -1,5 +1,6 @@
-import { BadRequestException, Controller, Get, HttpCode, Post, PayloadTooLargeException, Query, Req, UnsupportedMediaTypeException } from '@nestjs/common';
-import { enviarImportacaoQuerySchema, paginaLotesImportacaoQuerySchema } from '@sisdoc/contratos';
+import { BadRequestException, Body, Controller, Get, HttpCode, Post, PayloadTooLargeException, Query, Req, Res, UnsupportedMediaTypeException } from '@nestjs/common';
+import { enviarImportacaoQuerySchema, exportarDadosSchema, paginaLotesImportacaoQuerySchema } from '@sisdoc/contratos';
+import type { ServerResponse } from 'node:http';
 import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } from '../seguranca/guarda';
 import { ImportacaoService } from './importacao';
 import { LIMITE_ARQUIVO_BYTES } from './planilhas';
@@ -27,6 +28,20 @@ async function lerCorpoBruto(req: RequisicaoAutenticada): Promise<Buffer> {
 @Controller('admin/importacoes')
 export class ImportacaoController {
   constructor(private readonly importacao: ImportacaoService) {}
+
+  @ExigirAcao('administrar_importacao')
+  @Post('exportar')
+  @HttpCode(200)
+  async exportar(@Body() corpo: unknown, @Req() req: RequisicaoAutenticada, @Res() resposta: ServerResponse) {
+    const dados = exportarDadosSchema.safeParse(corpo);
+    if (!dados.success) throw new BadRequestException('Informe tipo, origem, formato csv/xlsx e modalidade dos afastamentos.');
+    const arquivo = await this.importacao.exportar(exigirSessao(req), ipRequisicao(req), dados.data);
+    resposta.setHeader('Cache-Control', 'no-store');
+    resposta.setHeader('Content-Type', dados.data.formato === 'csv' ? 'text/csv; charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    resposta.setHeader('Content-Disposition', `attachment; filename="${dados.data.tipo}-${dados.data.origem}.${dados.data.formato}"`);
+    resposta.statusCode = 200;
+    resposta.end(arquivo);
+  }
 
   @ExigirAcao('administrar_importacao')
   @Post()

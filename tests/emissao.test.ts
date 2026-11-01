@@ -217,7 +217,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
   }> {
     const { pessoaId, vinculoId } = await criarFonte(nome);
     const calculo = {
-      pessoaId, vinculoId, inicio: '1980-01-01', fim: '2024-12-31', confirmacaoDados: true,
+      pessoaId, vinculoId, inicio: coordenador === 'admin' ? '1979-01-01' : '1980-01-01', fim: '2024-12-31', confirmacaoDados: true,
       anos: Array.from({ length: 45 }, (_, indice) => ({
         ano: 1980 + indice, abrangencia: 'intervalo_declarado',
         faltas: indice === 3 ? 2 : 0, ts: 0, pf: 0, ip: 0, outros: 0, pb: 0, pv: 0, licencaPremio: 0,
@@ -228,14 +228,23 @@ describe('emissão da DOF em recursos descartáveis', () => {
       corpo: { calculo, admissaoEsperada: '1980-01-01', motivo: 'Cálculo sintético de 45 anos' },
     });
     expect(criado.status, criado.corpo).toBe(201);
-    const rascunho = rascunhoDofSchema.parse(JSON.parse(criado.corpo));
+    let rascunho = rascunhoDofSchema.parse(JSON.parse(criado.corpo));
+    if (coordenador === 'admin') {
+      const confirmado = await requisitar({
+        metodo: 'POST', rota: `documentos/${rascunho.id}/confirmar-inicio`, sessao: sessao('admin'),
+        corpo: { revisao: rascunho.revisao, confirmar: true },
+      });
+      expect(confirmado.status, confirmado.corpo).toBe(201);
+      rascunho = rascunhoDofSchema.parse(JSON.parse(confirmado.corpo));
+      expect(rascunho.inicioAjustadoConfirmado).toBe(true);
+    }
     const processo = await requisitar({
-      metodo: 'PATCH', rota: `documentos/${rascunho.id}/processo`, sessao: sessao(autor),
+      metodo: 'PATCH', rota: `documentos/${rascunho.id}/processo`, sessao: sessao(coordenador === 'admin' ? 'admin' : autor),
       corpo: { revisao: rascunho.revisao, processo: '1234/5678', motivo: 'Processo fictício' },
     });
     expect(processo.status, processo.corpo).toBe(200);
     let revisao = rascunhoDofSchema.parse(JSON.parse(processo.corpo)).revisao;
-    if (autor !== coordenador) {
+    if (autor !== coordenador && coordenador !== 'admin') {
       const encaminhado = await requisitar({
         metodo: 'POST', rota: `documentos/${rascunho.id}/encaminhar`, sessao: sessao(autor),
         corpo: { revisao, destinatarioId: idUsuario(coordenador) },
@@ -387,6 +396,9 @@ describe('emissão da DOF em recursos descartáveis', () => {
     const bloqueada = await emitir(alvo, randomUUID());
     expect(bloqueada.status, bloqueada.corpo).toBe(409);
     expect(JSON.parse(bloqueada.corpo).detail).toBe(MENSAGEM_SEM_APROVACAO);
+    const adminBloqueada = await emitir(alvo, randomUUID(), 'admin');
+    expect(adminBloqueada.status, adminBloqueada.corpo).toBe(409);
+    expect(JSON.parse(adminBloqueada.corpo).detail).toBe(MENSAGEM_SEM_APROVACAO);
     expect(MENSAGEM_SEM_APROVACAO).toContain('npm run aprovar-modelo');
     const comFlag = await requisitar({
       metodo: 'POST', rota: `documentos/${alvo.documentoId}/emitir`, sessao: sessao('coordenador'), chave: randomUUID(),
@@ -398,7 +410,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     expect((await banco().query('SELECT count(*)::int AS total FROM documentos.numeracao')).rows[0].total).toBe(0);
     expect((await banco().query('SELECT status FROM documentos.documento WHERE id = $1', [alvo.documentoId])).rows[0].status)
       .toBe('conferido');
-    expect(await auditorias('emissao_dof_bloqueada_sem_aprovacao', alvo.documentoId)).toBe(1);
+    expect(await auditorias('emissao_dof_bloqueada_sem_aprovacao', alvo.documentoId)).toBe(2);
 
     const aplicativo = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_emissao', user: 'sisdoc_aplicativo', password: senhaAplicativo,
@@ -437,7 +449,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
 
     const alvo = emissoesPendentes.shift();
     if (!alvo) throw new Error('DOF conferida sintética ausente.');
-    for (const quem of ['analista', 'secretario', 'admin']) {
+    for (const quem of ['analista', 'secretario']) {
       expect((await emitir(alvo, randomUUID(), quem)).status).toBe(403);
     }
     expect((await emitir(alvo, randomUUID(), 'coordenador2')).status).toBe(404);
@@ -521,12 +533,13 @@ describe('emissão da DOF em recursos descartáveis', () => {
       .toBe(200);
     expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf`, sessao: sessao('coordenador2') })).status)
       .toBe(200);
-    for (const quem of ['analista2', 'admin']) {
+    for (const quem of ['analista2']) {
       expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf`, sessao: sessao(quem) })).status).toBe(404);
     }
     expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf` })).status).toBe(401);
-    expect(await auditorias('pdf_baixado', emitida.emissaoId)).toBe(3);
-    expect(await auditorias('pdf_nao_encontrado', emitida.emissaoId)).toBe(2);
+    expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf`, sessao: sessao('admin') })).status).toBe(200);
+    expect(await auditorias('pdf_baixado', emitida.emissaoId)).toBe(4);
+    expect(await auditorias('pdf_nao_encontrado', emitida.emissaoId)).toBe(1);
     emissoes.push(concluida);
   });
 
@@ -619,7 +632,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     }
   });
 
-  it('lista o histórico por perfil, minimizado para o administrador', async () => {
+  it('lista o histórico por perfil, completo para o administrador', async () => {
     const historico = async (quem: string, escopo: string, tipo = 'DOF') => requisitar({
       metodo: 'GET', rota: `historico?tipo=${tipo}&escopo=${escopo}`, sessao: sessao(quem),
     });
@@ -639,9 +652,9 @@ describe('emissão da DOF em recursos descartáveis', () => {
       .toBe(true);
     const admin = historicoEmissoesSchema.parse(JSON.parse((await historico('admin', 'todos')).corpo));
     expect(admin.itens).toHaveLength(7);
-    expect(admin.itens.every((item) => item.nome === null && item.matricula === null && !item.podeBaixar
-      && !item.podeCopiar && item.podeCancelar)).toBe(true);
-    expect((await historico('admin', 'proprio')).status).toBe(400);
+    expect(admin.itens.every((item) => item.nome !== null && item.matricula !== null && item.podeBaixar
+      && item.podeCopiar && item.podeCancelar)).toBe(true);
+    expect((await historico('admin', 'proprio')).status).toBe(200);
     expect(historicoEmissoesSchema.parse(JSON.parse((await historico('analista', 'proprio', 'DTC')).corpo)).itens).toHaveLength(0);
     expect((await historico('analista', 'proprio', 'XYZ')).status).toBe(400);
     const registros = await banco().query<{ total: string }>(
@@ -652,7 +665,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
 
   it('copia a emissão como novo rascunho sem alterar o documento emitido', async () => {
     const origem = emissoes[0];
-    for (const quem of ['secretario', 'admin']) {
+    for (const quem of ['secretario']) {
       expect((await requisitar({
         metodo: 'POST', rota: `documentos/${origem.documentoId}/copia`, sessao: sessao(quem), corpo: { confirmar: true },
       })).status).toBe(403);
@@ -739,8 +752,8 @@ describe('emissão da DOF em recursos descartáveis', () => {
       aplicativo: { usuario: 'sisdoc_aplicativo', senha: senhaAplicativo },
     };
     const atualizado = await migrar(provisionamento);
-    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '015-importacao' });
-    expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total).toBe(16);
+    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '016-acesso-admin' });
+    expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total).toBe(17);
 
     const anterior = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_migrar', user: 'sisdoc_migrador', password: senhaMigrador,
@@ -776,9 +789,9 @@ describe('emissão da DOF em recursos descartáveis', () => {
       const semEmissao = await anterior.query("SELECT to_regclass('documentos.aprovacao_modelo') IS NULL AS ausente");
       expect(semEmissao.rows[0].ausente).toBe(true);
       const primeiraExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(primeiraExecucao).toEqual({ aplicadas: ['013-emissao', '014-dtc', '015-importacao'], versaoAtual: '015-importacao' });
+      expect(primeiraExecucao).toEqual({ aplicadas: ['013-emissao', '014-dtc', '015-importacao', '016-acesso-admin'], versaoAtual: '016-acesso-admin' });
       const segundaExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '015-importacao' });
+      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '016-acesso-admin' });
       const privilegios = await anterior.query<{ inserir: boolean; aprovar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.emissao', 'snapshot_cifrado', 'INSERT') AS inserir,
           has_table_privilege('sisdoc_aplicativo', 'documentos.aprovacao_modelo', 'INSERT') AS aprovar
@@ -788,5 +801,68 @@ describe('emissão da DOF em recursos descartáveis', () => {
     } finally {
       await anterior.end();
     }
+  });
+
+  it('admin edita, confere e emite DOF de outro autor sem encaminhamento, preservando controles', async () => {
+    const alvo = await prepararConferida('Pessoa Acesso Admin Fictícia', 'analista2', 'admin');
+    const linha = await banco().query(`
+      SELECT d.criado_por, d.conferido_por, count(e.id)::int AS encaminhamentos
+      FROM documentos.documento d LEFT JOIN documentos.encaminhamento_dof e ON e.documento_id = d.id
+      WHERE d.id = $1 GROUP BY d.id
+    `, [alvo.documentoId]);
+    expect(linha.rows[0]).toEqual({
+      criado_por: idUsuario('analista2'), conferido_por: idUsuario('admin'), encaminhamentos: 0,
+    });
+    expect((await emitir({ ...alvo, revisao: alvo.revisao - 1 }, randomUUID(), 'admin')).status).toBe(409);
+    const semCsrf = await requisitar({
+      metodo: 'POST', rota: `documentos/${alvo.documentoId}/emitir`, cookie: sessao('admin').cookie, chave: randomUUID(),
+      corpo: { revisao: alvo.revisao, provaFonte: alvo.provaFonte },
+    });
+    expect(semCsrf.status).toBe(403);
+    const resposta = await emitir(alvo, randomUUID(), 'admin');
+    expect(resposta.status, resposta.corpo).toBe(200);
+    const emitida = situacaoEmissaoSchema.parse(JSON.parse(resposta.corpo));
+    const snapshot = await banco().query<{ snapshot_cifrado: Buffer; emitido_por: string }>(
+      'SELECT snapshot_cifrado, emitido_por FROM documentos.emissao WHERE id = $1', [emitida.emissaoId],
+    );
+    expect(snapshot.rows[0].emitido_por).toBe(idUsuario('admin'));
+    const copia = await requisitar({
+      metodo: 'POST', rota: `documentos/${alvo.documentoId}/copia`, sessao: sessao('admin'), corpo: { confirmar: true },
+    });
+    expect(copia.status, copia.corpo).toBe(201);
+    expect(resultadoCopiaEmitidoSchema.parse(JSON.parse(copia.corpo)).documentoId).not.toBe(alvo.documentoId);
+    const cancelada = await requisitar({
+      metodo: 'POST', rota: `documentos/${alvo.documentoId}/cancelar`, sessao: sessao('admin'),
+      corpo: { motivo: 'Cancelamento administrativo fictício', confirmar: true },
+    });
+    expect(cancelada.status, cancelada.corpo).toBe(200);
+    const preservado = await banco().query<{ snapshot_cifrado: Buffer }>(
+      'SELECT snapshot_cifrado FROM documentos.emissao WHERE id = $1', [emitida.emissaoId],
+    );
+    expect(preservado.rows[0].snapshot_cifrado).toEqual(snapshot.rows[0].snapshot_cifrado);
+    expect(await auditorias('dof_emitida', alvo.documentoId)).toBe(1);
+    const encaminhada = await prepararConferida('Pessoa Devolução Admin Fictícia', 'analista2');
+    const devolvida = await requisitar({
+      metodo: 'POST', rota: `documentos/${encaminhada.documentoId}/devolver-conferido`, sessao: sessao('admin'),
+      corpo: { revisao: encaminhada.revisao, motivo: 'Devolução administrativa fictícia' },
+    });
+    expect(devolvida.status, devolvida.corpo).toBe(201);
+    const aberta = await requisitar({
+      metodo: 'GET', rota: `documentos/${encaminhada.documentoId}`, sessao: sessao('admin'),
+    });
+    expect(aberta.status, aberta.corpo).toBe(200);
+    const rascunho = rascunhoDofSchema.parse(JSON.parse(aberta.corpo));
+    expect(rascunho.encaminhamento).toBeNull();
+    const reenviada = await requisitar({
+      metodo: 'POST', rota: `documentos/${rascunho.id}/encaminhar`, sessao: sessao('admin'),
+      corpo: { revisao: rascunho.revisao, destinatarioId: idUsuario('coordenador2') },
+    });
+    expect(reenviada.status, reenviada.corpo).toBe(201);
+    const recolhida = await requisitar({
+      metodo: 'POST', rota: `documentos/${rascunho.id}/recolher`, sessao: sessao('admin'),
+      corpo: { revisao: rascunhoDofSchema.parse(JSON.parse(reenviada.corpo)).revisao, motivo: 'Recolhimento administrativo fictício' },
+    });
+    expect(recolhida.status, recolhida.corpo).toBe(201);
+    expect(rascunhoDofSchema.parse(JSON.parse(recolhida.corpo)).encaminhamento).toBeNull();
   });
 });

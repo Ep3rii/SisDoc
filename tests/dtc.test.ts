@@ -526,7 +526,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     expect((await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao('analista'), corpo: sobrepostos })).status).toBe(400);
     const processoInvalido = { ...corpoDtc('DTC_IPAM', fonte), processo: '12/34' };
     expect((await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao('analista'), corpo: processoInvalido })).status).toBe(400);
-    for (const quem of ['secretario', 'admin']) {
+    for (const quem of ['secretario']) {
       expect((await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao(quem), corpo: corpoDtc('DTC_IPAM', fonte) })).status)
         .toBe(403);
     }
@@ -589,7 +589,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       const dados = await previa(criado.id, 'analista');
       expect(dados.fonte).toMatchObject({ nome: nomes[tipo], nomePai: 'Filiação paterna fictícia', admissao: '1980-01-01' });
       expect((await requisitar({ metodo: 'GET', rota: `dtc/${criado.id}/previa`, sessao: sessao('analista2') })).status).toBe(404);
-      for (const quem of ['secretario', 'admin']) {
+      for (const quem of ['secretario']) {
         expect((await requisitar({ metodo: 'GET', rota: `dtc/${criado.id}/previa`, sessao: sessao(quem) })).status).toBe(403);
       }
       expect((await requisitar({
@@ -620,14 +620,17 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     expect(devolucoes.rows[0].total).toBe(3);
   });
 
-  it('bloqueia a emissão sem aprovação formal do tipo e restringe a emissão ao coordenador', async () => {
+  it('bloqueia a emissão sem aprovação formal do tipo, inclusive para admin', async () => {
     for (const tipo of ['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'] as const) {
       const alvo = conferidas.get(tipo);
       if (!alvo) throw new Error(`DTC ${tipo} conferida ausente.`);
       const bloqueada = await emitirDtc(alvo.documentoId);
       expect(bloqueada.status, bloqueada.corpo).toBe(409);
       expect(JSON.parse(bloqueada.corpo).detail).toBe(MENSAGEM_SEM_APROVACAO);
-      expect(await auditorias('emissao_dtc_bloqueada_sem_aprovacao', alvo.documentoId)).toBe(1);
+      const adminBloqueada = await emitirDtc(alvo.documentoId, 'admin');
+      expect(adminBloqueada.status, adminBloqueada.corpo).toBe(409);
+      expect(JSON.parse(adminBloqueada.corpo).detail).toBe(MENSAGEM_SEM_APROVACAO);
+      expect(await auditorias('emissao_dtc_bloqueada_sem_aprovacao', alvo.documentoId)).toBe(2);
     }
     expect((await banco().query('SELECT count(*)::int AS total FROM documentos.emissao')).rows[0].total).toBe(0);
     expect((await banco().query('SELECT count(*)::int AS total FROM documentos.numeracao')).rows[0].total).toBe(0);
@@ -643,7 +646,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
         tipo, aprovadoPor: 'Responsável fictício', referenciaDecisao: `Decisão fictícia ${tipo}`,
       });
     }
-    for (const quem of ['analista', 'secretario', 'admin']) {
+    for (const quem of ['analista', 'secretario']) {
       expect((await emitirDtc(ipam.documentoId, quem)).status).toBe(403);
     }
   });
@@ -780,7 +783,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
 
     const origem = emitidas.get('DTC_COMISSIONADO');
     if (!origem) throw new Error('Emissão Comissionado ausente.');
-    for (const quem of ['secretario', 'admin']) {
+    for (const quem of ['secretario']) {
       expect((await requisitar({
         metodo: 'POST', rota: `dtc/${origem.documentoId}/copia`, sessao: sessao(quem), corpo: { confirmar: true },
       })).status).toBe(403);
@@ -879,8 +882,8 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       await anterior.query('COMMIT');
       const semDtc = await anterior.query("SELECT to_regclass('documentos.conferencia_dtc') IS NULL AS ausente");
       expect(semDtc.rows[0].ausente).toBe(true);
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: ['014-dtc', '015-importacao'], versaoAtual: '015-importacao' });
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '015-importacao' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: ['014-dtc', '015-importacao', '016-acesso-admin'], versaoAtual: '016-acesso-admin' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '016-acesso-admin' });
       const privilegios = await anterior.query<{ conferencia: boolean; tabela: boolean; categoria: boolean; apagar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'conferido_por', 'INSERT') AS conferencia,
           has_table_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'INSERT') AS tabela,
@@ -898,6 +901,57 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       ]);
     } finally {
       await anterior.end();
+    }
+  });
+
+  it('admin acessa, edita, confere, devolve e emite DTC de outro autor, com revisão e auditoria', async () => {
+    for (const tipo of ['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'] as const) {
+      const criado = await criarDtc(tipo, `Pessoa Admin ${tipo} Fictícia`, 1, 'analista2');
+      const { tipo: _tipo, pessoaId: _p, vinculoId: _v, confirmacaoDados: _c, ...conteudo } = corpoDtc(tipo, {
+        pessoaId: criado.pessoaId, vinculoId: criado.vinculoId,
+      }, 1);
+      const pedido = { ...conteudo, processo: '4321/8765', revisao: 1, motivo: 'Correção administrativa fictícia' };
+      expect((await requisitar({
+        metodo: 'PATCH', rota: `dtc/${criado.id}`, sessao: { ...sessao('admin'), csrf: '' }, corpo: pedido,
+      })).status).toBe(403);
+      const editado = await requisitar({ metodo: 'PATCH', rota: `dtc/${criado.id}`, sessao: sessao('admin'), corpo: pedido });
+      expect(editado.status, editado.corpo).toBe(200);
+      expect((await requisitar({
+        metodo: 'PATCH', rota: `dtc/${criado.id}`, sessao: sessao('admin'), corpo: pedido,
+      })).status).toBe(409);
+      expect(await auditorias('dtc_atualizada', criado.id)).toBe(1);
+      const conferido = await conferir(criado.id, 'admin');
+      const devolvido = await requisitar({
+        metodo: 'POST', rota: `dtc/${criado.id}/devolver`, sessao: sessao('admin'),
+        corpo: { revisao: conferido.revisao, motivo: 'Nova verificação administrativa fictícia' },
+      });
+      expect(devolvido.status, devolvido.corpo).toBe(200);
+      await conferir(criado.id, 'admin');
+      const atual = await previa(criado.id, 'admin');
+      expect((await requisitar({
+        metodo: 'POST', rota: `dtc/${criado.id}/emitir`, sessao: sessao('admin'), chave: randomUUID(),
+        corpo: { revisao: atual.documento.revisao - 1, provaFonte: atual.fonte.provaFonte },
+      })).status).toBe(409);
+      const resposta = await emitirDtc(criado.id, 'admin');
+      expect(resposta.status, resposta.corpo).toBe(200);
+      const emitida = situacaoEmissaoSchema.parse(JSON.parse(resposta.corpo));
+      const atores = await banco().query(`
+        SELECT d.criado_por, d.conferido_por, e.emitido_por FROM documentos.documento d
+        JOIN documentos.emissao e ON e.documento_id = d.id WHERE d.id = $1
+      `, [criado.id]);
+      expect(atores.rows[0]).toEqual({
+        criado_por: idUsuario('analista2'), conferido_por: idUsuario('admin'), emitido_por: idUsuario('admin'),
+      });
+      const copia = await requisitar({
+        metodo: 'POST', rota: `dtc/${criado.id}/copia`, sessao: sessao('admin'), corpo: { confirmar: true },
+      });
+      expect(copia.status, copia.corpo).toBe(201);
+      const cancelada = await requisitar({
+        metodo: 'POST', rota: `documentos/${criado.id}/cancelar`, sessao: sessao('admin'),
+        corpo: { motivo: 'Cancelamento administrativo fictício', confirmar: true },
+      });
+      expect(cancelada.status, cancelada.corpo).toBe(200);
+      expect(await auditorias('dtc_emitida', criado.id)).toBe(1);
     }
   });
 });

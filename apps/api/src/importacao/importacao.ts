@@ -1,6 +1,6 @@
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import type {
-  ConferenciaImportacao, Configuracao, EnviarImportacaoQuery, PaginaLotesImportacao, RelatorioImportacao,
+  ConferenciaImportacao, Configuracao, EnviarImportacaoQuery, ExportarDados, PaginaLotesImportacao, RelatorioImportacao,
 } from '@sisdoc/contratos';
 import type { Pool, PoolClient } from 'pg';
 import { transacao } from '../banco';
@@ -11,12 +11,25 @@ import { confirmarSessao } from '../seguranca/sessao-transacao';
 import { ErroFormato } from './formatos';
 import { conferenciaGeral, ErroImportacao, hashArquivo, importarLinhas } from './importador';
 import { ErroPlanilha, lerPlanilha } from './planilhas';
+import { gerarExportacao } from './exportador';
 
 export class ImportacaoService {
   private readonly protetor: ProtetorDados;
 
   constructor(private readonly banco: Pool, configuracao: Configuracao) {
     this.protetor = new ProtetorDados(configuracao.chaves);
+  }
+
+  async exportar(sessao: SessaoAutenticada, ip: string, dados: ExportarDados): Promise<Buffer> {
+    return transacao(this.banco, async (cliente) => {
+      await cliente.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+      const arquivo = await gerarExportacao(cliente, this.protetor, dados);
+      await cliente.query(`INSERT INTO seguranca.auditoria (usuario_id, acao, entidade, ip, detalhes)
+        VALUES ($1, 'dados_exportados', 'exportacao', $2, $3::jsonb)`,
+      [sessao.usuario.id, ip, JSON.stringify(dados)]);
+      return arquivo;
+    });
   }
 
   async enviar(sessao: SessaoAutenticada, ip: string, consulta: EnviarImportacaoQuery, conteudo: Buffer): Promise<RelatorioImportacao> {

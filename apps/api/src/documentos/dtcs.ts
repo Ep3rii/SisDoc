@@ -260,7 +260,8 @@ export class DtcService {
     id: string,
     opcoes: { estados: Array<'rascunho' | 'conferido'>; bloquear?: 'leitura' | 'alteracao'; somenteAutor?: boolean },
   ): Promise<LinhaDtc | undefined> {
-    const coordenador = sessao.usuario.papel === 'coordenador' && !opcoes.somenteAutor;
+    const acessoTerceiros = sessao.usuario.papel === 'admin'
+      || (sessao.usuario.papel === 'coordenador' && !opcoes.somenteAutor);
     const consulta = await cliente.query<LinhaDtc>(`
       SELECT d.id, d.tipo, d.pessoa_id, d.vinculo_id, d.criado_por, autor.nome AS autor_nome, p.nome, v.matricula,
         to_char(v.admissao, 'YYYY-MM-DD') AS admissao, d.status, d.revisao, d.criado_em, d.atualizado_em,
@@ -279,7 +280,7 @@ export class DtcService {
       ${opcoes.bloquear === 'alteracao' ? 'FOR UPDATE OF d' : opcoes.bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
     `, [
       id, sessao.usuario.id, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA),
-      TIPOS_DTC, opcoes.estados, coordenador,
+      TIPOS_DTC, opcoes.estados, acessoTerceiros,
     ]);
     return consulta.rows[0];
   }
@@ -500,7 +501,8 @@ export class DtcService {
         JOIN seguranca.usuario autor ON autor.id = d.criado_por
         WHERE d.tipo = ANY($1::text[]) AND d.status = $2 AND (d.criado_por = $3 OR $4::boolean)
         ORDER BY d.atualizado_em DESC, d.id LIMIT 50
-      `, [consulta.tipo ? [consulta.tipo] : TIPOS_DTC, consulta.estado, sessao.usuario.id, sessao.usuario.papel === 'coordenador']);
+      `, [consulta.tipo ? [consulta.tipo] : TIPOS_DTC, consulta.estado, sessao.usuario.id,
+        sessao.usuario.papel === 'coordenador' || sessao.usuario.papel === 'admin']);
       await auditarConsultaFuncional(cliente, sessao, 'dtc_listadas', 'documento', null, null, ip);
       return {
         itens: linhas.rows.map((linha) => ({
@@ -908,7 +910,7 @@ export class DtcService {
       `, [documentoId, TIPOS_DTC]);
       const linha = origem.rows[0];
       if (!linha || !(linha.criado_por === sessao.usuario.id || linha.emitido_por === sessao.usuario.id
-          || sessao.usuario.papel === 'coordenador')) {
+          || sessao.usuario.papel === 'coordenador' || sessao.usuario.papel === 'admin')) {
         await auditarConsultaFuncional(cliente, sessao, 'copia_emissao_nao_encontrada', 'documento', documentoId, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'DTC emitida não encontrada para cópia.' } };
       }

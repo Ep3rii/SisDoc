@@ -143,7 +143,7 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada }: Prop
   return (
     <section aria-labelledby="usuarios-titulo">
       <h2 id="usuarios-titulo">Administração de usuários</h2>
-      <p>O administrador técnico não recebe acesso aos dados funcionais por esse perfil.</p>
+      <p>O administrador tem acesso completo aos dados e documentos funcionais, inclusive aos rascunhos de outros usuários. Todas as ações são auditadas.</p>
       <div className="grade">
         <form className="painel" onSubmit={criar}>
           <h3>Criar usuário</h3>

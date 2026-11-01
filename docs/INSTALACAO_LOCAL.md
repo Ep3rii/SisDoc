@@ -57,8 +57,9 @@ Acesse **https://localhost:3443/**. Use o administrador definido no setup e
 troque a senha obrigatória no primeiro acesso. Não forneça senhas no chat,
 em argumentos de comandos ou em variáveis de ambiente.
 
-O administrador técnico gerencia usuários e auditoria; ele não recebe acesso
-funcional à busca pelo seu perfil. Crie contas funcionais autorizadas conforme
+O administrador da Informática gerencia usuários/auditoria e possui acesso
+funcional completo por autorização na decisão 026. Crie contas de
+analista/coordenador para o setor de Cadastro conforme
 [os controles de operação](OPERACAO.md). Nenhuma pessoa foi importada.
 
 Após reiniciar o Windows, abra PowerShell na raiz do repositório:

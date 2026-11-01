@@ -1292,7 +1292,8 @@ describe('interface de rascunhos com API sintética', () => {
     estado.papel = 'admin';
     await pagina.reload();
     await pagina.getByRole('heading', { name: 'Administração de usuários' }).waitFor();
-    expect(await pagina.getByRole('button', { name: 'Buscar servidores' }).count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Buscar servidores' }).count()).toBe(1);
+    expect(await pagina.getByRole('button', { name: 'Todos os rascunhos', exact: true }).count()).toBe(1);
     expect(await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).count()).toBe(0);
 
     estado.papel = 'coordenador';

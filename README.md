@@ -3,6 +3,11 @@
 Sistema local para agilizar a busca de dados funcionais e a preparação de
 declarações: DOF, DTC IPAM, DTC Comissionado e DTC INSS.
 
+Destinado ao setor de Cadastro (analista/coordenador), com dados de referência
+completos para DOF/DTC. O administrador da Informática tem acesso funcional
+completo para revisão e operação. A tela Sincronização reúne importação e
+exportação CSV/XLSX ([decisão 026](docs/decisoes/026-cadastro-informatica-e-exportacao.md)).
+
 **Autorizado para uso operacional local em 31/10/2026** ([decisão 021](docs/decisoes/021-autorizacao-operacional.md)),
 nas funções existentes: consulta de servidores, cálculo, rascunhos, prévia e
 conferência da DOF. A emissão da DOF e das DTCs IPAM, Comissionado e INSS

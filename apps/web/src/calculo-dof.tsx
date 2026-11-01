@@ -337,7 +337,7 @@ export function CalculoDof({
       <p className="identificador-documento">DOF · Declaração de Ocorrências Funcionais</p>
       <h2 id="calculo-dof-titulo">DOF — {rascunho?.nome ?? nome}</h2>
       <p>{rascunho?.nome ?? nome} — matrícula {rascunho?.matricula ?? matricula}. Admissão na fonte: {admissaoAtual ?? 'não informada'}.</p>
-      {rascunho && <p>{somenteLeitura ? 'Rascunho encaminhado' : 'Rascunho próprio'} — revisão {rascunho.revisao}. Ainda não conferido nem emitido.</p>}
+      {rascunho && <p>{somenteLeitura ? 'Rascunho encaminhado' : 'Rascunho'} — revisão {rascunho.revisao}. Ainda não conferido nem emitido.</p>}
       {rascunho && podeSalvar && !somenteLeitura
         && <UltimaDevolucaoDof rascunho={rascunho} onErro={onErro} onLimpar={onLimpar} />}
       {rascunho && admissaoAtual !== rascunho.resultado.admissaoConsiderada && (
@@ -549,7 +549,7 @@ export function CalculoDof({
       <div className="acoes"><button type="button" className="secundario" disabled={ocupado || operacaoEncaminhamento || operacaoConferencia} onClick={() => {
         if (confirmarSaida()) { onPendente(false); onFechar(); }
       }}>
-        {somenteLeitura ? 'Voltar aos encaminhados' : rascunhoInicial ? 'Voltar aos meus rascunhos' : 'Fechar cálculo'}
+        {somenteLeitura ? 'Voltar aos encaminhados' : rascunhoInicial ? 'Voltar aos rascunhos' : 'Fechar cálculo'}
       </button></div>
     </section>
   );

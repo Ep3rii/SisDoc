@@ -15,6 +15,14 @@ export const enviarImportacaoQuerySchema = z.strictObject({
 });
 export type EnviarImportacaoQuery = z.infer<typeof enviarImportacaoQuerySchema>;
 
+export const exportarDadosSchema = z.strictObject({
+  tipo: tipoImportacaoSchema,
+  origem: origemImportacaoSchema,
+  formato: z.enum(['csv', 'xlsx']),
+  afastamentos: z.enum(['anual', 'intervalo']).default('anual'),
+});
+export type ExportarDados = z.infer<typeof exportarDadosSchema>;
+
 export const tipoOcorrenciaImportacaoSchema = z.enum(['rejeitada', 'quarentena', 'duplicada', 'divergencia', 'anomalia']);
 
 export const ocorrenciaImportacaoSchema = z.strictObject({

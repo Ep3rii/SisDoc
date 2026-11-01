@@ -162,8 +162,13 @@ Analista, coordenador e secretário adjunto podem buscar por nome, CPF válido
 ou matrícula exata, incluindo seu sufixo. Nome exige pelo menos três
 caracteres. Resultados, vínculos e eventos são paginados; matrículas
 duplicadas são apresentadas com sua origem, sem escolha automática. A busca
-não devolve CPF e os detalhes exibem apenas máscara. O administrador técnico
-não recebe acesso funcional por seu perfil.
+não devolve CPF e os detalhes iniciais exibem apenas máscara. Para consultar
+os dados completos de DOF/DTC, selecione **Dados de referência do vínculo**:
+CPF, filiação, documentos pessoais, endereço e registros paginados por tipo.
+Esse acesso é auditado. Analista/coordenador são os perfis do setor de
+Cadastro; o administrador é da Informática e tem acesso funcional completo,
+inclusive a documentos de terceiros, conforme a
+[decisão 026](decisoes/026-cadastro-informatica-e-exportacao.md).
 
 O termo trafega no parâmetro `q` de uma requisição HTTPS local. A aplicação
 não registra esse termo na auditoria ou em log de acesso, mas histórico de
@@ -195,6 +200,18 @@ Repetir o mesmo arquivo não altera nada. Documentos emitidos mantêm seu
 snapshot e não mudam com novas importações.
 
 ## Sincronização
+
+A tela **Administração → Sincronização** também reúne **Importação** e
+**Exportação de dados**. Para exportar, selecione tipo, origem, CSV/XLSX e,
+para afastamentos, a modalidade anual ou por intervalo. Confirme o download
+de dados pessoais completos e proteja o arquivo. Só administradores exportam;
+a ação é auditada. Veja limites e regras em
+[DADOS_E_IMPORTACAO.md](DADOS_E_IMPORTACAO.md#exportação-pela-tela).
+
+O limite de 50 itens por página não limita usuários simultâneos. A aferição
+de 64 sessões concorrentes por perfil e mistas usa apenas recursos
+descartáveis; veja [decisão 026](decisoes/026-cadastro-informatica-e-exportacao.md).
+A instalação permanece em loopback, sem acesso por outras máquinas.
 
 A sincronização copia servidores e vínculos de uma API externa para o modelo
 canônico local (decisão 025). Ela é opcional: sem o bloco `sincronizacao` na

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  conferenciaImportacaoSchema, paginaLotesImportacaoSchema, relatorioImportacaoSchema,
+  conferenciaImportacaoSchema, paginaLotesImportacaoSchema, relatorioImportacaoSchema, exportarDadosSchema,
   type ConferenciaImportacao, type LoteImportacao, type PaginaLotesImportacao, type RelatorioImportacao, type TipoImportacao,
 } from '@sisdoc/contratos';
 import { ErroApi, requisitar, validar } from './api';
@@ -14,6 +14,63 @@ const nomesTipo: Record<TipoImportacao, string> = {
   periodos_ipam: 'Períodos IPAM',
   eventos_funcionais: 'Eventos funcionais',
 };
+
+export function ExportacaoAdmin({ csrf, onErro, onMensagem }: {
+  csrf: string; onErro: (erro: unknown) => void; onMensagem: (mensagem: string) => void;
+}) {
+  const [tipo, setTipo] = useState<TipoImportacao>('dados_funcionais');
+  const [origem, setOrigem] = useState('planilha');
+  const [formato, setFormato] = useState<'csv' | 'xlsx'>('xlsx');
+  const [afastamentos, setAfastamentos] = useState<'anual' | 'intervalo'>('anual');
+  const [enviando, setEnviando] = useState(false);
+  async function exportar() {
+    const dados = exportarDadosSchema.safeParse({ tipo, origem, formato, afastamentos });
+    if (!dados.success) { onErro(new ErroApi(400, 'Confira o tipo, origem e formato da exportação.')); return; }
+    if (!window.confirm('Exportar dados pessoais completos? Proteja o arquivo baixado e compartilhe apenas com pessoas autorizadas. O acesso será auditado.')) return;
+    setEnviando(true);
+    try {
+      const resposta = await fetch('/api/v1/admin/importacoes/exportar', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify(dados.data),
+      });
+      if (!resposta.ok) {
+        const problema: unknown = await resposta.json();
+        const detalhe = typeof problema === 'object' && problema !== null && 'detail' in problema && typeof problema.detail === 'string'
+          ? problema.detail : 'Não foi possível exportar os dados.';
+        throw new ErroApi(resposta.status, detalhe);
+      }
+      const url = URL.createObjectURL(await resposta.blob());
+      try {
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${dados.data.tipo}-${dados.data.origem}.${dados.data.formato}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        onMensagem('Exportação baixada. Guarde o arquivo em local protegido; ele contém dados pessoais completos.');
+      } finally { URL.revokeObjectURL(url); }
+    } catch (erro) { onErro(erro); }
+    finally { setEnviando(false); }
+  }
+  return <section className="painel separado" aria-labelledby="exportacao-titulo">
+    <h3 id="exportacao-titulo">Exportação de dados</h3>
+    <p>CSV/XLSX nos formatos da importação, por origem, somente registros ativos. Exportação não substitui backup do banco ou dos PDFs.</p>
+    <div className="grade-busca">
+      <label>Tipo<select value={tipo} onChange={(e) => {
+        const valor = exportarDadosSchema.shape.tipo.safeParse(e.target.value);
+        if (valor.success) setTipo(valor.data);
+      }}>{Object.entries(nomesTipo).map(([valor, nome]) => <option key={valor} value={valor}>{nome}</option>)}</select></label>
+      <label>Origem<input required maxLength={63} value={origem} onChange={(e) => setOrigem(e.target.value)} /></label>
+      <label>Formato<select value={formato} onChange={(e) => setFormato(e.target.value === 'csv' ? 'csv' : 'xlsx')}>
+        <option value="xlsx">XLSX (recomendado)</option><option value="csv">CSV UTF-8</option>
+      </select></label>
+      {tipo === 'afastamentos' && <label>Modalidade<select value={afastamentos} onChange={(e) => setAfastamentos(e.target.value === 'intervalo' ? 'intervalo' : 'anual')}>
+        <option value="anual">Totais anuais</option><option value="intervalo">Intervalos de datas</option>
+      </select></label>}
+    </div>
+    <button type="button" disabled={enviando} onClick={() => void exportar()}>{enviando ? 'Exportando...' : 'Exportar dados completos'}</button>
+  </section>;
+}
 
 const nomesStatus: Record<LoteImportacao['status'], string> = {
   processando: 'Em processamento',

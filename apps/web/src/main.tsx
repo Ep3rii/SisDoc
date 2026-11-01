@@ -180,9 +180,10 @@ function App() {
     setConsulta(busca);
     setMenuAberto(false);
   };
-  const funcional = sessao && sessao.usuario.papel !== 'admin';
-  const podeSalvar = sessao?.usuario.papel === 'analista' || sessao?.usuario.papel === 'coordenador';
-  const escoposHistorico: ReadonlyArray<'proprio' | 'todos'> = sessao?.usuario.papel === 'coordenador' ? ['proprio', 'todos']
+  const funcional = sessao;
+  const podeSalvar = sessao?.usuario.papel === 'analista' || sessao?.usuario.papel === 'coordenador' || sessao?.usuario.papel === 'admin';
+  const podeEmitir = sessao?.usuario.papel === 'coordenador' || sessao?.usuario.papel === 'admin';
+  const escoposHistorico: ReadonlyArray<'proprio' | 'todos'> = podeEmitir ? ['proprio', 'todos']
     : sessao?.usuario.papel === 'analista' ? ['proprio'] : ['todos'];
 
   return (
@@ -199,11 +200,11 @@ function App() {
                 <button type="button" aria-label="Buscar servidores" aria-current={tela === 'busca' ? 'page' : undefined}
                   onClick={() => navegar('busca')}>Buscar servidores<span>DOF · Ocorrências funcionais</span></button>
                 {podeSalvar && <>
-                  <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>Meus rascunhos</button>
+                  <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>{sessao.usuario.papel === 'admin' ? 'Todos os rascunhos' : 'Meus rascunhos'}</button>
                   <button type="button" aria-current={tela === 'conferidos' ? 'page' : undefined} onClick={() => navegar('conferidos')}>DOFs conferidas</button>
                 </>}
-                {sessao.usuario.papel === 'coordenador' && <button type="button"
-                  aria-current={tela === 'encaminhados' ? 'page' : undefined} onClick={() => navegar('encaminhados')}>Encaminhados a mim</button>}
+                {podeEmitir && <button type="button"
+                  aria-current={tela === 'encaminhados' ? 'page' : undefined} onClick={() => navegar('encaminhados')}>{sessao.usuario.papel === 'admin' ? 'Todos os encaminhados' : 'Encaminhados a mim'}</button>}
                 {podeSalvar && <>
                   <p className="grupo-menu">DTCs</p>
                   <button type="button" aria-current={tela === 'DTC_IPAM' ? 'page' : undefined}
@@ -223,8 +224,6 @@ function App() {
                 onClick={() => navegar('sincronizacao')}>Sincronização</button>}
               {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'importacao' ? 'page' : undefined}
                 onClick={() => navegar('importacao')}>Importação</button>}
-              {sessao.usuario.papel === 'admin' && <button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
-                onClick={() => navegar('historico')}>Histórico de emissões</button>}
               {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <button type="button"
                 aria-current={tela === 'auditoria' ? 'page' : undefined} onClick={() => navegar('auditoria')}>Auditoria</button>}
             </nav>
@@ -268,14 +267,14 @@ function App() {
             {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf} podeSalvar={podeSalvar}
               consulta={consulta}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
-            {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf}
+            {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf} administrador={sessao.usuario.papel === 'admin'}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'conferidos' && <ConferidosDof key={chaveTela} csrf={sessao.csrf}
-              podeDevolver={sessao.usuario.papel === 'coordenador'} podeEmitir={sessao.usuario.papel === 'coordenador'}
+              administrador={sessao.usuario.papel === 'admin'} podeDevolver={podeEmitir} podeEmitir={podeEmitir}
               onErro={tratarErro} onLimpar={limparMensagens}
               onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
-            {sessao.usuario.papel === 'coordenador' && tela === 'encaminhados' && (
-              <RascunhosDof key={chaveTela} csrf={sessao.csrf} recebidos
+            {podeEmitir && tela === 'encaminhados' && (
+              <RascunhosDof key={chaveTela} csrf={sessao.csrf} recebidos administrador={sessao.usuario.papel === 'admin'}
                 onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
             )}
             {podeSalvar && (tela === 'DTC_IPAM' || tela === 'DTC_COMISSIONADO' || tela === 'DTC_INSS') && (

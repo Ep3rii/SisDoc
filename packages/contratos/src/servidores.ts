@@ -83,3 +83,20 @@ export type TipoBuscaServidor = z.infer<typeof tipoBuscaSchema>;
 export type PaginaBuscaServidores = z.infer<typeof paginaBuscaServidoresSchema>;
 export type DetalheServidor = z.infer<typeof detalheServidorSchema>;
 export type PaginaEventosServidor = z.infer<typeof paginaEventosServidorSchema>;
+
+export const referenciaServidorQuerySchema = z.strictObject({
+  vinculoId: z.uuid(),
+  tipo: z.enum(['eventos_funcionais', 'afastamentos', 'incorporacoes', 'periodos_ipam']).default('eventos_funcionais'),
+  limite: limitePaginaSchema,
+  cursor: z.uuid().optional(),
+});
+export const referenciaServidorSchema = z.strictObject({
+  pessoa: z.record(z.string(), z.string().nullable()),
+  registros: z.array(z.strictObject({
+    id: z.uuid(),
+    campos: z.record(z.string(), z.string().nullable()),
+  })),
+  proximoCursor: z.uuid().nullable(),
+});
+export type ReferenciaServidorQuery = z.infer<typeof referenciaServidorQuerySchema>;
+export type ReferenciaServidor = z.infer<typeof referenciaServidorSchema>;

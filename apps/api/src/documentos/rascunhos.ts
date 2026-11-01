@@ -104,6 +104,7 @@ const confirmacaoInicioProtegidaSchema = z.strictObject({
   admissao: dataFuncionalSchema,
   confirmadoPor: z.uuid(),
   confirmadoEm: z.iso.datetime(),
+  perfilConfirmante: z.literal('admin').optional(),
 });
 
 export const MENSAGEM_SEM_APROVACAO = 'Emissão operacional bloqueada: regra/template provisórios ainda não aprovados. Registre a aprovação com npm run aprovar-modelo.';
@@ -217,7 +218,7 @@ export class RascunhosService {
   private async encaminhamento(cliente: PoolClient, documentoId: string): Promise<LinhaEncaminhamento | undefined> {
     const consulta = await cliente.query<LinhaEncaminhamento>(`
       SELECT e.id, e.destinatario_id, u.nome AS destinatario_nome,
-        (u.ativo AND u.papel = 'coordenador') AS destinatario_disponivel, e.encaminhado_em
+        (u.ativo AND u.papel IN ('coordenador', 'admin')) AS destinatario_disponivel, e.encaminhado_em
       FROM documentos.encaminhamento_dof e
       JOIN seguranca.usuario u ON u.id = e.destinatario_id
       WHERE e.documento_id = $1 AND e.recolhido_em IS NULL
@@ -246,7 +247,8 @@ export class RascunhosService {
       ? confirmacaoInicioProtegidaSchema.parse(
         this.ler('documento', linha.id, 'confirmacao_inicio_cifrada', linha.confirmacao_inicio_cifrada),
       ) : null;
-    if (confirmacaoInicio && confirmacaoInicio.confirmadoPor !== linha.criado_por) {
+    if (confirmacaoInicio && confirmacaoInicio.confirmadoPor !== linha.criado_por
+        && confirmacaoInicio.perfilConfirmante !== 'admin') {
       throw new Error('Autor da confirmação do início é inconsistente.');
     }
     const encaminhamento = await this.encaminhamento(cliente, linha.id);
@@ -302,19 +304,23 @@ export class RascunhosService {
       JOIN nucleo.pessoa p ON p.id = d.pessoa_id
       JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
       JOIN documentos.regra_versao r ON r.id = d.regra_versao_id
-      WHERE d.id = $1 AND (d.criado_por = $2 OR $6::boolean) AND d.tipo = 'DOF' AND d.status = $7
+      WHERE d.id = $1 AND (d.criado_por = $2 OR $6::boolean OR EXISTS (
+        SELECT 1 FROM seguranca.usuario u WHERE u.id = $2 AND u.ativo AND u.papel = 'admin'
+      )) AND d.tipo = 'DOF' AND d.status = $7
       ${bloquear === 'alteracao' ? 'FOR UPDATE OF d' : bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
     `, [id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA), permitirEncaminhado, estado]);
     const linha = consulta.rows[0];
     if (!linha || linha.criado_por === autorId) return linha;
     // Revalida após bloquear o documento, para não aceitar um encaminhamento recolhido durante a espera.
     const acesso = await cliente.query(`
+      SELECT 1 FROM seguranca.usuario u WHERE u.id = $2 AND u.ativo AND u.papel = 'admin'
+      UNION ALL
       SELECT 1 FROM documentos.encaminhamento_dof e
       JOIN seguranca.usuario u ON u.id = e.destinatario_id
       WHERE e.documento_id = $1 AND e.destinatario_id = $2 AND e.recolhido_em IS NULL
-        AND u.ativo AND u.papel = 'coordenador'
+        AND u.ativo AND u.papel IN ('coordenador', 'admin')
     `, [id, autorId]);
-    return acesso.rowCount === 1 ? linha : undefined;
+    return (acesso.rowCount ?? 0) > 0 ? linha : undefined;
   }
 
   private async registrarAjustes(
@@ -348,10 +354,10 @@ export class RascunhosService {
         FROM documentos.documento d
         JOIN nucleo.pessoa p ON p.id = d.pessoa_id
         JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
-        WHERE d.criado_por = $1 AND d.tipo = 'DOF' AND d.status = 'rascunho'
+        WHERE (d.criado_por = $1 OR $4::boolean) AND d.tipo = 'DOF' AND d.status = 'rascunho'
           AND ($2::uuid IS NULL OR d.id > $2::uuid)
         ORDER BY d.id LIMIT $3
-      `, [sessao.usuario.id, cursor ?? null, limite + 1]);
+      `, [sessao.usuario.id, cursor ?? null, limite + 1, sessao.usuario.papel === 'admin']);
       await auditarConsultaFuncional(cliente, sessao, 'rascunhos_listados', 'documento', null, null, ip);
       return {
         itens: consulta.rows.slice(0, limite).map((linha) => ({
@@ -370,7 +376,7 @@ export class RascunhosService {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
       const consulta = await cliente.query<{ id: string; nome: string; matricula: string }>(`
         SELECT id, nome, matricula FROM seguranca.usuario
-        WHERE ativo AND papel = 'coordenador' AND id <> $1
+        WHERE ativo AND papel IN ('coordenador', 'admin') AND id <> $1
           AND ($2::uuid IS NULL OR id > $2::uuid)
         ORDER BY id LIMIT $3
       `, [sessao.usuario.id, cursor ?? null, limite + 1]);
@@ -396,12 +402,12 @@ export class RascunhosService {
         JOIN documentos.documento d ON d.id = e.documento_id
         JOIN nucleo.pessoa p ON p.id = d.pessoa_id
         JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
-        JOIN seguranca.usuario u ON u.id = e.encaminhado_por
-        WHERE e.destinatario_id = $1 AND e.recolhido_em IS NULL
+        JOIN seguranca.usuario u ON u.id = d.criado_por
+        WHERE (e.destinatario_id = $1 OR $4::boolean) AND e.recolhido_em IS NULL
           AND d.tipo = 'DOF' AND d.status = 'rascunho'
           AND ($2::uuid IS NULL OR d.id > $2::uuid)
         ORDER BY d.id LIMIT $3
-      `, [sessao.usuario.id, cursor ?? null, limite + 1]);
+      `, [sessao.usuario.id, cursor ?? null, limite + 1, sessao.usuario.papel === 'admin']);
       await auditarConsultaFuncional(cliente, sessao, 'encaminhamentos_listados', 'documento', null, null, ip);
       return {
         itens: consulta.rows.slice(0, limite).map((linha) => ({
@@ -433,15 +439,15 @@ export class RascunhosService {
         JOIN seguranca.usuario autor ON autor.id = d.criado_por
         JOIN seguranca.usuario conferente ON conferente.id = c.conferido_por
         WHERE d.tipo = 'DOF' AND d.status = 'conferido'
-          AND (d.criado_por = $1 OR EXISTS (
+          AND (d.criado_por = $1 OR $4::boolean OR EXISTS (
             SELECT 1 FROM documentos.encaminhamento_dof e
             JOIN seguranca.usuario u ON u.id = e.destinatario_id
             WHERE e.documento_id = d.id AND e.destinatario_id = $1 AND e.recolhido_em IS NULL
-              AND u.ativo AND u.papel = 'coordenador'
+              AND u.ativo AND u.papel IN ('coordenador', 'admin')
           ))
           AND ($2::uuid IS NULL OR d.id > $2::uuid)
         ORDER BY d.id LIMIT $3
-      `, [sessao.usuario.id, cursor ?? null, limite + 1]);
+      `, [sessao.usuario.id, cursor ?? null, limite + 1, sessao.usuario.papel === 'admin']);
       await auditarConsultaFuncional(cliente, sessao, 'conferidos_dof_listados', 'documento', null, null, ip);
       return {
         itens: consulta.rows.slice(0, limite).map((linha) => ({
@@ -1078,6 +1084,7 @@ export class RascunhosService {
         admissao: rascunho.admissao,
         confirmadoPor: sessao.usuario.id,
         confirmadoEm: tempo.rows[0].confirmado_em.toISOString(),
+        ...(sessao.usuario.papel === 'admin' ? { perfilConfirmante: 'admin' } : {}),
       });
       await cliente.query(`
         UPDATE documentos.documento SET confirmacao_inicio_cifrada = $1, atualizado_por = $2,
@@ -1098,20 +1105,20 @@ export class RascunhosService {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
       const proprio = await cliente.query(`
         SELECT 1 FROM documentos.documento
-        WHERE id = $1 AND criado_por = $2 AND tipo = 'DOF' AND status = 'rascunho'
-      `, [id, sessao.usuario.id]);
+        WHERE id = $1 AND (criado_por = $2 OR $3::boolean) AND tipo = 'DOF' AND status = 'rascunho'
+      `, [id, sessao.usuario.id, sessao.usuario.papel === 'admin']);
       if (proprio.rowCount !== 1) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
       }
       if (dados.destinatarioId === sessao.usuario.id) {
-        return { falha: { tipo: 'invalido', mensagem: 'Selecione outro coordenador como destinatário.' } };
+        return { falha: { tipo: 'invalido', mensagem: 'Selecione outro coordenador ou administrador como destinatário.' } };
       }
       await cliente.query('SAVEPOINT destinatario_encaminhamento');
       let destinatario: { id: string } | undefined;
       try {
         const consulta = await cliente.query<{ id: string }>(`
-          SELECT id FROM seguranca.usuario WHERE id = $1 AND ativo AND papel = 'coordenador' FOR UPDATE NOWAIT
+          SELECT id FROM seguranca.usuario WHERE id = $1 AND ativo AND papel IN ('coordenador', 'admin') FOR UPDATE NOWAIT
         `, [dados.destinatarioId]);
         destinatario = consulta.rows[0];
         await cliente.query('RELEASE SAVEPOINT destinatario_encaminhamento');
@@ -1124,7 +1131,7 @@ export class RascunhosService {
         throw erro;
       }
       if (!destinatario) {
-        return { falha: { tipo: 'invalido', mensagem: 'Selecione um coordenador ativo para receber o rascunho.' } };
+        return { falha: { tipo: 'invalido', mensagem: 'Selecione um coordenador ou administrador ativo para receber o rascunho.' } };
       }
       const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao');
       if (!linha) {
@@ -1196,7 +1203,8 @@ export class RascunhosService {
       await confirmarSessao(cliente, sessao, papeisPermitidos('receber_encaminhamento'));
       const linha = await this.linha(cliente, id, sessao.usuario.id, 'alteracao', true);
       const encaminhamento = linha ? await this.encaminhamento(cliente, id) : undefined;
-      if (!linha || linha.criado_por === sessao.usuario.id || encaminhamento?.destinatario_id !== sessao.usuario.id) {
+      if (!linha || !encaminhamento || (sessao.usuario.papel !== 'admin'
+          && (linha.criado_por === sessao.usuario.id || encaminhamento.destinatario_id !== sessao.usuario.id))) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
       }
@@ -1430,7 +1438,7 @@ export class RascunhosService {
       `, [documentoId]);
       const linha = origem.rows[0];
       if (!linha || !(linha.criado_por === sessao.usuario.id || linha.emitido_por === sessao.usuario.id
-          || sessao.usuario.papel === 'coordenador')) {
+          || sessao.usuario.papel === 'coordenador' || sessao.usuario.papel === 'admin')) {
         await auditarConsultaFuncional(cliente, sessao, 'copia_emissao_nao_encontrada', 'documento', documentoId, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'DOF emitida não encontrada para cópia.' } };
       }

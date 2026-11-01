@@ -56,7 +56,7 @@ export function EncaminhamentoDof({
     const envio = encaminharRascunhoDofSchema.safeParse({ revisao: rascunho.revisao, destinatarioId });
     const recolhimento = recolherRascunhoDofSchema.safeParse({ revisao: rascunho.revisao, motivo });
     if ((!recolhendo && !envio.success) || (recolhendo && !recolhimento.success)) {
-      onErro(new ErroApi(400, recolhendo ? 'Informe o motivo do recolhimento.' : 'Selecione um coordenador ativo.'));
+      onErro(new ErroApi(400, recolhendo ? 'Informe o motivo do recolhimento.' : 'Selecione um coordenador ou administrador ativo.'));
       return;
     }
     try {
@@ -96,13 +96,13 @@ export function EncaminhamentoDof({
   return (
     <section className="separado" aria-labelledby="encaminhamento-dof-titulo">
       <h4 id="encaminhamento-dof-titulo">Encaminhamento para análise</h4>
-      <p>O coordenador escolhido poderá consultar o rascunho e a prévia ou devolvê-lo para ajustes. A conferência e a emissão ainda não estão disponíveis.</p>
+      <p>O coordenador ou administrador escolhido poderá consultar a prévia, conferir ou devolver o rascunho para ajustes. A emissão depende da conferência e da aprovação formal do modelo.</p>
       {bloqueado && <p className="aviso erro">Salve ou descarte as alterações de cálculo, processo e blocos antes de encaminhar.</p>}
       {rascunho.encaminhamento ? (
         <form onSubmit={salvar}>
           <p>Encaminhado a <strong>{rascunho.encaminhamento.destinatarioNome}</strong>. As edições estão bloqueadas até o recolhimento ou a devolução.</p>
           {!rascunho.encaminhamento.destinatarioDisponivel && (
-            <p className="aviso erro" role="alert">O destinatário deixou de ser coordenador ativo e não pode acessar o rascunho. Recolha e escolha outro.</p>
+            <p className="aviso erro" role="alert">O destinatário deixou de ser coordenador ou administrador ativo e não pode acessar o rascunho. Recolha e escolha outro.</p>
           )}
           <fieldset disabled={ocupado || bloqueado}>
             <label>Motivo do recolhimento

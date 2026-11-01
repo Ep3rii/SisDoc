@@ -8,6 +8,8 @@ import {
   type PaginaBuscaServidores,
   type PaginaEventosServidor,
   type Configuracao,
+  type ReferenciaServidor,
+  type ReferenciaServidorQuery,
 } from '@sisdoc/contratos';
 import type { Pool } from 'pg';
 import { transacao } from '../banco';
@@ -16,6 +18,7 @@ import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
+import { decifrarTexto } from '../importacao/exportador';
 
 type LinhaBusca = {
   pessoa_id: string;
@@ -49,6 +52,71 @@ export class ServidoresService {
 
   constructor(private readonly banco: Pool, configuracao: Configuracao) {
     this.protetor = new ProtetorDados(configuracao.chaves);
+  }
+
+  async referencia(sessao: SessaoAutenticada, ip: string, pessoaId: string, consulta: ReferenciaServidorQuery): Promise<ReferenciaServidor> {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_pessoa'));
+      const pessoal = await cliente.query<{
+        id: string; nome: string; nascimento: string | null; rg_orgao: string | null; rg_expedicao: string | null;
+        cpf_cifrado: Buffer; nome_mae_cifrado: Buffer | null; nome_pai_cifrado: Buffer | null;
+        pis_pasep_cifrado: Buffer | null; rg_numero_cifrado: Buffer | null;
+        titulo_eleitor_cifrado: Buffer | null; endereco_cifrado: Buffer | null;
+      }>(`SELECT p.id, p.nome, to_char(p.nascimento, 'YYYY-MM-DD') AS nascimento,
+        p.rg_orgao, to_char(p.rg_expedicao, 'YYYY-MM-DD') AS rg_expedicao,
+        p.cpf_cifrado, p.nome_mae_cifrado, p.nome_pai_cifrado, p.pis_pasep_cifrado,
+        p.rg_numero_cifrado, p.titulo_eleitor_cifrado, p.endereco_cifrado
+        FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id WHERE p.id = $1 AND v.id = $2`,
+      [pessoaId, consulta.vinculoId]);
+      const p = pessoal.rows[0];
+      if (!p) throw new NotFoundException('Vínculo não encontrado para esta pessoa.');
+      const pessoa: ReferenciaServidor['pessoa'] = {
+        Nome: p.nome, Nascimento: p.nascimento, 'Órgão expedidor': p.rg_orgao, 'Expedição RG': p.rg_expedicao,
+      };
+      for (const [rotulo, campo] of [
+        ['CPF', 'cpf_cifrado'], ['Mãe', 'nome_mae_cifrado'], ['Pai', 'nome_pai_cifrado'],
+        ['PIS/PASEP', 'pis_pasep_cifrado'], ['RG', 'rg_numero_cifrado'],
+        ['Título de eleitor', 'titulo_eleitor_cifrado'], ['Endereço', 'endereco_cifrado'],
+      ] as const) pessoa[rotulo] = decifrarTexto(this.protetor, p.id, 'pessoa', campo, p[campo]);
+      const definicoes = {
+        eventos_funcionais: { tabela: 'evento_funcional', pai: 'vinculo_id',
+          campos: ['tipo', 'data_evento', 'data_publicacao', 'ato_tipo', 'ato_numero', 'fonte', 'removido_na_fonte_em'],
+          cifrados: ['descricao_origem_cifrada', 'dados_cifrados'] },
+        afastamentos: { tabela: 'afastamento', pai: 'vinculo_id',
+          campos: ['tipo', 'data_inicio', 'data_fim', 'ano_ref', 'dias_ano', 'fonte', 'removido_na_fonte_em'],
+          cifrados: ['observacao_cifrada'] },
+        incorporacoes: { tabela: 'incorporacao', pai: 'vinculo_id',
+          campos: ['tipo', 'data_inicio', 'data_fim', 'ano_ref', 'dias_entrada', 'convencao', 'origem', 'removido_na_fonte_em'],
+          cifrados: [] },
+        periodos_ipam: { tabela: 'periodo_ipam', pai: 'pessoa_id',
+          campos: ['mes_inicio', 'mes_fim', 'fonte', 'removido_na_fonte_em'], cifrados: [] },
+      } as const;
+      const d = definicoes[consulta.tipo];
+      const colunas = d.campos.map((campo) => `${campo}::text AS ${campo}`).concat([...d.cifrados]);
+      const resultado = await cliente.query<Record<string, string | Buffer | null>>(
+        `SELECT id::text, ${colunas.join(', ')} FROM nucleo.${d.tabela}
+        WHERE ${d.pai} = $1 AND ($2::uuid IS NULL OR id > $2) ORDER BY id LIMIT $3`,
+        [d.pai === 'pessoa_id' ? pessoaId : consulta.vinculoId, consulta.cursor ?? null, consulta.limite + 1],
+      );
+      const registros = resultado.rows.slice(0, consulta.limite).map((registro) => {
+        if (typeof registro.id !== 'string') throw new Error('Registro de referência sem identificador.');
+        const id = registro.id;
+        const campos: Record<string, string | null> = {};
+        for (const campo of d.campos) {
+          const valor = registro[campo];
+          if (valor !== null && typeof valor !== 'string') throw new Error('Campo de referência inválido.');
+          campos[campo] = valor;
+        }
+        for (const campo of d.cifrados) {
+          const valor = registro[campo];
+          if (valor !== null && !Buffer.isBuffer(valor)) throw new Error('Campo protegido de referência inválido.');
+          campos[campo.replace(/_cifrad[oa]$/, '')] = decifrarTexto(this.protetor, id, d.tabela, campo, valor);
+        }
+        return { id, campos };
+      });
+      await auditarConsultaFuncional(cliente, sessao, 'referencias_consultadas', consulta.tipo, consulta.vinculoId, pessoaId, ip);
+      return { pessoa, registros, proximoCursor: resultado.rows.length > consulta.limite ? registros[registros.length - 1].id : null };
+    });
   }
 
   async buscar(sessao: SessaoAutenticada, ip: string, consulta: BuscarServidoresQuery): Promise<PaginaBuscaServidores> {

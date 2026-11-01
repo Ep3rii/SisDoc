@@ -200,12 +200,8 @@ export class EmissoesService {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_emissoes'));
       const papel = sessao.usuario.papel;
       const todos = consulta.escopo === 'todos';
-      const minimizado = papel === 'admin';
       if (todos && !perfilPermiteAcao(papel, 'historico_terceiros') && !perfilPermiteAcao(papel, 'cancelar_emitido')) {
         throw new BadRequestException('Seu perfil consulta apenas as próprias emissões.');
-      }
-      if (!todos && minimizado) {
-        throw new BadRequestException('O perfil administrador consulta apenas o histórico geral minimizado.');
       }
       const linhas = await cliente.query<LinhaSituacao>(`
         ${consultaSituacao}
@@ -218,13 +214,13 @@ export class EmissoesService {
       const itens: ItemHistorico[] = linhas.rows.map((linha) => {
         const situacao = apresentarSituacao(linha);
         const participa = this.participa(sessao, linha);
-        const ve = !minimizado && this.podeVer(sessao, linha);
+        const ve = this.podeVer(sessao, linha);
         return {
           ...situacao,
           nome: ve ? linha.nome : null,
           matricula: ve ? linha.matricula : null,
-          podeCopiar: !minimizado && perfilPermiteAcao(papel, 'criar_rascunho')
-            && (participa || papel === 'coordenador'),
+          podeCopiar: perfilPermiteAcao(papel, 'criar_rascunho')
+            && (participa || papel === 'coordenador' || papel === 'admin'),
           podeCancelar: linha.status === 'emitido' && perfilPermiteAcao(papel, 'cancelar_emitido'),
           podeBaixar: ve && situacao.pdf.disponivel,
         };

@@ -166,10 +166,31 @@ Menu **Administração → Importação** (perfil administrador): escolher tipo,
 origem e arquivo, **Validar arquivo** (dry-run) e, só depois de validar o
 mesmo arquivo, **Gravar importação** (com confirmação). A tela mostra
 contagens, ocorrências, conferência por origem e os lotes anteriores. A rota
-é `POST /api/v1/admin/importacoes?tipo=&origem=&nome=&gravar=` com corpo
+é `POST /api/v1/admin/importacoes?tipo=&origem=&modo=validar|gravar` com corpo
 `application/octet-stream`; `GET /api/v1/admin/importacoes` e
-`GET /api/v1/admin/importacoes/conferencia` listam e conferem. Nenhuma
-dessas rotas devolve dados funcionais ao administrador.
+`GET /api/v1/admin/importacoes/conferencia` listam e conferem.
+Os mesmos controles de importação estão na tela **Sincronização**.
+
+### Exportação pela tela
+
+Na tela **Administração → Sincronização**, selecione **Exportação de dados**:
+tipo, origem e formato CSV UTF-8/XLSX. O administrador confirma o download
+com dados pessoais completos. `POST /api/v1/admin/importacoes/exportar`
+recebe JSON `{tipo, origem, formato, afastamentos}` com CSRF; `afastamentos`
+é `anual` (padrão) ou `intervalo`.
+
+Os cabeçalhos são os da importação e os arquivos podem ser reimportados.
+Somente registros ativos da origem escolhida são incluídos. Exporte as duas
+modalidades de afastamentos quando ambas existirem. CSV com conteúdo
+interpretável como fórmula é recusado; XLSX mantém os valores como texto.
+Incorporações anuais ou com convenção exclusiva não são convertidas para
+intervalos inclusivos: a exportação é recusada com explicação.
+
+Limites: 100 mil linhas e 64 MB por arquivo, sem truncamento silencioso.
+A auditoria registra usuário, tipo, origem, formato e modalidade, sem valores
+pessoais. O arquivo baixado **não é cifrado**; guarde-o em pasta protegida,
+fora do Git. Exportação de dados não substitui backup de banco, auditorias,
+documentos emitidos ou PDFs.
 
 ## Garantias
 

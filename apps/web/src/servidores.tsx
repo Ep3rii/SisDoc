@@ -1,17 +1,66 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   buscarServidoresQuerySchema,
+  referenciaServidorSchema,
+  type ReferenciaServidor,
+  type ReferenciaServidorQuery,
   type DetalheServidor,
   type PaginaBuscaServidores,
   type PaginaEventosServidor,
   type TipoBuscaServidor,
 } from '@sisdoc/contratos';
-import { api, ErroApi } from './api';
+import { api, ErroApi, requisitar, validar } from './api';
 import { CalculoDof } from './calculo-dof';
 
 type Props = { onErro: (erro: unknown) => void; onLimpar: () => void };
 type ProtecaoEdicao = { onPendente: (valor: boolean) => void; confirmarSaida: () => boolean };
 export type Consulta = { q: string; tipo: TipoBuscaServidor };
+
+function Referencias({ pessoaId, vinculoId, onErro }: { pessoaId: string; vinculoId: string; onErro: Props['onErro'] }) {
+  const [tipo, setTipo] = useState<ReferenciaServidorQuery['tipo']>('eventos_funcionais');
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [dados, setDados] = useState<ReferenciaServidor | null>(null);
+  const [falhou, setFalhou] = useState(false);
+  const [versao, setVersao] = useState(0);
+  useEffect(() => {
+    let ativa = true;
+    setDados(null);
+    setFalhou(false);
+    const query = new URLSearchParams({ vinculoId, tipo, limite: '50' });
+    if (cursor) query.set('cursor', cursor);
+    requisitar(`servidores/${pessoaId}/referencias?${query}`).then((resultado) => {
+      if (ativa) setDados(validar(referenciaServidorSchema, resultado));
+    }).catch((erro: unknown) => {
+      if (ativa) { setFalhou(true); onErro(erro); }
+    });
+    return () => { ativa = false; };
+  }, [pessoaId, vinculoId, tipo, cursor, versao, onErro]);
+  return <section className="separado" aria-label="Dados de referência para DOF e DTC">
+    <h4>Dados de referência — DOF e DTCs</h4>
+    <p className="aviso">Dados pessoais completos. Consulte apenas para atividades autorizadas do setor; o acesso é auditado.</p>
+    <label>Referências<select value={tipo} onChange={(evento) => {
+      const valor = evento.target.value;
+      if (valor === 'eventos_funcionais' || valor === 'afastamentos' || valor === 'incorporacoes' || valor === 'periodos_ipam') {
+        setTipo(valor); setCursor(undefined);
+      }
+    }}>
+      <option value="eventos_funcionais">Eventos funcionais</option><option value="afastamentos">Afastamentos</option>
+      <option value="incorporacoes">Incorporações</option><option value="periodos_ipam">Períodos IPAM</option>
+    </select></label>
+    {falhou ? <button type="button" onClick={() => setVersao((v) => v + 1)}>Tentar carregar referências novamente</button>
+      : !dados ? <p role="status">Carregando referências...</p> : <>
+        <dl>{Object.entries(dados.pessoa).map(([nome, valor]) => <div key={nome}><dt>{nome}</dt><dd>{valor ?? 'Não informado'}</dd></div>)}</dl>
+        {dados.registros.length === 0 && <p>Nenhum registro deste tipo.</p>}
+        {dados.registros.map((registro) => <dl className="bloco" key={registro.id}>
+          {Object.entries(registro.campos).map(([nome, valor]) => <div key={nome}><dt>{nome.replace(/_/g, ' ')}</dt><dd>{valor ?? 'Não informado'}</dd></div>)}
+        </dl>)}
+        <div className="acoes">
+          <button type="button" disabled={!cursor} onClick={() => setCursor(undefined)}>Primeira página de referências</button>
+          <button type="button" disabled={!dados.proximoCursor} onClick={() => setCursor(dados.proximoCursor ?? undefined)}>Próxima página de referências</button>
+        </div>
+      </>}
+  </section>;
+}
 
 export function BuscaGlobal({ onBuscar, onErro }: {
   onBuscar: (consulta: Consulta) => void; onErro: (erro: unknown) => void;
@@ -90,6 +139,7 @@ function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPen
   const [detalhe, setDetalhe] = useState<DetalheServidor | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [vinculoId, setVinculoId] = useState<string | null>(null);
+  const [referenciaId, setReferenciaId] = useState<string | null>(null);
   const [vinculoCalculo, setVinculoCalculo] = useState<{ id: string; matricula: string; admissao: string } | null>(null);
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
@@ -101,6 +151,7 @@ function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPen
     setDetalhe(null);
     setFalhou(false);
     setVinculoId(null);
+    setReferenciaId(null);
     setVinculoCalculo(null);
     api.servidor(pessoaId, cursor).then((resultado) => {
       if (ativa) setDetalhe(resultado);
@@ -125,6 +176,11 @@ function Detalhe({ pessoaId, csrf, podeSalvar, onFechar, onErro, onLimpar, onPen
         <>
           <h4>{detalhe.pessoa.nome}</h4>
           <p>CPF: {detalhe.pessoa.cpfMascarado}</p>
+          <label>Dados de referência do vínculo<select value={referenciaId ?? ''} onChange={(evento) => setReferenciaId(evento.target.value || null)}>
+            <option value="">Selecionar para consultar dados completos</option>
+            {detalhe.vinculos.map((vinculo) => <option key={vinculo.id} value={vinculo.id}>{vinculo.matricula} — {vinculo.sistemaOrigem}</option>)}
+          </select></label>
+          {referenciaId && <Referencias key={referenciaId} pessoaId={pessoaId} vinculoId={referenciaId} onErro={onErro} />}
           <div className="tabela"><table>
             <thead><tr><th scope="col">Matrícula</th><th scope="col">Origem</th><th scope="col">Regime</th><th scope="col">Cargo / referência</th><th scope="col">Classe / nível</th><th scope="col">Órgão / setor</th><th scope="col">Admissão / desligamento</th><th scope="col">Vínculo anterior</th><th scope="col">Eventos</th><th scope="col">Cálculo</th></tr></thead>
             <tbody>{detalhe.vinculos.map((vinculo) => {

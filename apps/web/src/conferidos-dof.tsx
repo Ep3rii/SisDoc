@@ -8,6 +8,7 @@ type Props = {
   csrf: string;
   podeDevolver: boolean;
   podeEmitir: boolean;
+  administrador?: boolean;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
@@ -16,7 +17,7 @@ type Props = {
 
 type Conferido = PaginaConferidosDof['itens'][number];
 
-export function ConferidosDof({ csrf, podeDevolver, podeEmitir, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
+export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = false, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
   const [pagina, setPagina] = useState<PaginaConferidosDof | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [selecionado, setSelecionado] = useState<Conferido | null>(null);
@@ -198,7 +199,8 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, onErro, onLimpar
   return (
     <section className="painel" aria-labelledby="conferidos-titulo">
       <h2 id="conferidos-titulo">DOFs conferidas</h2>
-      <p>Somente suas DOFs e as encaminhadas a você são exibidas. A emissão é feita pelo coordenador e depende da aprovação formal da regra e do modelo.</p>
+      <p>{administrador ? 'Todas as DOFs conferidas são exibidas. O administrador pode emitir ou devolver documentos de qualquer autoria.'
+        : 'Somente suas DOFs e as encaminhadas a você são exibidas. A emissão é feita pelo coordenador.'} A emissão depende da aprovação formal da regra e do modelo.</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {falhou ? (
         <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>

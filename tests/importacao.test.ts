@@ -7,6 +7,7 @@ import path from 'node:path';
 import {
   conferenciaImportacaoSchema, paginaLotesImportacaoSchema, relatorioImportacaoSchema, respostaSessaoSchema,
   type Configuracao, type RelatorioImportacao, type TipoImportacao,
+  referenciaServidorSchema,
 } from '@sisdoc/contratos';
 import EmbeddedPostgres from 'embedded-postgres';
 import forge from 'node-forge';
@@ -139,7 +140,7 @@ describe('Importação de planilhas e base legada', () => {
 
   async function requisitar(opcoes: {
     metodo: 'GET' | 'POST'; rota: string; corpo?: Buffer; tipoConteudo?: string; sessao?: Sessao;
-  }): Promise<{ status: number | undefined; corpo: string; cookie?: string }> {
+  }): Promise<{ status: number | undefined; corpo: string; binario: Buffer; cookie?: string }> {
     return new Promise((resolve, reject) => {
       const pedido = https.request({
         host: '127.0.0.1', port: portaHttps, servername: nomeTls, path: `/api/v1/${opcoes.rota}`, method: opcoes.metodo,
@@ -153,7 +154,8 @@ describe('Importação de planilhas e base legada', () => {
         const partes: Buffer[] = [];
         resposta.on('data', (parte: Buffer) => partes.push(parte));
         resposta.on('end', () => resolve({
-          status: resposta.statusCode, corpo: Buffer.concat(partes).toString('utf8'), cookie: resposta.headers['set-cookie']?.[0]?.split(';')[0],
+          status: resposta.statusCode, corpo: Buffer.concat(partes).toString('utf8'), binario: Buffer.concat(partes),
+          cookie: resposta.headers['set-cookie']?.[0]?.split(';')[0],
         }));
         resposta.on('error', reject);
       });
@@ -243,7 +245,7 @@ describe('Importação de planilhas e base legada', () => {
     await migrador.connect();
     poolAplicativo = new Pool({
       host: config.banco.host, port: config.banco.porta, database: config.banco.nome,
-      user: config.banco.usuario, password: config.banco.senha, max: 10,
+      user: config.banco.usuario, password: config.banco.senha, max: 10, connectionTimeoutMillis: 5000,
     });
     app = await criarAplicacao(config, poolAplicativo);
     await app.listen(portaHttps, '127.0.0.1');
@@ -508,5 +510,122 @@ describe('Importação de planilhas e base legada', () => {
     expect(duracao).toBeLessThan(120_000);
     const segundo = await importar('dados_funcionais', linhas, 'volume', true, Buffer.from('volume-de-novo'));
     expect(segundo.contagens).toMatchObject({ inseridos: 0, atualizados: 0 });
+  }, 300_000);
+
+  it('exporta os cinco tipos em CSV/XLSX reimportáveis, sem dar exportação ao analista', async () => {
+    const sessaoAdmin = usuarios.get('admin')?.sessao;
+    const analista = usuarios.get('analista')?.sessao;
+    if (!sessaoAdmin || !analista) throw new Error('Sessões ausentes.');
+    const exportar = (tipo: TipoImportacao, formato: 'csv' | 'xlsx', afastamentos = 'anual', sessao = sessaoAdmin) =>
+      requisitar({ metodo: 'POST', rota: 'admin/importacoes/exportar', sessao,
+        tipoConteudo: 'application/json', corpo: Buffer.from(JSON.stringify({ tipo, origem: 'origem-tipos', formato, afastamentos })) });
+    expect((await exportar('dados_funcionais', 'csv', 'anual', analista)).status).toBe(403);
+    expect((await requisitar({ metodo: 'POST', rota: 'admin/importacoes/exportar',
+      corpo: Buffer.from('{}'), tipoConteudo: 'application/json' })).status).toBe(401);
+    for (const formato of ['csv', 'xlsx'] as const) {
+      for (const tipo of ['dados_funcionais', 'afastamentos', 'incorporacoes', 'periodos_ipam', 'eventos_funcionais'] as const) {
+        const resposta = await exportar(tipo, formato);
+        expect(resposta.status, resposta.corpo).toBe(200);
+        const linhas = lerPlanilha(resposta.binario).linhas;
+        expect(linhas.length).toBeGreaterThan(1);
+        expect(analisarLinhas(tipo, linhas).validos).toBe(linhas.length - 1);
+        const reimportado = await importar(tipo, linhas, 'origem-tipos', false);
+        expect(reimportado.contagens).toMatchObject({ inseridos: 0, atualizados: 0 });
+        if (tipo === 'dados_funcionais') expect(linhas.some((linha) => linha.includes(cpfSintetico(910000030)))).toBe(true);
+      }
+      const intervalos = await exportar('afastamentos', formato, 'intervalo');
+      expect(intervalos.status, intervalos.corpo).toBe(200);
+      const linhas = lerPlanilha(intervalos.binario).linhas;
+      expect(linhas[0]).toEqual(['MATRICULA', 'TIPO', 'DT_INICIO', 'DT_FIM']);
+      expect(analisarLinhas('afastamentos', linhas).validos).toBe(1);
+    }
+    const auditados = await banco().query("SELECT count(*)::int AS total FROM seguranca.auditoria WHERE acao = 'dados_exportados'");
+    expect(auditados.rows[0].total).toBe(12);
+    const perigosos = planilha('dados_funcionais', [funcional(910000080, 'X-1', { NOME: '=1+1' })]);
+    await importar('dados_funcionais', perigosos, 'formula-teste');
+    const formula = (formato: string) => requisitar({ metodo: 'POST', rota: 'admin/importacoes/exportar', sessao: sessaoAdmin,
+      tipoConteudo: 'application/json', corpo: Buffer.from(JSON.stringify({ tipo: 'dados_funcionais', origem: 'formula-teste', formato })) });
+    expect((await formula('csv')).status).toBe(422);
+    const seguro = await formula('xlsx');
+    expect(seguro.status).toBe(200);
+    expect(lerPlanilha(seguro.binario).linhas[1]).toContain('=1+1');
+    await banco().query("UPDATE nucleo.incorporacao SET convencao = 'exclusivo' WHERE sistema_origem = 'origem-tipos'");
+    try {
+      const exclusiva = await exportar('incorporacoes', 'xlsx');
+      expect(exclusiva.status).toBe(422);
+      expect(exclusiva.corpo).toContain('inclusivos');
+    } finally {
+      await banco().query("UPDATE nucleo.incorporacao SET convencao = 'inclusivo' WHERE sistema_origem = 'origem-tipos'");
+    }
+  });
+
+  it('mostra referências pessoais completas ao Cadastro e administrador com paginação e auditoria', async () => {
+    const linha = (await banco().query<{ pessoa_id: string; id: string }>(
+      "SELECT pessoa_id, id FROM nucleo.vinculo WHERE sistema_origem = 'origem-tipos' AND matricula = 'E-1'")).rows[0];
+    for (const papel of ['analista', 'admin']) {
+      const sessao = usuarios.get(papel)?.sessao;
+      if (!sessao) throw new Error('Sessão ausente.');
+      const rota = `servidores/${linha.pessoa_id}/referencias?vinculoId=${linha.id}&tipo=afastamentos&limite=1`;
+      const primeira = await requisitar({ metodo: 'GET', rota, sessao });
+      expect(primeira.status, primeira.corpo).toBe(200);
+      const dados = referenciaServidorSchema.parse(JSON.parse(primeira.corpo));
+      expect(dados.pessoa.CPF).toBe(cpfSintetico(910000030));
+      expect(dados.pessoa.Mãe).toBe('MAE FICTICIA 910000030');
+      expect(dados.registros).toHaveLength(1);
+      expect(dados.proximoCursor).not.toBeNull();
+      const seguinte = await requisitar({ metodo: 'GET', rota: `${rota}&cursor=${dados.proximoCursor}`, sessao });
+      expect(referenciaServidorSchema.parse(JSON.parse(seguinte.corpo)).registros[0].id).not.toBe(dados.registros[0].id);
+    }
+    const anonimo = await requisitar({ metodo: 'GET', rota: `servidores/${linha.pessoa_id}/referencias?vinculoId=${linha.id}` });
+    expect(anonimo.status).toBe(401);
+    const trocado = await requisitar({ metodo: 'GET',
+      rota: `servidores/${randomUUID()}/referencias?vinculoId=${linha.id}`, sessao: usuarios.get('admin')?.sessao });
+    expect(trocado.status).toBe(404);
+    expect((await banco().query("SELECT count(*)::int AS total FROM seguranca.auditoria WHERE acao = 'referencias_consultadas'")).rows[0].total).toBe(4);
+  });
+
+  it('atende 64 usuários simultâneos por perfil e mistos sobre 20 mil vínculos via HTTPS', async () => {
+    const senhaHash = await gerarHashSenha(senhaUsuarios);
+    const grupos = new Map<string, Sessao[]>();
+    for (const papel of ['analista', 'coordenador', 'secretario_adjunto', 'admin']) {
+      const sessoes: Sessao[] = [];
+      for (let indice = 0; indice < 64; indice += 1) {
+        const matricula = `CARGA-${papel}-${indice}`;
+        await banco().query(`INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, troca_senha_obrigatoria)
+          VALUES ($1, $2, 'Usuário de carga fictício', $3, $4, false)`, [randomUUID(), matricula, senhaHash, papel]);
+        const login = await requisitar({ metodo: 'POST', rota: 'auth/login', tipoConteudo: 'application/json',
+          corpo: Buffer.from(JSON.stringify({ matricula, senha: senhaUsuarios })) });
+        expect(login.status, login.corpo).toBe(200);
+        if (!login.cookie) throw new Error('Sessão de carga ausente.');
+        sessoes.push({ cookie: login.cookie, csrf: respostaSessaoSchema.parse(JSON.parse(login.corpo)).csrf });
+      }
+      grupos.set(papel, sessoes);
+    }
+    const mistos = [...grupos.values()].flatMap((sessoes) => sessoes.slice(0, 16));
+    grupos.set('mistos', mistos);
+    const vinculo = (await banco().query<{ pessoa_id: string; id: string }>(
+      "SELECT pessoa_id, id FROM nucleo.vinculo WHERE sistema_origem = 'volume' ORDER BY id LIMIT 1")).rows[0];
+    for (const [perfil, sessoes] of grupos) {
+      expect(new Set(sessoes.map((s) => s.cookie)).size).toBe(64);
+      const tempos: number[] = [];
+      for (const rota of [
+        'auth/me', 'servidores?q=PESSOA&tipo=nome&limite=50',
+        `servidores/${vinculo.pessoa_id}/referencias?vinculoId=${vinculo.id}`,
+      ]) {
+        await Promise.all(sessoes.map(async (sessao) => {
+          const inicio = performance.now();
+          const resposta = await requisitar({ metodo: 'GET', rota, sessao });
+          tempos.push(performance.now() - inicio);
+          expect(resposta.status, `${perfil}: ${rota}: ${resposta.corpo}`).toBe(200);
+        }));
+      }
+      tempos.sort((a, b) => a - b);
+      const p95 = tempos[Math.ceil(tempos.length * .95) - 1];
+      const maximo = tempos[tempos.length - 1];
+      console.log(`Carga HTTPS: perfil=${perfil}, usuários=64, requisições=${tempos.length}, erros=0, p95=${p95.toFixed(1)} ms, máximo=${maximo.toFixed(1)} ms.`);
+      expect(p95).toBeLessThan(5000);
+      expect(maximo).toBeLessThan(10000);
+      expect(poolAplicativo?.waitingCount).toBe(0);
+    }
   }, 300_000);
 });

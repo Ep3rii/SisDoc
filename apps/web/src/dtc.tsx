@@ -341,7 +341,7 @@ function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, onPenden
   const { documento, fonte } = previa;
   if (documento.tipo !== tipo) return <p className="aviso erro">Este documento não é uma {ROTULOS_DTC[tipo]}.</p>;
   const servidor = { pessoaId: documento.pessoaId, vinculoId: documento.vinculoId, nome: documento.nome, matricula: documento.matricula };
-  const coordenador = papel === 'coordenador';
+  const podeEmitir = papel === 'coordenador' || papel === 'admin';
 
   if (editando) {
     return <Editor tipo={tipo} inicial={documento.conteudo} documento={documento} servidor={servidor} csrf={csrf}
@@ -381,7 +381,7 @@ function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, onPenden
               setVersao((atual) => atual + 1);
             })}>Conferir</button></div>
         </>}
-        {documento.status === 'conferido' && coordenador && <>
+        {documento.status === 'conferido' && podeEmitir && <>
           <div className="acoes"><button type="button" disabled={ocupado} onClick={() => void executar(async () => {
             if (!window.confirm(`Emitir a ${ROTULOS_DTC[tipo]} de ${documento.nome}? Um número oficial será reservado.`)) return;
             if (chave.current?.revisao !== documento.revisao) chave.current = { revisao: documento.revisao, valor: crypto.randomUUID() };
@@ -501,7 +501,7 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
       <div className="acoes">
         <button type="button" onClick={() => { onLimpar(); setModo({ tela: 'busca' }); }}>Nova {ROTULOS_DTC[tipo]}</button>
         <label>Situação<select value={estado} onChange={(evento) => setEstado(evento.target.value === 'conferido' ? 'conferido' : 'rascunho')}>
-          <option value="rascunho">{papel === 'coordenador' ? 'Rascunhos' : 'Meus rascunhos'}</option>
+          <option value="rascunho">{papel === 'coordenador' || papel === 'admin' ? 'Rascunhos' : 'Meus rascunhos'}</option>
           <option value="conferido">Conferidas</option>
         </select></label>
       </div>

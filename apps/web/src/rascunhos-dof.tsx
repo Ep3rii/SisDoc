@@ -6,13 +6,14 @@ import { CalculoDof } from './calculo-dof';
 type Props = {
   csrf: string;
   recebidos?: boolean;
+  administrador?: boolean;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
   confirmarSaida: () => boolean;
 };
 
-export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
+export function RascunhosDof({ csrf, recebidos = false, administrador = false, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
   const [pagina, setPagina] = useState<PaginaRascunhosDof | PaginaEncaminhamentosDof | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [rascunho, setRascunho] = useState<RascunhoDof | null>(null);
@@ -59,7 +60,7 @@ export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPend
       <CalculoDof
         key={rascunho.id} pessoaId={rascunho.pessoaId} vinculoId={rascunho.vinculoId}
         nome={rascunho.nome} matricula={rascunho.matricula} admissao={rascunho.admissao}
-        csrf={csrf} podeSalvar={!recebidos} somenteLeitura={recebidos} rascunhoInicial={rascunho} onErro={onErro} onLimpar={onLimpar}
+        csrf={csrf} podeSalvar={administrador || !recebidos} somenteLeitura={recebidos && !administrador} rascunhoInicial={rascunho} onErro={onErro} onLimpar={onLimpar}
         onPendente={onPendente} confirmarSaida={confirmarSaida}
         onFechar={(aviso) => { setRascunho(null); setVersao((atual) => atual + 1); onLimpar(); setMensagem(aviso ?? ''); }}
       />
@@ -68,8 +69,10 @@ export function RascunhosDof({ csrf, recebidos = false, onErro, onLimpar, onPend
 
   return (
     <section aria-labelledby="rascunhos-titulo">
-      <h2 id="rascunhos-titulo">{recebidos ? 'Rascunhos encaminhados a mim' : 'Meus rascunhos de DOF'}</h2>
-      <p>{recebidos
+      <h2 id="rascunhos-titulo">{administrador ? (recebidos ? 'Todos os rascunhos encaminhados' : 'Todos os rascunhos de DOF')
+        : recebidos ? 'Rascunhos encaminhados a mim' : 'Meus rascunhos de DOF'}</h2>
+      <p>{administrador ? 'O administrador pode acessar e editar rascunhos de qualquer autoria. Recolha encaminhamentos antes de alterar o conteúdo.'
+        : recebidos
         ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta, conferência provisória e devolução.'
         : 'Somente rascunhos de sua autoria são exibidos. Você pode encaminhá-los a um coordenador para análise.'}</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}

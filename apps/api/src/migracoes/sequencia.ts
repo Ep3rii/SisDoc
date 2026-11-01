@@ -1,4 +1,5 @@
 import type { Client } from 'pg';
+import { aplicarAcessoAdmin } from './acesso-admin';
 import { aplicarAutenticacao } from './autenticacao';
 import { aplicarBlocosDof } from './blocos-dof';
 import { aplicarConferenciaDof } from './conferencia-dof';
@@ -33,6 +34,7 @@ export const SEQUENCIA_MIGRACOES: readonly Migracao[] = [
   { versao: '013-emissao', aplicar: aplicarEmissao },
   { versao: '014-dtc', aplicar: aplicarDtc },
   { versao: '015-importacao', aplicar: aplicarImportacao },
+  { versao: '016-acesso-admin', aplicar: aplicarAcessoAdmin },
 ];
 
 // Deve ser chamada dentro de uma transação aberta pelo papel de migração; devolve as versões aplicadas agora.

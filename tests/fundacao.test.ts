@@ -1686,7 +1686,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: '/api/v1/servidores?q=arvore&tipo=nome' })).status).toBe(401);
         for (const rota of ['/api/v1/servidores?q=arvore&tipo=nome', `/api/v1/servidores/${primeira.id}`,
           `/api/v1/servidores/${primeira.id}/eventos?vinculoId=${primeira.vinculos[0].id}`]) {
-          expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: admin.cookie })).status).toBe(403);
+          expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota, cookie: admin.cookie })).status).toBe(200);
         }
         const duracoes = { nome: 0, cpf: 0, matricula: 0, pagina: 0 };
         const consultar = async (q: string, tipo: 'nome' | 'cpf' | 'matricula') => {
@@ -1889,7 +1889,7 @@ describe('fundação em recursos descartáveis', () => {
         })).status).toBe(403);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: '/api/v1/calculos', corpo: entrada, ...admin,
-        })).status).toBe(403);
+        })).status).toBe(200);
         for (const papel of ['analista', 'coordenador', 'secretario_adjunto']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão funcional sintética ausente.');
@@ -1957,7 +1957,7 @@ describe('fundação em recursos descartáveis', () => {
 
         const motivo = 'Conferência fictícia das ocorrências por ano';
         const admissaoEsperada = '1980-01-01';
-        for (const papel of ['secretario_adjunto', 'admin']) {
+        for (const papel of ['secretario_adjunto']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão sintética ausente.');
           expect((await requisitarApi(portaHttps, caPem, {
@@ -2006,7 +2006,7 @@ describe('fundação em recursos descartáveis', () => {
         })).status).toBe(404);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: `/api/v1/documentos/${rascunho.id}`, cookie: admin.cookie,
-        })).status).toBe(403);
+        })).status).toBe(200);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'PATCH', rota: `/api/v1/documentos/${rascunho.id}`,
           corpo: { calculo: entrada, motivo, admissaoEsperada, revisao: 1 }, cookie: analista.cookie,
@@ -2357,7 +2357,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaDadosPrevia, cookie: coordenador.cookie,
         })).status).toBe(404);
-        for (const papel of ['secretario_adjunto', 'admin']) {
+        for (const papel of ['secretario_adjunto']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão sintética ausente.');
           expect((await requisitarApi(portaHttps, caPem, {
@@ -2602,7 +2602,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...coordenador,
         })).status).toBe(404);
-        for (const papel of ['secretario_adjunto', 'admin']) {
+        for (const papel of ['secretario_adjunto']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão sintética ausente.');
           expect((await requisitarApi(portaHttps, caPem, {
@@ -2839,7 +2839,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaPreconferencia, cookie: primeiro.cookie,
         })).status).toBe(404);
-        for (const chave of ['secretario', 'administrador']) {
+        for (const chave of ['secretario']) {
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: rotaPreconferencia, cookie: sessao(chave).cookie,
           })).status).toBe(403);
@@ -2897,7 +2897,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, cookie: autor.cookie,
         })).status).toBe(403);
-        for (const chave of ['secretario', 'administrador']) {
+        for (const chave of ['secretario']) {
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...sessao(chave),
           })).status).toBe(403);
@@ -3261,7 +3261,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: `${rota}/encaminhar`, corpo: pedido, cookie: autor.cookie,
         })).status).toBe(403);
-        for (const chave of ['secretario', 'administrador']) {
+        for (const chave of ['secretario']) {
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: '/api/v1/documentos/coordenadores', cookie: sessao(chave).cookie,
           })).status).toBe(403);
@@ -3533,7 +3533,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaUltimaDevolucao, cookie: sessao('outro-analista').cookie,
         })).status).toBe(404);
-        for (const chave of ['administrador', 'secretario']) {
+        for (const chave of ['secretario']) {
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: rotaUltimaDevolucao, cookie: sessao(chave).cookie,
           })).status).toBe(403);
@@ -3543,7 +3543,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...autor,
         })).status).toBe(403);
-        for (const chave of ['administrador', 'secretario']) {
+        for (const chave of ['secretario']) {
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...sessao(chave),
           })).status).toBe(403);
@@ -4113,7 +4113,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await pedirConferencia(destinatario, revisao - 1, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(409);
         expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, 'a'.repeat(64))).status).toBe(409);
         expect((await pedirConferencia(sessao('outro'), revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(404);
-        for (const chave of ['secretario', 'administrador']) {
+        for (const chave of ['secretario']) {
           expect((await pedirConferencia(sessao(chave), revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(403);
         }
         expect((await requisitarApi(portaHttps, caPem, {
@@ -4195,7 +4195,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await lista(autor)).some((item) => item.id === rascunho.id)).toBe(true);
         expect((await lista(destinatario)).some((item) => item.id === rascunho.id)).toBe(true);
         expect((await lista(sessao('outro'))).some((item) => item.id === rascunho.id)).toBe(false);
-        for (const chave of ['secretario', 'administrador']) {
+        for (const chave of ['secretario']) {
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'GET', rota: '/api/v1/documentos/conferidos', cookie: sessao(chave).cookie,
           })).status).toBe(403);
@@ -4225,7 +4225,7 @@ describe('fundação em recursos descartáveis', () => {
         })).status).toBe(404);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaDadosPrevia, cookie: sessao('administrador').cookie,
-        })).status).toBe(403);
+        })).status).toBe(200);
         const dadosPrevia = await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaDadosPrevia, cookie: destinatario.cookie,
         });

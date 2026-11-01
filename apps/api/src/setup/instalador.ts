@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { configuracaoProcessosSchema, configuracaoSchema, type Configuracao } from '@sisdoc/contratos';
 import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
 import { aplicarAutenticacao } from '../migracoes/autenticacao';
+import { aplicarAcessoAdmin } from '../migracoes/acesso-admin';
 import { aplicarBlocosDof } from '../migracoes/blocos-dof';
 import { aplicarConfirmacaoInicioDof } from '../migracoes/confirmacao-inicio-dof';
 import { aplicarConferenciaDof } from '../migracoes/conferencia-dof';
@@ -418,6 +419,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
     await aplicarEmissao(cliente, opcoes.banco.usuario);
     await aplicarDtc(cliente, opcoes.banco.usuario);
     await aplicarImportacao(cliente, opcoes.banco.usuario);
+    await aplicarAcessoAdmin(cliente, opcoes.banco.usuario);
 
     const configuracao: Configuracao = configuracaoSchema.parse({
       porta: opcoes.porta,

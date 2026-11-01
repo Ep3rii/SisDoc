@@ -12,6 +12,11 @@ DTC Comissionado e DTC INSS, com PDF, histórico e auditoria. Busca, cálculo,
 prévia e emissão usam dados locais; somente o módulo de sincronização acessa a
 fonte externa. O cálculo é puro e compartilhado pelo servidor e navegador.
 
+O setor usuário é Cadastro de Pessoas (analista/coordenador). O administrador
+é da Informática e possui acesso funcional completo, por autorização explícita
+na [decisão 026](../decisoes/026-cadastro-informatica-e-exportacao.md).
+Sincronização reúne transferência por arquivos e integração com a API.
+
 Há uma única instalação operacional, destinada à produção. O banco inicia
 vazio; dados reais são importados por usuário autorizado. Testes usam apenas
 recursos descartáveis e dados inteiramente fictícios, fora do banco, histórico

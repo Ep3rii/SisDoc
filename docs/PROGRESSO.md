@@ -542,3 +542,35 @@ aprovada a pedido do responsável mesmo com os textos provisórios; os PDFs
 continuam marcados como **MODELO PROVISÓRIO** até os textos oficiais.
 
 Pacote extra (fatias 8–9 e pendências externas) não autorizado por enquanto.
+
+## Cadastro, Informática e transferência de dados — 31/10/2026
+
+Alteração funcional autorizada pelo responsável, separada do pacote extra:
+
+- Cadastro usa analista/coordenador, com consulta auditada aos dados pessoais
+  completos e referências de eventos, afastamentos, incorporações e períodos IPAM.
+- Administrador da Informática tem acesso funcional completo, inclusive
+  rascunhos e emissões de terceiros, sem eliminar revisão, CSRF, auditoria,
+  aprovação formal ou imutabilidade dos documentos emitidos.
+- Migração `016-acesso-admin` atualiza os controles de perfil no banco.
+- Sincronização reúne importação e exportação dos cinco tipos em CSV/XLSX,
+  por origem, com dados completos e confirmação/auditoria. Exportação não é backup.
+- Testados 64 usuários concorrentes por perfil e um grupo misto (256 contas
+  e sessões reais HTTPS, base sintética de 20 mil vínculos, 960 requisições):
+  zero erros. p95 da suíte completa entre 715,0 e 737,2 ms; máximo 795,7 ms.
+  A medição cobre sessão, busca e referências, não emissão concorrente de PDFs.
+- Chromium verificou a consulta de referências pelo Cadastro e a exportação
+  com confirmação/download na tela Sincronização.
+
+Detalhes, limites e evidências:
+[decisão 026](decisoes/026-cadastro-informatica-e-exportacao.md).
+A aplicação permanece somente em loopback; as fatias 8–9 continuam fora do escopo.
+
+Validação final: 173 testes em 22 arquivos (a única expectativa antiga de
+contagem das migrações foi corrigida e o arquivo de emissão reexecutado com
+10/10 testes aprovados). Build e `npm run typecheck` aprovados.
+
+Implantado em `https://localhost:3443/` após backup `pg_dump` e aplicação de
+`016-acesso-admin`. Health respondeu `ok`; referências e exportação sem
+login responderam 401. Nenhum dado real ou usuário operacional foi usado
+nos testes de carga.
