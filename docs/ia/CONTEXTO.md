@@ -67,6 +67,12 @@ de edição e prévias permanecem compatíveis. Serviços maiores e documentaç�
 integral das funções ainda estão em revisão; evidências e árvore atual em
 [ARQUITETURA.md](../ARQUITETURA.md).
 
+Consulta/cálculo DTC, importador e sincronização foram decompostos mantendo
+transações e locks. Cálculo e funções nomeadas dos contratos receberam
+JSDoc específico. Última regressão completa: 230 testes em 30 arquivos.
+A revisão de DOF, unidades restantes, templates, CLI/setup/ferramentas e
+funções nomeadas dos testes ainda não terminou.
+
 A refatoração de 01/11/2026 preserva o monólito local e é publicada por
 etapas validadas. A composição da API usa módulos NestJS por domínio, sem
 exportar seus serviços indiscriminadamente; somente pool/configuração são

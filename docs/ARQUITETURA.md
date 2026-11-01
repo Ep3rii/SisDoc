@@ -203,8 +203,33 @@ na interface. Oito testes injetam falhas de BEGIN, ROLLBACK, COMMIT e registro
 sem conectar a banco real.
 
 Typecheck aprovado; suíte completa **225/225 testes em 29 arquivos**.
-Revisão integral de rascunhos DOF, sincronização, templates, demais telas,
-CLI/setup/ferramentas e funções dos testes continua pendente.
+Esta etapa não conclui a revisão integral das outras unidades.
+
+### Sincronização — etapa 6
+
+Separados `mapeamento-sincronizacao.ts` (adaptação pura de nomes) e
+`persistencia-sincronizacao.ts` (gravação por item), mantendo no serviço
+paginação, staging, savepoints, retomada, disjuntor e reconciliação.
+Persistência recebe o protetor e cliente existentes, sem abrir outro pool
+ou transação. **34/34 funções/métodos/construtores e arrows nomeadas**
+dessas três unidades foram documentados após leitura do fluxo completo.
+
+Um novo teste revelou que mapeamento parcial descartava campos de vínculo
+sem alias: o fallback buscava `vinculo.cargo` no objeto em vez de `cargo`.
+Corrigido para conservar campos canônicos não renomeados. Cinco testes
+puros cobrem aliases, zeros de matrícula, preservação da entrada e campos
+inválidos, sem chamar API externa.
+
+Falhas de agendamento, cursor ilegível, staging inválido, liberação de locks
+e registro de falha agora têm mensagens técnicas explícitas e sanitizadas.
+Conexão cujo desbloqueio falhar é descartada. O fluxo permanece não
+bloqueante para emissão local; nenhuma configuração externa foi habilitada.
+
+Typecheck aprovado; suíte completa **230/230 testes em 30 arquivos**.
+**Revisão integral ainda pendente:** rascunhos DOF, demais serviços/helpers
+não cobertos nestas etapas, templates, telas restantes, CLI/setup/ferramentas
+e funções nomeadas dos testes. Organização do grafo e cobertura JSDoc
+parcial não substituem essa leitura semântica.
 
 A etapa 1 documenta funções da composição, configuração, bootstrap,
 transações, health e tratamento de erros. Métodos de domínio, interface,

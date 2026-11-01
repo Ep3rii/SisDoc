@@ -1,5 +1,23 @@
 # Progresso da construção
 
+## Modularização — etapa 6: sincronização — 01/11/2026
+
+Módulo separado em coordenação do lote, mapeamento puro e persistência por
+item. Mantidos locks, cliente transacional, savepoints, staging cifrado,
+retomada, paginação, disjuntor e limites de remoção lógica.
+**34/34 funções/métodos/construtores e arrows nomeadas** dessas unidades
+com JSDoc específico.
+
+Corrigido bug de mapeamento parcial que descartava campos canônicos de
+vínculo sem alias. Cinco testes puros verificam aliases, dados inválidos,
+zeros de matrícula e preservação de campos. Falhas técnicas antes ocultas
+agora têm logging sanitizado, sem valores pessoais ou credenciais.
+
+Typecheck aprovado; suíte completa **230/230 testes em 30 arquivos**.
+Sem migração, sincronização real ou configuração externa habilitada.
+A revisão integral permanece aberta nos demais serviços/helpers, DOF,
+templates, telas restantes, CLI/setup/ferramentas e funções dos testes.
+
 ## Modularização — etapa 5: importador e falhas transacionais — 01/11/2026
 
 Importador decomposto em coordenação, estado, gravação, relatório,

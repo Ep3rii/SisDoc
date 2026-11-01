@@ -354,6 +354,13 @@ real e o token nunca entram no Git):
 | `esperaRepeticaoMs` | não | 1000 | Espera inicial entre repetições (dobra a cada tentativa). |
 | `mapeamento` | não | — | Mapa de campo canônico → nome do campo na API (ex.: `{"nome": "nome_completo", "vinculo.matricula": "mat"}`). |
 
+O mapa pode ser parcial: campos não renomeados continuam usando o nome
+canônico. Nos objetos de vínculo, `vinculo.cargo` identifica o campo na
+configuração; sem alias, o objeto recebido continua contendo `cargo`.
+Zeros iniciais de matrícula são preservados. Erros técnicos de agendamento,
+leitura de cursor/staging, registro do estado ou liberação de locks são
+indicados no console do serviço sem valores pessoais ou credenciais.
+
 O contrato esperado da API e um exemplo fictício estão em
 `referencias\api-simulada\`. Alterações na configuração exigem reiniciar o
 serviço. A variável de ambiente `SISDOC_SINCRONIZACAO_AGENDADA=desligado`
