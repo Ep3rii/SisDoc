@@ -4,12 +4,14 @@ Há uma [instalação local inicializada](INSTALACAO_LOCAL.md), com banco
 permanente, HTTPS e administrador inicial, **autorizada para uso operacional**
 pelo responsável em 31/10/2026 ([decisão 021](decisoes/021-autorizacao-operacional.md)).
 Estão liberados consulta de servidores e cálculo, rascunho, blocos, prévia e
-conferência de DOF pela interface. A emissão da DOF (numeração, snapshot,
-PDF, histórico, cópia e cancelamento) está implementada, mas **fica bloqueada
-até o registro da aprovação formal** da regra e do template
-([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)). As DTCs IPAM,
-Comissionado e INSS têm o mesmo fluxo e o mesmo bloqueio por tipo; o modelo
-INSS é provisório ([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)).
+conferência de DOF pela interface. A emissão da DOF e das DTCs IPAM,
+Comissionado e INSS (numeração, snapshot, PDF, histórico, cópia e
+cancelamento) foi **liberada em 31/10/2026** pelo registro da aprovação
+formal de cada tipo, por Euzébio Pereira da Silva Filho (Desenvolvedor de
+Sistemas), referência "Autorização do responsável em 31/10/2026
+(docs/decisoes/022)" ([decisão 022](decisoes/022-aprovacao-formal-e-emissao.md)).
+O modelo INSS continua provisório e sai marcado como tal
+([decisão 023](decisoes/023-dtc-ipam-comissionado-inss.md)).
 A importação de planilhas e da base legada está disponível ao administrador
 (ver [Importação de dados](#importação-de-dados) e
 [DADOS_E_IMPORTACAO.md](DADOS_E_IMPORTACAO.md)). **Backup e serviço Windows

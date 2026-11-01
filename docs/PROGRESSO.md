@@ -527,3 +527,18 @@ A instalação local foi atualizada, com backup `pg_dump` prévio, por
   por coluna nas tabelas do núcleo; DELETE continua negado.
 - 20 mil vínculos importados em segundos no teste. `npm test` passou com
   **166 testes em 21 arquivos**; `npm run typecheck` passou.
+
+## Implantação da fatia 7 e aprovações formais — 31/10/2026
+
+A instalação local foi atualizada com backup `pg_dump` prévio e
+`npm run migrar` (aplicou `015-importacao`); a aplicação foi reiniciada em
+`https://localhost:3443/`, somente em loopback.
+
+Aprovação formal registrada para **DOF, DTC IPAM, DTC Comissionado e DTC
+INSS** por Euzébio Pereira da Silva Filho (Desenvolvedor de Sistemas),
+referência "Autorização do responsável em 31/10/2026 (docs/decisoes/022)".
+A emissão operacional está liberada para coordenadores. A DTC INSS foi
+aprovada a pedido do responsável mesmo com os textos provisórios; os PDFs
+continuam marcados como **MODELO PROVISÓRIO** até os textos oficiais.
+
+Pacote extra (fatias 8–9 e pendências externas) não autorizado por enquanto.

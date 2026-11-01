@@ -5,11 +5,11 @@ declarações: DOF, DTC IPAM, DTC Comissionado e DTC INSS.
 
 **Autorizado para uso operacional local em 31/10/2026** ([decisão 021](docs/decisoes/021-autorizacao-operacional.md)),
 nas funções existentes: consulta de servidores, cálculo, rascunhos, prévia e
-conferência da DOF. A emissão da DOF com numeração, PDF, histórico, cópia e
-cancelamento está implementada, mas **bloqueada até a aprovação formal** da
-regra e do template ([decisão 022](docs/decisoes/022-aprovacao-formal-e-emissao.md)).
-As DTCs IPAM, Comissionado e INSS seguem o mesmo fluxo e também ficam
-bloqueadas até a aprovação formal de cada tipo; o modelo INSS é provisório
+conferência da DOF. A emissão da DOF e das DTCs IPAM, Comissionado e INSS
+(numeração, PDF, histórico, cópia e cancelamento) está **liberada desde
+31/10/2026**, após o registro da aprovação formal de cada tipo
+([decisão 022](docs/decisoes/022-aprovacao-formal-e-emissao.md)). O modelo
+INSS continua provisório e sai marcado como tal
 ([decisão 023](docs/decisoes/023-dtc-ipam-comissionado-inss.md)). A
 importação de planilhas e da base legada está disponível ao administrador
 ([dados e importação](docs/DADOS_E_IMPORTACAO.md)); backup e serviço
@@ -24,8 +24,8 @@ automático da aplicação ainda não estão implementados.
 - Autenticação, usuários, auditoria, busca e fluxo provisório de rascunhos DOF.
 - Layout inspirado no [protótipo](Modelos%20e%20Documentação/prototipo_SistemaWEB.jpeg):
   menu lateral, busca global, abas, editor com prévia à direita e totais fixos.
-- Emissão da DOF e das DTCs dependente de aprovação formal por tipo;
-  sincronização indisponível;
+- Emissão da DOF e das DTCs aprovada formalmente por tipo (o INSS com
+  textos provisórios); sincronização opcional, configurada fora do Git;
   nenhuma fonte é alterada pela edição de rascunhos.
 
 ## Acesso à instalação desta máquina
