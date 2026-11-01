@@ -1,5 +1,9 @@
 import type { Pool, PoolClient } from 'pg';
 
+/**
+ * Executa trabalho em uma conexão e garante sua liberação, descartando-a se o estado transacional for incerto.
+ * Falha no COMMIT não permite assumir que nada foi gravado; o chamador deve conferir antes de repetir a operação.
+ */
 export async function transacao<T>(banco: Pool, executar: (cliente: PoolClient) => Promise<T>): Promise<T> {
   const cliente = await banco.connect();
   let aberta = false;

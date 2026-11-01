@@ -49,10 +49,26 @@ O layout usa menu lateral escuro, busca global, abas, editor com prévia
 auditada à direita e totais fixos. Recursos ausentes são sinalizados, não
 simulados. A instalação local foi inicializada vazia e autorizada para uso
 operacional pelo responsável em 31/10/2026
-([decisão 021](../decisoes/021-autorizacao-operacional.md)); a emissão com PDF
-ainda não existe e exigirá liberação própria quando implementada.
+([decisão 021](../decisoes/021-autorizacao-operacional.md)); emissão com PDF
+foi implementada e aprovada por tipo na
+[decisão 022](../decisoes/022-aprovacao-formal-e-emissao.md), mantendo a
+identificação provisória do modelo INSS.
 Estado, confiança HTTPS e próxima etapa estão em
 [INSTALACAO_LOCAL.md](../INSTALACAO_LOCAL.md).
 
 O trabalho segue as fatias e respectivos gates da seção 7 do prompt. O estado
 efetivo e as evidências ficam em [PROGRESSO.md](../PROGRESSO.md).
+
+## Modularização autorizada
+
+A refatoração de 01/11/2026 preserva o monólito local e é publicada por
+etapas validadas. A composição da API usa módulos NestJS por domínio, sem
+exportar seus serviços indiscriminadamente; somente pool/configuração são
+recursos globais. Guarda, transações e encerramento dos workers continuam
+obrigatórios. A organização, invariantes, limites da revisão e etapas
+pendentes estão em [ARQUITETURA.md](../ARQUITETURA.md).
+
+Documentar cada função nomeada e método com JSDoc durante a revisão do
+respectivo módulo, explicando contratos e referências não óbvias. Não
+considerar a revisão ou documentação global concluída apenas pela extração
+dos módulos de composição.

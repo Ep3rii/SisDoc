@@ -3,6 +3,7 @@ import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
 import { VERSAO_DESTINATARIO_COORDENADOR } from './migracoes/destinatario-coordenador';
 
+/** Valida instalação e migrações existentes, cria o pool único e inicia HTTPS somente em loopback. */
 async function iniciar(): Promise<void> {
   const configuracao = await carregarConfiguracao(process.env.SISDOC_CONFIG);
   const banco = new Pool({

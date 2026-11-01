@@ -3,11 +3,13 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { configuracaoSchema, type Configuracao } from '@sisdoc/contratos';
 
+/** Compara caminhos relativos sem aceitar diretórios irmãos com prefixo semelhante. */
 export function estaDentro(caminho: string, diretorio: string): boolean {
   const relativo = path.relative(diretorio, caminho);
   return relativo === '' || (!relativo.startsWith(`..${path.sep}`) && relativo !== '..' && !path.isAbsolute(relativo));
 }
 
+/** Resolve links e a grafia nativa do Windows antes de validar a localização de um arquivo. */
 export function caminhoReal(arquivo: string): Promise<string> {
   return new Promise((resolve, reject) => {
     realpath.native(arquivo, { encoding: 'utf8' }, (erro, resolvido) => {
@@ -17,10 +19,12 @@ export function caminhoReal(arquivo: string): Promise<string> {
   });
 }
 
+/** Resolve a raiz a partir do build da API; mover este arquivo exige revisar essa relação. */
 export async function raizRepositorio(): Promise<string> {
   return caminhoReal(path.resolve(__dirname, '..', '..', '..'));
 }
 
+/** Valida configuração externa e destinos de arquivos sem registrar credenciais ou executar migrações. */
 export async function carregarConfiguracao(arquivo: string | undefined): Promise<Configuracao> {
   if (!arquivo || !path.isAbsolute(arquivo)) {
     throw new Error('Defina SISDOC_CONFIG com o caminho absoluto da configuração externa.');
@@ -105,6 +109,7 @@ export async function carregarConfiguracao(arquivo: string | undefined): Promise
   return { ...resultado.data, pdf: { diretorio: path.resolve(diretorioPdf) } };
 }
 
+/** Obtém o destino validado dos PDFs, recusando uso antes da configuração do armazenamento. */
 export function diretorioPdf(configuracao: Configuracao): string {
   if (!configuracao.pdf) throw new Error('Diretório de PDF não configurado.');
   return configuracao.pdf.diretorio;

@@ -81,6 +81,7 @@ caminhos ASCII ou 8.3; consulte [operação](docs/OPERACAO.md).
 
 ## Documentação
 
+- [Arquitetura, revisão estrutural e etapas de modularização](docs/ARQUITETURA.md).
 - [Avaliação técnica de UI/UX e melhorias por tela](docs/AVALIACAO_UI_UX.md).
 
 - [Manual resumido: como ligar a aplicação](docs/COMO_LIGAR.md).

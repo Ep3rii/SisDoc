@@ -40,7 +40,7 @@ import { Client, Pool } from 'pg';
 import { chromium, type Browser } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { HealthController } from '../apps/api/dist/app.module.js';
+import { HealthController } from '../apps/api/dist/infraestrutura/saude.controller.js';
 import { transacao } from '../apps/api/dist/banco.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { ArmazenamentoPdf } from '../apps/api/dist/documentos/armazenamento-pdf.js';
@@ -4930,7 +4930,6 @@ describe('fundação em recursos descartáveis', () => {
   it('não expõe detalhes de erro no health', async () => {
     const controller = new HealthController({
       query: async () => { throw new Error('detalhe interno fictício'); },
-      end: async () => {},
     });
     await expect(controller.verificar()).rejects.toMatchObject({
       message: 'Banco de dados indisponível.',

@@ -16,6 +16,7 @@ const titulos: Record<number, string> = {
 export class FiltroProblemas implements ExceptionFilter {
   private readonly logger = new Logger('HTTP');
 
+  /** Converte falhas em problem+json e impede vazamento de erros internos ou respostas parciais. */
   catch(erro: unknown, contexto: ArgumentsHost): void {
     const resposta = contexto.switchToHttp().getResponse<ServerResponse>();
     const status = erro instanceof HttpException ? erro.getStatus() : 500;

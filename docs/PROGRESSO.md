@@ -1,5 +1,32 @@
 # Progresso da construção
 
+## Modularização — etapa 1: composição da API — 01/11/2026
+
+Revisão estrutural do grafo local de todos os fontes e testes, sem ciclos
+locais identificados. Diagnóstico, invariantes e limites da revisão em
+[ARQUITETURA.md](ARQUITETURA.md). Não é revisão semântica de todas as
+funções: serviços de domínio, interface, pacotes, CLI e ferramentas seguem
+pendentes nas etapas posteriores.
+
+AppModule agora compõe módulos de infraestrutura, segurança, servidores,
+cálculos, documentos, importação e sincronização. Serviços ficam privados
+por domínio; pool/configuração são os únicos exports globais. Health
+movido para infraestrutura, com seu teste atualizado. Encerramento do pool
+é tipado e ocorre após a destruição dos workers. Rotas, política de acesso,
+transações e comandos operacionais preservados; nenhuma migração ou
+gravação de dados reais necessária.
+
+JSDoc adicionado às funções da composição, bootstrap, configuração,
+transações, diagnóstico e tratamento de erros, além das referências dos
+tokens. A documentação de todas as funções ainda não está concluída.
+
+Build e typecheck aprovados. Suíte completa: **213/213 testes, 27 arquivos**.
+Novos testes verificam injeção de todos os controllers, guarda única,
+exports restritos e encerramento dos workers antes do pool; integração
+HTTPS/banco existente também passou.
+Etapa publicada na instalação local: health e página HTTPS 200, consulta
+privada sem sessão 401 e listener somente em loopback, após reinício.
+
 ## Prioridades de UI/UX e correção CSP — 01/11/2026
 
 Transferência dividida em Importar, Disponibilizar Legado, Exportar e
