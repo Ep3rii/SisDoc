@@ -1,6 +1,7 @@
 import { afastamentoSchema, dataFuncionalSchema, incorporacaoSchema } from '@sisdoc/contratos';
 import { regrasVersaoSchema, type RegrasVersao } from './regras';
 
+/** Converte data gregoriana validada em ordinal sem Date, fuso horário ou limites de timestamp. */
 function ordinal(data: string): number {
   const valida = dataFuncionalSchema.parse(data);
   const ano = Number(valida.slice(0, 4));
@@ -14,16 +15,19 @@ function ordinal(data: string): number {
   return diasAntesAno + inicioMes + dia + (mes > 2 && bissexto ? 1 : 0);
 }
 
+/** Conta diferença civil exclusiva e rejeita intervalos invertidos. */
 export function diasEntre(inicio: string, fim: string): number {
   const diferenca = ordinal(fim) - ordinal(inicio);
   if (diferenca < 0) throw new RangeError('A data final não pode ser anterior à inicial.');
   return diferenca;
 }
 
+/** Conta ambos os extremos do intervalo, incluindo um dia quando início e fim coincidem. */
 export function diasInclusivos(inicio: string, fim: string): number {
   return diasEntre(inicio, fim) + 1;
 }
 
+/** Divide intervalo inclusivo por anos civis sem ratear afastamentos ou incorporações. */
 export function dividirIntervaloPorAno(inicio: string, fim: string): Array<{
   ano: number; inicio: string; fim: string; dias: number;
 }> {
@@ -42,6 +46,7 @@ export function dividirIntervaloPorAno(inicio: string, fim: string): Array<{
   return partes;
 }
 
+/** Valida afastamento e distingue lançamento anual de dias pertencentes ao intervalo declarado. */
 export function distribuirAfastamento(entrada: unknown): Array<{
   ano: number;
   tipo: 'falta' | 'licenca_ts' | 'licenca_pf' | 'licenca_ip' | 'outro';
@@ -58,6 +63,7 @@ export function distribuirAfastamento(entrada: unknown): Array<{
     .map((parte) => ({ ...parte, tipo: afastamento.tipo, abrangencia: 'intervalo_declarado' as const }));
 }
 
+/** Converte dias inteiros pelas durações convencionais da regra, não por meses civis. */
 export function converterDias(dias: number, regras: RegrasVersao): { anos: number; meses: number; dias: number } {
   if (!Number.isSafeInteger(dias) || dias < 0) throw new RangeError('Informe uma quantidade inteira não negativa de dias.');
   const valida = regrasVersaoSchema.parse(regras);
@@ -67,6 +73,7 @@ export function converterDias(dias: number, regras: RegrasVersao): { anos: numbe
   return { anos, meses, dias: restante - meses * valida.diasMes };
 }
 
+/** Valida incorporação e respeita sua convenção anual, inclusiva ou exclusiva. */
 export function calcularIncorporacao(entrada: unknown): {
   dias: number; origem: string; convencao: 'anual' | 'inclusivo' | 'exclusivo';
 } {

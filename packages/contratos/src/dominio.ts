@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+/** Confere dia e bissexto da data após o formato ISO exigido pelo schema. */
 function dataValida(valor: string): boolean {
   const [ano, mes, dia] = valor.split('-').map(Number);
   if (ano < 1 || mes < 1 || mes > 12 || dia < 1) return false;
@@ -8,6 +9,7 @@ function dataValida(valor: string): boolean {
   return dia <= dias[mes - 1];
 }
 
+/** Verifica os dois dígitos do CPF normalizado e rejeita sequências repetidas. */
 function cpfValido(cpf: string): boolean {
   if (/^(\d)\1{10}$/.test(cpf)) return false;
   for (let posicao = 9; posicao <= 10; posicao += 1) {

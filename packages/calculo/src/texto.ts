@@ -2,14 +2,17 @@ import { converterDias, diasEntre } from './calendario';
 import type { PeriodoCalculado, TotaisCalculo } from './motor';
 import type { RegrasVersao } from './regras';
 
+/** Agrupa milhares para apresentação, sem alterar o total numérico calculado. */
 function numero(dias: number): string {
   return String(dias).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
 
+/** Aplica singular/plural e largura mínima às unidades convencionais do tempo. */
 function unidade(valor: number, singular: string, plural: string): string {
   return `${String(valor).padStart(2, '0')} ${valor === 1 ? singular : plural}`;
 }
 
+/** Redige total com conversão da regra; zero é omitido deliberadamente nos modelos. */
 export function textoTempo(dias: number, regras: RegrasVersao): string {
   const convertido = converterDias(dias, regras);
   if (dias === 0) return '';
@@ -22,6 +25,7 @@ export function textoTempo(dias: number, regras: RegrasVersao): string {
   return `${numero(dias)} dias, que correspondem a ${texto}${convertido.dias > 0 ? '.' : ''}`;
 }
 
+/** Monta somente linhas DOF com totais positivos, sem confundir efetivo exercício e contribuição. */
 export function linhasDeclaracaoDof(totais: TotaisCalculo, regras: RegrasVersao): string[] {
   const linhas: string[] = [];
   if (totais.efetivoExercicio > 0) linhas.push(`- Tempo de efetivo exercício: ${textoTempo(totais.efetivoExercicio, regras)}`);
@@ -34,15 +38,18 @@ export function linhasDeclaracaoDof(totais: TotaisCalculo, regras: RegrasVersao)
   return linhas;
 }
 
+/** Valida intervalos e redige datas efetivas, preservando a ordem recebida do cálculo. */
 export function textoPeriodos(periodos: ReadonlyArray<Pick<PeriodoCalculado, 'inicioEfetivo' | 'fim'>>): string {
   const partes = periodos.map((periodo) => {
     diasEntre(periodo.inicioEfetivo, periodo.fim);
+    /** Apresenta data ISO cujo intervalo já foi validado por diasEntre. */
     const formatar = (data: string) => `${data.slice(8, 10)}/${data.slice(5, 7)}/${data.slice(0, 4)}`;
     return `${formatar(periodo.inicioEfetivo)} A ${formatar(periodo.fim)}`;
   });
   return partes.length > 0 ? `${partes.join('; ')}.` : '';
 }
 
+/** Extrai nível anterior ao hífen, omitindo referência DA e sinalizando formato não reconhecido. */
 export function nivelDof(referencia: string): { nivel: string; avisos: string[] } {
   const valor = referencia.trim();
   if (!valor || valor.toUpperCase().startsWith('DA')) return { nivel: '', avisos: [] };

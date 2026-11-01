@@ -33,8 +33,10 @@ export const eventosServidorQuerySchema = z.strictObject({
 });
 
 const dataOpcional = z.iso.date().nullable();
+/** Aceita texto opcional de cadastro com quebras de linha e converte vazio validado em null. */
 const textoOpcionalCadastro = (maximo = 200) => z.string().trim().max(maximo)
   .regex(/^[^\x00-\x08\x0b\x0c\x0e-\x1f\x7f]*$/).nullable().transform((valor) => valor || null);
+/** Exige texto cadastral não vazio, dentro do limite e sem controles ASCII. */
 const textoCadastro = (maximo: number) => z.string().trim().min(1).max(maximo).regex(/^[^\x00-\x1f\x7f]+$/);
 
 export const paginaBuscaServidoresSchema = z.strictObject({

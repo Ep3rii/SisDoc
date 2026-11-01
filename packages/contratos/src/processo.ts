@@ -12,6 +12,7 @@ export const numeroProcessoSchema = z.string().trim().min(1).max(100)
   .regex(/^[A-Za-z0-9 ./-]+$/)
   .transform((valor) => valor.toUpperCase());
 
+/** Valida comprimento e marcadores: # dígito, @ letra, * alfanumérico; demais caracteres são literais. */
 export function processoCorrespondeMascara(numero: string, mascara: string): boolean {
   const normalizado = numeroProcessoSchema.safeParse(numero);
   const formato = mascaraProcessoSchema.safeParse(mascara);

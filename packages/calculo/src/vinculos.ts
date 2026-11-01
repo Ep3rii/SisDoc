@@ -19,6 +19,7 @@ export type ResultadoVinculo =
   | { sucesso: true; atual: VinculoParaConsulta; historico: VinculoParaConsulta[] }
   | { sucesso: false; codigo: string; mensagem: string };
 
+/** Resolve matrícula/origem e histórico da mesma pessoa, recusando ambiguidade, ciclos e elos ausentes. */
 export function localizarVinculo(entrada: unknown): ResultadoVinculo {
   const resultado = consultaSchema.safeParse(entrada);
   if (!resultado.success) return { sucesso: false, codigo: 'entrada_invalida', mensagem: 'Dados da consulta inválidos.' };

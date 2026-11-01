@@ -144,6 +144,7 @@ export function validarConteudoDtc(tipo: TipoDtc, conteudo: ConteudoDtc): Array<
   return problemas;
 }
 
+/** Converte problemas de forma por tipo em erros Zod localizados no campo original. */
 function refinarPorTipo(tipo: TipoDtc, conteudo: ConteudoDtc, contexto: z.RefinementCtx): void {
   for (const problema of validarConteudoDtc(tipo, conteudo)) {
     contexto.addIssue({ code: 'custom', path: problema.caminho.split('.'), message: problema.mensagem });

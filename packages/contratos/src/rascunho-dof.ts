@@ -218,6 +218,7 @@ export const dadosPdfProvisorioDofSchema = z.strictObject({
   }
 });
 
+/** Captura prévia validada para PDF provisório, removendo a prova transacional e sem emitir documento oficial. */
 export function capturarDadosPdfProvisorioDof(entrada: PreviaConferidaDof): DadosPdfProvisorioDof {
   const previa = previaConferidaDofSchema.parse(entrada);
   const { documentoId: _documentoId, revisao: _revisao, provaFonte: _provaFonte, ...fonte } = previa.fonte;

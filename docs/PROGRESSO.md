@@ -1,5 +1,14 @@
 # Progresso da construção
 
+## Revisão/JSDoc — etapa 4: cálculo e funções dos contratos — 01/11/2026
+
+Motor, calendário, histórico de vínculos, textos e funções nomeadas dos
+contratos lidos e documentados. Nenhuma regra, validação ou saída alterada.
+Varredura AST incluindo arrows nomeadas: **20/20 funções no cálculo** e
+**14/14 nos contratos** com JSDoc. Typecheck aprovado; **61 testes em três
+arquivos** passaram. Cobertura documental não representa nova aprovação
+dos modelos nem conclusão da revisão dos demais módulos.
+
 ## Modularização — etapa 3: consulta e cálculo DTC — 01/11/2026
 
 Serviço DTC decomposto em cálculo puro, consulta/validação da fonte e

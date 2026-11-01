@@ -170,6 +170,17 @@ contrato relevante e efeitos/riscos não óbvios. Explicar referências entre
 módulos, tokens e regras; não comentar indiscriminadamente imports,
 callbacks anônimos ou variáveis autoexplicativas.
 
+### Cálculo e contratos — etapa 4
+
+Leitura do motor, calendário, histórico de vínculos, formatação e funções
+nomeadas dos contratos. JSDoc específico adicionado sem mudar regras,
+schemas, textos de saída ou máscaras. Varredura AST incluindo funções
+declaradas e arrows atribuídas a nomes confirmou **20/20 funções no cálculo**
+e **14/14 nos contratos** documentadas. Isso mede essas funções, não uma
+certificação de todas as combinações dos schemas ou de regras administrativas.
+Typecheck aprovado e **61 testes em três arquivos** passaram na seleção de
+cálculo, contratos e DTC.
+
 A etapa 1 documenta funções da composição, configuração, bootstrap,
 transações, health e tratamento de erros. Métodos de domínio, interface,
 pacotes, CLI e ferramentas ainda precisam de revisão e documentação.

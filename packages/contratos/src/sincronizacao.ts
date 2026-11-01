@@ -36,8 +36,10 @@ export const configuracaoSincronizacaoSchema = z.strictObject({
   mapeamento: z.partialRecord(campoCanonicoSincronizacaoSchema, nomeCampoApiSchema).optional(),
 });
 
+/** Recusa controles ASCII em campos textuais recebidos da fonte externa. */
 const semControle = (valor: string) => !/[\u0000-\u001f\u007f]/.test(valor);
 
+/** Constrói campo externo opcional com limite e controles validados, representando ausência por null. */
 const textoOpcionalApi = (maximo: number) => z.string().trim().max(maximo).refine(semControle)
   .nullable().optional().transform((valor) => valor ? valor : null);
 

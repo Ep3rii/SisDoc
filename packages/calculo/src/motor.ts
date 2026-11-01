@@ -86,26 +86,35 @@ export type ResultadoCalculo =
   | { sucesso: true; regras: RegrasVersao; avisos: AvisoCalculo[]; periodos: PeriodoCalculado[]; totais: TotaisCalculo }
   | { sucesso: false; avisos: AvisoCalculo[]; erros: ErroCalculo[] };
 
+/** Soma valores de domínio e recusa totais fora da precisão inteira do JavaScript. */
 function somaSegura(...valores: number[]): number {
   const total = valores.reduce((soma, valor) => soma + valor, 0);
   if (!Number.isSafeInteger(total)) throw new RangeError('O total excede a precisão inteira permitida.');
   return total;
 }
 
+/** Produz falha discriminada com avisos já obtidos e localização do problema. */
 function erro(avisos: AvisoCalculo[], codigo: string, mensagem: string, periodo?: number, ano?: number): ResultadoCalculo {
   return { sucesso: false, avisos, erros: [{ codigo, mensagem, periodo, ano }] };
 }
 
+/** Cria acumulador independente para impedir compartilhamento entre períodos. */
 function totaisVazios(): TotaisCalculo {
   return { diasBrutos: 0, contribuicaoMunicipio: 0, efetivoExercicio: 0, totalContribuicao: 0, pb: 0, pv: 0, licencaPremio: 0 };
 }
 
+/** Acumula todos os totais no destino com checagem de precisão em cada campo. */
 function somarTotais(destino: TotaisCalculo, origem: TotaisCalculo): void {
   for (const chave of Object.keys(destino) as Array<keyof TotaisCalculo>) {
     destino[chave] = somaSegura(destino[chave], origem[chave]);
   }
 }
 
+/**
+ * Calcula contribuição e efetivo exercício com a mesma regra na API e no navegador.
+ * Exige anos explícitos e confirmação de intervalo parcial, sem rateio automático.
+ * Ajuste à posse e regras provisórias geram avisos; não constituem aprovação de emissão.
+ */
 export function calcular(entrada: unknown): ResultadoCalculo {
   const validacao = entradaCalculoSchema.safeParse(entrada);
   if (!validacao.success) {

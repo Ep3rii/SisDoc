@@ -158,11 +158,13 @@ export const conferenciaImportacaoSchema = z.strictObject({
 });
 export type ConferenciaImportacao = z.infer<typeof conferenciaImportacaoSchema>;
 
+/** Reduz CPF em resumos de transferência; não valida identidade nem restringe acesso operacional. */
 export function mascararCpf(cpf: string): string {
   const digitos = cpf.replace(/\D/g, '');
   return digitos.length === 11 ? `***.***.${digitos.slice(6, 9)}-**` : '***.***.***-**';
 }
 
+/** Mantém apenas o sufixo da matrícula em resumos, sem modificar o valor original. */
 export function mascararMatricula(matricula: string): string {
   const valor = matricula.trim();
   if (valor.length <= 3) return '*'.repeat(valor.length);
