@@ -1,15 +1,17 @@
+import { tipoImportacaoSchema, type RelatorioImportacao, type TipoImportacao } from '@sisdoc/contratos';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { tipoImportacaoSchema, type RelatorioImportacao, type TipoImportacao } from '@sisdoc/contratos';
 import { Client } from 'pg';
 import { z } from 'zod';
 import { carregarConfiguracao } from '../configuracao';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { arquivoProvisionamento, conectarMigracao, lerProvisionamento } from '../setup/migrar';
+import { ErroImportacao, hashArquivo } from './estado-importacao';
 import { ErroFormato } from './formatos';
-import { desfazerLote, ErroImportacao, hashArquivo, importarLinhas } from './importador';
+import { importarLinhas } from './importador';
 import { lerLegado, lerMapeamento } from './legado';
 import { ErroPlanilha, LIMITE_ARQUIVO_BYTES, lerPlanilha } from './planilhas';
+import { desfazerLote } from './rollback-importacao';
 
 export type ArgumentosCli = Record<string, string | true>;
 

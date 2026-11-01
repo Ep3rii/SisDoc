@@ -1,8 +1,9 @@
-import path from 'node:path';
 import { tipoImportacaoSchema } from '@sisdoc/contratos';
+import path from 'node:path';
+import { conferenciaGeral, conferirArquivo } from './conferencia-importacao';
+import { ErroImportacao } from './estado-importacao';
 import { ErroFormato } from './formatos';
 import { conectarAplicacao, lerArgumentos, lerArquivo, texto } from './importacao.cli';
-import { conferenciaGeral, conferirArquivo, ErroImportacao } from './importador';
 import { ErroPlanilha, lerPlanilha } from './planilhas';
 
 const AJUDA = `Uso:

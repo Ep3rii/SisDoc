@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { createRequire } from 'node:module';
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import https from 'node:https';
 import net from 'node:net';
@@ -18,13 +19,19 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { criarAplicacao } from '../apps/api/dist/aplicacao.js';
 import { carregarConfiguracao } from '../apps/api/dist/configuracao.js';
 import { analisarLinhas, COLUNAS } from '../apps/api/dist/importacao/formatos.js';
-import { conferenciaGeral, conferirArquivo, desfazerLote, ErroImportacao, hashArquivo, importarLinhas } from '../apps/api/dist/importacao/importador.js';
 import { lerLegado, lerMapeamento } from '../apps/api/dist/importacao/legado.js';
 import { escreverCsv, escreverXlsx, ErroPlanilha, lerPlanilha } from '../apps/api/dist/importacao/planilhas.js';
 import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
 import { gerarHashSenha } from '../apps/api/dist/seguranca/senhas.js';
 import { instalar } from '../apps/api/dist/setup/instalador.js';
 import { cpfSintetico } from './dados-sinteticos.js';
+
+// Compartilha o loader CommonJS entre operações e erros, sem duplicar suas classes no transformador de testes.
+const carregar = createRequire(import.meta.url);
+const { conferenciaGeral, conferirArquivo } = carregar('../apps/api/dist/importacao/conferencia-importacao.js') as typeof import('../apps/api/dist/importacao/conferencia-importacao.js');
+const { desfazerLote } = carregar('../apps/api/dist/importacao/rollback-importacao.js') as typeof import('../apps/api/dist/importacao/rollback-importacao.js');
+const { ErroImportacao, hashArquivo } = carregar('../apps/api/dist/importacao/estado-importacao.js') as typeof import('../apps/api/dist/importacao/estado-importacao.js');
+const { importarLinhas } = carregar('../apps/api/dist/importacao/importador.js') as typeof import('../apps/api/dist/importacao/importador.js');
 
 const senhaMigrador = 'MigracaoImportFicticia!12345';
 const senhaAplicativo = 'AplicativoImportFicticio!12345';

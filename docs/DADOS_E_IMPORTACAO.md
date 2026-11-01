@@ -259,7 +259,13 @@ documentos emitidos ou PDFs.
   preenchem vazios e reportam divergências. A CLI mantém sua política anterior
   de atualizar campos alterados; não a use para contornar a revisão operacional.
 - **Transação por lote**: a importação inteira é uma transação; falha
-  inesperada não deixa dados parciais e é registrada como lote `falhou`.
+  inesperada anterior ao commit é revertida e registrada como lote `falhou`.
+  Falhas ao reverter ou registrar o lote são comunicadas explicitamente,
+  preservando as causas. Se a conexão falhar durante o `COMMIT`, o resultado
+  é incerto: **confira a situação do lote antes de repetir a operação**,
+  tanto na importação quanto no rollback. Não se presume que a carga foi
+  desfeita e não se registra um lote falso de falha. A interface descarta
+  conexões com estado transacional incerto.
 - **Exclusão mútua**: um bloqueio consultivo impede importações e rollbacks
   simultâneos.
 - **Rastreabilidade**: `nucleo.importacao_lote` (tipo, origem, canal,

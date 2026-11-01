@@ -1,12 +1,12 @@
+import { origemImportacaoSchema, tipoImportacaoSchema, type TipoImportacao } from '@sisdoc/contratos';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { origemImportacaoSchema, tipoImportacaoSchema, type TipoImportacao } from '@sisdoc/contratos';
 import { Client } from 'pg';
 import { z } from 'zod';
 import { caminhoReal, estaDentro, raizRepositorio } from '../configuracao';
+import { ErroImportacao } from './estado-importacao';
 import { COLUNAS, COLUNAS_AFASTAMENTO_INTERVALO } from './formatos';
-import { ErroImportacao } from './importador';
 
 const identificador = z.string().regex(/^[A-Za-z_][A-Za-z0-9_$]{0,62}$/, 'Identificador SQL inválido no mapeamento.');
 

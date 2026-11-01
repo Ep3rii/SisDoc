@@ -1,5 +1,23 @@
 # Progresso da construção
 
+## Modularização — etapa 5: importador e falhas transacionais — 01/11/2026
+
+Importador decomposto em coordenação, estado, gravação, relatório,
+conferência e rollback. Imports da interface, Legado, CLI e testes
+atualizados diretamente. **25/25 funções declaradas/arrows nomeadas**
+dessas unidades com JSDoc específico. Mantidos cliente único por operação,
+locks, cifra, idempotência, preenchimento de vazios e rollback LIFO.
+
+Corrigidas falhas ocultas de rollback e registro de lote. Erro no commit
+agora sinaliza resultado incerto, sem afirmar reversão nem registrar lote
+falso de falha; a interface descarta conexão incerta. Manual explica que
+o operador precisa conferir a situação antes de repetir. Oito novos testes
+injetam falhas sem abrir conexão real.
+
+Typecheck aprovado; suíte completa **225/225 testes em 29 arquivos**.
+Nenhuma migração ou carga de dados operacionais. As demais unidades
+continuam em revisão; não declarar a revisão integral concluída.
+
 ## Revisão/JSDoc — etapa 4: cálculo e funções dos contratos — 01/11/2026
 
 Motor, calendário, histórico de vínculos, textos e funções nomeadas dos

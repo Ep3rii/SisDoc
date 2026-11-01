@@ -181,6 +181,31 @@ certificação de todas as combinações dos schemas ou de regras administrativa
 Typecheck aprovado e **61 testes em três arquivos** passaram na seleção de
 cálculo, contratos e DTC.
 
+### Importador — etapa 5
+
+O arquivo de coordenação foi reduzido de aproximadamente 830 para 120 linhas.
+Responsabilidades separadas em `estado-importacao.ts`,
+`gravacao-importacao.ts`, `relatorio-importacao.ts`,
+`conferencia-importacao.ts` e `rollback-importacao.ts`.
+CLI, interface, Legado e testes importam as unidades corretas diretamente;
+não há wrappers de compatibilidade nos caminhos antigos. Gravação continua
+recebendo o mesmo cliente e estado do lote, sem abrir transações adicionais.
+
+**25/25 funções declaradas ou arrows nomeadas** dessas unidades têm JSDoc
+específico. Política de preenchimento de vazios, cifra, identidades,
+contagens, idempotência, relatórios e rollback LIFO preservados.
+
+Corrigidas falhas silenciosas na limpeza e registro de falha:
+erros de rollback e de gravação do lote agora preservam ambas as causas.
+Falha no commit sinaliza estado incerto e exige conferir o lote antes de
+repetir, sem registrar uma falha falsa. Conexões incertas são descartadas
+na interface. Oito testes injetam falhas de BEGIN, ROLLBACK, COMMIT e registro
+sem conectar a banco real.
+
+Typecheck aprovado; suíte completa **225/225 testes em 29 arquivos**.
+Revisão integral de rascunhos DOF, sincronização, templates, demais telas,
+CLI/setup/ferramentas e funções dos testes continua pendente.
+
 A etapa 1 documenta funções da composição, configuração, bootstrap,
 transações, health e tratamento de erros. Métodos de domínio, interface,
 pacotes, CLI e ferramentas ainda precisam de revisão e documentação.

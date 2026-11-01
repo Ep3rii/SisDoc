@@ -1,7 +1,12 @@
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import type {
-  ConferenciaImportacao, Configuracao, EnviarImportacaoQuery, ExportarDados, PaginaLotesImportacao, RelatorioImportacao,
-  RelatorioPlanilhaLegado, PromoverLegado, PreviaLegado, TipoImportacao, RelatorioPromocaoLegado,
+  ConferenciaImportacao, Configuracao, EnviarImportacaoQuery, ExportarDados, PaginaLotesImportacao,
+  PreviaLegado,
+  PromoverLegado,
+  RelatorioImportacao,
+  RelatorioPlanilhaLegado,
+  RelatorioPromocaoLegado,
+  TipoImportacao,
 } from '@sisdoc/contratos';
 import type { Pool, PoolClient } from 'pg';
 import { transacao } from '../banco';
@@ -9,11 +14,13 @@ import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { papeisPermitidos } from '../seguranca/permissoes';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
-import { ErroFormato, sugerirMapeamento } from './formatos';
-import { conferenciaGeral, ErroImportacao, hashArquivo, importarLinhas } from './importador';
-import { ErroPlanilha, escreverXlsx, lerPlanilha, LIMITE_ARQUIVO_BYTES } from './planilhas';
+import { conferenciaGeral } from './conferencia-importacao';
+import { ErroImportacao, ErroTransacaoImportacao, hashArquivo } from './estado-importacao';
 import { gerarExportacao } from './exportador';
-import { exportarPlanilhaLegado, importarPlanilhaLegado, listarPlanilhasLegado, lerPlanilhaLegado } from './planilha-legado';
+import { ErroFormato, sugerirMapeamento } from './formatos';
+import { importarLinhas } from './importador';
+import { exportarPlanilhaLegado, importarPlanilhaLegado, lerPlanilhaLegado, listarPlanilhasLegado } from './planilha-legado';
+import { ErroPlanilha, escreverXlsx, lerPlanilha, LIMITE_ARQUIVO_BYTES } from './planilhas';
 import { assinarValidacaoLegado, colunasConversaoLegado, mapearPlanilhaLegado } from './promocao-legado';
 
 export class ImportacaoService {
@@ -103,6 +110,7 @@ export class ImportacaoService {
     }
     const cliente = await this.banco.connect();
     let validacao = '';
+    let erroLiberacao: Error | undefined;
     try {
       const relatorio = await importarLinhas(cliente, this.protetor, linhas, {
         tipo: dados.tipo, origem: lote.origem, canal: 'legado', usuarioId: sessao.usuario.id,
@@ -118,10 +126,11 @@ export class ImportacaoService {
       });
       return { loteLegadoId: dados.loteId, validacao, relatorio };
     } catch (erro) {
+      if (erro instanceof ErroTransacaoImportacao) erroLiberacao = erro;
       if (erro instanceof ErroImportacao || erro instanceof ErroFormato) throw new UnprocessableEntityException(erro.message);
       throw erro;
     } finally {
-      cliente.release();
+      cliente.release(erroLiberacao);
     }
   }
 
@@ -141,6 +150,7 @@ export class ImportacaoService {
       });
     }
     const cliente = await this.banco.connect();
+    let erroLiberacao: Error | undefined;
     try {
       return await importarLinhas(cliente, this.protetor, linhas, {
         tipo: consulta.tipo,
@@ -155,12 +165,13 @@ export class ImportacaoService {
         preservarExistentes: true,
       });
     } catch (erro) {
+      if (erro instanceof ErroTransacaoImportacao) erroLiberacao = erro;
       if (erro instanceof ErroImportacao || erro instanceof ErroFormato || erro instanceof ErroPlanilha) {
         throw new UnprocessableEntityException(erro.message);
       }
       throw erro;
     } finally {
-      cliente.release();
+      cliente.release(erroLiberacao);
     }
   }
 

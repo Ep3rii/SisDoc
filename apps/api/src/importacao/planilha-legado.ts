@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import { UnprocessableEntityException } from '@nestjs/common';
-import { z } from 'zod';
 import type { EnviarImportacaoQuery, LotePlanilhaLegado, RelatorioPlanilhaLegado } from '@sisdoc/contratos';
+import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
+import { z } from 'zod';
 import type { ProtetorDados } from '../seguranca/protecao-dados';
-import { hashArquivo } from './importador';
+import { hashArquivo } from './estado-importacao';
 import { escreverCsv, escreverXlsx, LIMITE_ARQUIVO_BYTES } from './planilhas';
 
 const MAXIMO_LINHAS = 100_000;
