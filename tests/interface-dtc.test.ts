@@ -130,9 +130,11 @@ describe('Editor DTC', () => {
         expect(await pagina.getByRole('button', { name: `Nova ${ROTULOS_DTC[tipo]}` }).count()).toBe(0);
         await pagina.getByRole('button', { name: `Abrir ${nome}` }).click();
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
+        expect(await pagina.locator(`iframe[title="Prévia da ${ROTULOS_DTC[tipo]}"]`).isVisible()).toBe(true);
         await pagina.getByLabel('PB em 2020', { exact: true }).fill('40');
         await pagina.getByLabel('PV em 2020', { exact: true }).fill('50');
         await pagina.getByLabel('Licença-prêmio em 2020', { exact: true }).fill('60');
+        expect(await pagina.getByText('Prévia da revisão salva 1.', { exact: false }).isVisible()).toBe(true);
         await pagina.getByLabel('Fim', { exact: true }).fill('2022-12-31');
         expect(await pagina.getByLabel('PB em 2020', { exact: true }).inputValue()).toBe('40');
         expect(await pagina.getByLabel('PV em 2020', { exact: true }).inputValue()).toBe('50');

@@ -1,5 +1,20 @@
 # Progresso da construção
 
+## Prévias persistentes e densidade — 01/11/2026
+
+DOF salva/reaberta carrega a prévia automaticamente e recarrega a cada
+revisão, sem exigir abrir/fechar. DTC mantém a prévia da revisão salva
+durante a edição. Tabelas, controles anuais e painéis foram compactados,
+preservando dados completos e alvos móveis de 44 px. 25 testes de navegador
+passaram, incluindo persistência entre abas, respostas antigas descartadas,
+DTC em edição e tamanho dos campos anuais; build e typecheck aprovados.
+Frontend publicado na instalação existente, com health e página 200.
+
+A [avaliação por tela](AVALIACAO_UI_UX.md) registra sugestões não implementadas
+e a pendência visual da CSP: estilos inline em prévias `srcDoc` podem ser
+bloqueados pela política da página. A prévia disponível não equivale a
+conferência ou emissão autorizada.
+
 ## Senhas, destinatários e organização do menu — 01/11/2026
 
 Senhas de usuário exigem 10 caracteres em contratos, API, setup, CLI e

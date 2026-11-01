@@ -323,9 +323,15 @@ function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, onPenden
   const podeEmitir = papel === 'coordenador' || papel === 'admin';
 
   if (editando) {
-    return <Editor tipo={tipo} inicial={documento.conteudo} documento={documento} servidor={servidor} csrf={csrf}
+    return <section className="area-dof">
+      <div className="editor-dof"><Editor tipo={tipo} inicial={documento.conteudo} documento={documento} servidor={servidor} csrf={csrf}
       onSalvo={() => { setEditando(false); setPrevia(null); setVersao((atual) => atual + 1); }}
-      onCancelar={() => { onPendente(false); setEditando(false); }} onErro={onErro} onLimpar={onLimpar} onPendente={onPendente} />;
+      onCancelar={() => { onPendente(false); setEditando(false); }} onErro={onErro} onLimpar={onLimpar} onPendente={onPendente} /></div>
+      <aside className="painel-previa previa-documento" aria-label="Prévia do documento">
+        <p>Prévia da revisão salva {documento.revisao}. Alterações do formulário aparecem após salvar.</p>
+        <iframe title={`Prévia da ${ROTULOS_DTC[tipo]}`} sandbox="" srcDoc={renderizarPreviaDtc({ documento, fonte })} />
+      </aside>
+    </section>;
   }
 
   return (

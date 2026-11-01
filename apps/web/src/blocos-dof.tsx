@@ -38,6 +38,9 @@ export function BlocosDof({
   const [fonte, setFonte] = useState<DadosFontePreviaDof | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [mensagem, setMensagem] = useState('');
+  const [carregandoPrevia, setCarregandoPrevia] = useState(false);
+  const [falhaPrevia, setFalhaPrevia] = useState(false);
+  const [atualizacaoPrevia, setAtualizacaoPrevia] = useState(0);
   const ativa = useRef(true);
   const revisaoAtual = useRef({ id: rascunho.id, revisao: rascunho.revisao });
   revisaoAtual.current = { id: rascunho.id, revisao: rascunho.revisao };
@@ -46,10 +49,27 @@ export function BlocosDof({
     return () => { ativa.current = false; };
   }, []);
   useEffect(() => {
+    let corrente = true;
     setFonte(null);
     onPrevia(null);
     onFonte(null);
-  }, [rascunho.id, rascunho.revisao, onPrevia, onFonte]);
+    setFalhaPrevia(false);
+    setCarregandoPrevia(true);
+    api.obterPreviaDof(rascunho.id).then((resposta) => {
+      if (!corrente) return;
+      if (resposta.documentoId !== revisaoAtual.current.id || resposta.revisao !== revisaoAtual.current.revisao) {
+        throw new ErroApi(409, 'O rascunho foi alterado. Reabra-o antes de visualizar a prévia.');
+      }
+      setFonte(resposta);
+      onFonte(resposta);
+      onPrevia({ documentoId: resposta.documentoId, revisao: resposta.revisao, provaFonte: resposta.provaFonte });
+    }).catch((erro: unknown) => {
+      if (corrente) { setFalhaPrevia(true); onErro(erro); }
+    }).finally(() => {
+      if (corrente) setCarregandoPrevia(false);
+    });
+    return () => { corrente = false; };
+  }, [rascunho.id, rascunho.revisao, atualizacaoPrevia, onPrevia, onFonte, onErro]);
 
   function alterar(novos: BlocoRascunhoDof[], novoMotivo = motivo) {
     setBlocos(novos);
@@ -101,26 +121,6 @@ export function BlocosDof({
           ? new ErroApi(0, 'Não foi possível confirmar a gravação. Reabra seus rascunhos e confira antes de tentar novamente.')
           : erro);
       }
-    } finally {
-      if (ativa.current) setOcupado(false);
-    }
-  }
-
-  async function abrirPrevia() {
-    try {
-      onLimpar();
-      setOcupado(true);
-      const resposta = await api.obterPreviaDof(rascunho.id);
-      if (resposta.documentoId !== revisaoAtual.current.id || resposta.revisao !== revisaoAtual.current.revisao) {
-        throw new ErroApi(409, 'O rascunho foi alterado. Reabra-o antes de visualizar a prévia.');
-      }
-      if (ativa.current) {
-        setFonte(resposta);
-        onFonte(resposta);
-        onPrevia({ documentoId: resposta.documentoId, revisao: resposta.revisao, provaFonte: resposta.provaFonte });
-      }
-    } catch (erro) {
-      if (ativa.current) onErro(erro);
     } finally {
       if (ativa.current) setOcupado(false);
     }
@@ -180,21 +180,23 @@ export function BlocosDof({
         <div className="previa-documento">
           <details className="orientacoes-dof">
             <summary>Dados consultados ao abrir · proteja a prévia</summary>
-            <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Os dados da fonte são consultados ao abrir; feche e reabra para atualizá-los. A prévia contém dados pessoais integrais; proteja a tela. Não possui validade oficial.</p>
+            <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Carrega automaticamente após salvar e reabrir o rascunho. Use Atualizar prévia para consultar novamente a fonte. Contém dados pessoais integrais; proteja a tela. Não possui validade oficial.</p>
           </details>
+          <button type="button" className="secundario" disabled={carregandoPrevia || previaBloqueada}
+            onClick={() => { onLimpar(); setAtualizacaoPrevia((valor) => valor + 1); }}>
+            {falhaPrevia ? 'Tentar carregar prévia novamente' : 'Atualizar prévia'}
+          </button>
+          {carregandoPrevia && <p role="status">Carregando prévia da revisão {rascunho.revisao}...</p>}
+          {falhaPrevia && <p className="aviso erro">A prévia não pôde ser carregada. Tente novamente antes de conferir.</p>}
           {fonte && fonte.documentoId === rascunho.id && fonte.revisao === rascunho.revisao ? (
             <>
-              <button type="button" className="secundario" disabled={previaBloqueada}
-                onClick={() => { setFonte(null); onPrevia(null); onFonte(null); }}>
-                Fechar prévia
-              </button>
               <iframe
                 title="Prévia provisória da DOF"
                 sandbox=""
                 srcDoc={renderizarPreviaDof({ ...rascunho, blocos, fonte })}
               />
             </>
-          ) : <button type="button" className="secundario" disabled={ocupado || previaBloqueada} onClick={() => void abrirPrevia()}>Abrir prévia</button>}
+          ) : null}
         </div>
       , destinoPrevia)}
     </>

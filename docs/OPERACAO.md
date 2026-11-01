@@ -1,5 +1,20 @@
 # Operação local — uso operacional autorizado
 
+## Prévias e densidade das tabelas
+
+Após salvar ou reabrir uma DOF, a prévia auditada carrega automaticamente
+e permanece disponível entre abas. Cada nova revisão salva recarrega a
+prévia; use **Atualizar prévia** para consultar novamente a fonte. Falha de
+carregamento oferece retentativa e não libera conferência sem prova válida.
+Blocos locais aparecem na prévia, mas cálculo/processo usam valores salvos.
+
+Na DTC, a prévia da revisão salva permanece ao editar. Valores alterados no
+formulário só aparecem depois de salvar, como informado no painel.
+As tabelas são compactas sem ocultar dados completos; em telas pequenas,
+controles mantêm alvos maiores e a rolagem fica dentro da tabela.
+Veja [avaliação de UI/UX](AVALIACAO_UI_UX.md) para recomendações por tela
+e a pendência de integração dos estilos da prévia com a CSP. local — uso operacional autorizado
+
 ## Senhas, encaminhamentos e menu
 
 Por alteração autorizada em 01/11/2026, novas senhas exigem no mínimo
