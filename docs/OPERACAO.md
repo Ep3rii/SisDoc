@@ -10,6 +10,16 @@
   `npm run verificar-instalacao` com a conta executora. Somente leitura,
   sem aprovação automática; não substitui ACLs e aceite da restauração.
 
+Os modelos WinSW e Caddy em `ops/windows` são preparação, não serviços
+instalados. Até validação e ativação autorizadas, a API continua iniciada
+manualmente e o Caddy não deve ser considerado operacional.
+Os XML definem execução sob `LocalService`; a API depende do serviço
+`postgresql-x64-16`, e o Caddy depende do SisDoc. Nesta etapa os XML foram
+analisados pelo parser do Windows;
+Caddy não está instalado, portanto a configuração do proxy e a execução dos
+serviços seguem sem validação operacional. Caminhos, certificados, ACLs e
+confiança TLS precisam ser confirmados localmente antes de instalar.
+
 ## Novos modelos de saída — versão 2
 
 Os formulários seguem as referências locais em
@@ -179,8 +189,8 @@ lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `023-modelos-oficiais` ao banco novo. O bootstrap exige
-essa migração; o diagnóstico confere a sequência completa do release.
+O setup aplica até `024-perfil-secretario-adjunto` ao banco novo. O bootstrap
+exige essa migração; o diagnóstico confere a sequência completa do release.
 Para atualizar uma instalação existente sob autorização, pare a aplicação,
 preserve uma cópia consistente conforme o guia de migração e execute na raiz
 do repositório:

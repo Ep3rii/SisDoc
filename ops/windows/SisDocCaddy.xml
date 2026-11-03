@@ -1,0 +1,21 @@
+<service>
+  <id>SisDocCaddy</id>
+  <name>SisDoc Caddy</name>
+  <description>Proxy HTTPS local do SisDoc</description>
+  <executable>C:\Program Files\Caddy\caddy.exe</executable>
+  <arguments>run --config C:\ProgramData\SisDoc\proxy\Caddyfile --adapter caddyfile</arguments>
+  <workingdirectory>C:\ProgramData\SisDoc\proxy</workingdirectory>
+  <env name="SISDOC_PROXY_HOST" value="localhost" />
+  <env name="SISDOC_API_PORT" value="3443" />
+  <env name="SISDOC_TLS_NAME" value="REPLACE_WITH_tls.nome" />
+  <env name="SISDOC_TLS_CERT" value="REPLACE_WITH_tls.certificado" />
+  <env name="SISDOC_TLS_KEY" value="REPLACE_WITH_tls.chave" />
+  <logpath>C:\ProgramData\SisDoc\logs</logpath>
+  <log mode="roll" />
+  <depend>SisDoc</depend>
+  <serviceaccount>
+    <localservice />
+  </serviceaccount>
+  <onfailure action="restart" delay="10 sec" />
+  <stoptimeout>30 sec</stoptimeout>
+</service>

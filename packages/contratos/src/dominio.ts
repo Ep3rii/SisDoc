@@ -34,7 +34,7 @@ export const cpfSchema = z.string().trim()
 
 export const tipoDocumentoSchema = z.enum(['DOF', 'DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS']);
 export const estadoDocumentoSchema = z.enum(['rascunho', 'conferido', 'emitido', 'cancelado']);
-export const papelSchema = z.enum(['analista', 'coordenador', 'secretario_adjunto', 'admin']);
+export const papelSchema = z.enum(['analista', 'coordenador', 'admin']);
 export const tipoAfastamentoSchema = z.enum(['falta', 'licenca_ts', 'licenca_pf', 'licenca_ip', 'outro']);
 export const tipoIncorporacaoSchema = z.enum(['PB', 'PV', 'LIC_PREMIO']);
 

@@ -12,7 +12,6 @@ import { api, ErroApi } from '../infraestrutura/api';
 export const nomesPerfis: Record<UsuarioAdministrativo['papel'], string> = {
   analista: 'Analista',
   coordenador: 'Coordenador',
-  secretario_adjunto: 'Secretário adjunto',
   admin: 'Administrador',
 };
 

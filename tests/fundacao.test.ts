@@ -54,6 +54,7 @@ import { aplicarConferenciaDof } from '../apps/api/dist/migracoes/conferencia-do
 import { aplicarEncaminhamentoDof } from '../apps/api/dist/migracoes/encaminhamento-dof.js';
 import { aplicarPreconferenciaDof, CHAVE_BLOQUEIO_FONTE_DOF } from '../apps/api/dist/migracoes/preconferencia-dof.js';
 import { aplicarRevisaoFonteDof } from '../apps/api/dist/migracoes/revisao-fonte-dof.js';
+import { aplicarRetiradaPerfilSecretarioAdjunto } from '../apps/api/dist/migracoes/perfil-secretario-adjunto.js';
 import { aplicarProcessoDof } from '../apps/api/dist/migracoes/processo-dof.js';
 import { aplicarConsulta } from '../apps/api/dist/migracoes/consulta.js';
 import { aplicarRascunhoDof } from '../apps/api/dist/migracoes/rascunho-dof.js';
@@ -371,8 +372,8 @@ async function conferirSqlSintetico(cliente: Client, documentoId: string, usuari
 
 describe('fundação em recursos descartáveis', () => {
   it('mantém a sequência de migrações alinhada ao release dos modelos oficiais', () => {
-    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('023-modelos-oficiais');
-    expect(SEQUENCIA_MIGRACOES.at(-7)?.versao).toBe('017-documentos-admin');
+    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('024-perfil-secretario-adjunto');
+    expect(SEQUENCIA_MIGRACOES.at(-8)?.versao).toBe('017-documentos-admin');
   });
 
   let temporario = '';
@@ -641,7 +642,7 @@ describe('fundação em recursos descartáveis', () => {
     });
   });
 
-  it('recusa inicialização sem a migração dos modelos vigentes mesmo com a versão 022 registrada', async () => {
+  it('recusa inicialização sem a migração de retirada de perfil mesmo com a versão 023 registrada', async () => {
     const cliente = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_ocupado',
       user: 'sisdoc_migrador', password: senhaMigrador,
@@ -651,18 +652,18 @@ describe('fundação em recursos descartáveis', () => {
       await cliente.query(`
         CREATE SCHEMA seguranca;
         CREATE TABLE seguranca.migracao (versao text PRIMARY KEY);
-        INSERT INTO seguranca.migracao VALUES ('022-destinatario-coordenador');
+        INSERT INTO seguranca.migracao VALUES ('023-modelos-oficiais');
         GRANT USAGE ON SCHEMA seguranca TO sisdoc_aplicativo;
         GRANT SELECT ON seguranca.migracao TO sisdoc_aplicativo;
       `);
       const config = await carregarConfiguracao(arquivoConfig);
       config.banco.nome = 'sisdoc_ocupado';
-      const arquivo = path.join(temporario, 'configuracao-sem-modelos.json');
+      const arquivo = path.join(temporario, 'configuracao-sem-perfil-removido.json');
       await writeFile(arquivo, JSON.stringify(config), 'utf8');
       await expect(execFile(process.execPath, [path.join(process.cwd(), 'apps', 'api', 'dist', 'main.js')], {
         env: { ...ambiente(), SISDOC_CONFIG: arquivo }, timeout: 10000, windowsHide: true,
       })).rejects.toMatchObject({
-        stderr: expect.stringContaining('não possui a migração 023-modelos-oficiais'),
+        stderr: expect.stringContaining('não possui a migração 024-perfil-secretario-adjunto'),
       });
     } finally {
       await cliente.query('DROP TABLE seguranca.migracao; DROP SCHEMA seguranca');
@@ -675,6 +676,7 @@ describe('fundação em recursos descartáveis', () => {
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_atualizacao',
       user: 'sisdoc_migrador', password: senhaMigrador,
     });
+
     await cliente.connect();
     try {
       await cliente.query(`
@@ -685,7 +687,7 @@ describe('fundação em recursos descartáveis', () => {
           nome text NOT NULL,
           email text,
           senha_hash text NOT NULL,
-          papel text NOT NULL CHECK (papel IN ('analista', 'coordenador', 'secretario_adjunto', 'admin')),
+          papel text NOT NULL CHECK (papel IN ('analista', 'coordenador', 'admin')),
           ativo boolean NOT NULL DEFAULT true,
           tentativas_falhas integer NOT NULL DEFAULT 0 CHECK (tentativas_falhas >= 0),
           bloqueado_ate timestamptz,
@@ -802,6 +804,58 @@ describe('fundação em recursos descartáveis', () => {
         await cliente.query('ROLLBACK');
       }
     } finally {
+      await cliente.end();
+    }
+  });
+
+  it('inativa contas do perfil descontinuado, revoga sessões e preserva auditoria na migração 024', async () => {
+    const cliente = new Client({
+      host: '127.0.0.1', port: portaBanco, database: opcoes.banco.nome,
+      user: 'sisdoc_migrador', password: senhaMigrador,
+    });
+    await cliente.connect();
+    let transacaoAberta = false;
+    const usuarioId = randomUUID();
+    try {
+      await cliente.query('BEGIN');
+      transacaoAberta = true;
+      await cliente.query(`
+        ALTER TABLE seguranca.usuario DROP CONSTRAINT usuario_papel_check;
+        ALTER TABLE seguranca.usuario ADD CONSTRAINT usuario_papel_check
+          CHECK (papel IN ('analista', 'coordenador', 'secretario_adjunto', 'admin'));
+      `);
+      await cliente.query(`
+        INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel, ativo, troca_senha_obrigatoria)
+        VALUES ($1, $2, 'Conta legada sintética', 'hash-fictício', 'secretario_adjunto', true, false)
+      `, [usuarioId, `LEGADO-${usuarioId}`]);
+      await cliente.query(`
+        INSERT INTO seguranca.sessao (id_hash, usuario_id, expira_em, ultimo_uso)
+        VALUES ($1, $2, now() + interval '1 hour', now())
+      `, [randomBytes(32), usuarioId]);
+      await cliente.query('DELETE FROM seguranca.migracao WHERE versao = $1', ['024-perfil-secretario-adjunto']);
+
+      expect(await aplicarRetiradaPerfilSecretarioAdjunto(cliente, 'sisdoc_aplicativo')).toBe(true);
+      expect((await cliente.query<{ papel: string; ativo: boolean }>(
+        'SELECT papel, ativo FROM seguranca.usuario WHERE id = $1', [usuarioId],
+      )).rows).toEqual([{ papel: 'analista', ativo: false }]);
+      expect((await cliente.query('SELECT 1 FROM seguranca.sessao WHERE usuario_id = $1', [usuarioId])).rowCount).toBe(0);
+      expect((await cliente.query<{ detalhes: { papelAnterior: string; papelNovo: string; usuarioInativado: boolean } }>(`
+        SELECT detalhes FROM seguranca.auditoria WHERE entidade = 'usuario' AND entidade_id = $1
+          AND acao = 'perfil_descontinuado'
+      `, [usuarioId])).rows).toEqual([{
+        detalhes: { papelAnterior: 'secretario_adjunto', papelNovo: 'analista', usuarioInativado: true },
+      }]);
+
+      await cliente.query('SAVEPOINT perfil_removido');
+      await expect(cliente.query(`
+        INSERT INTO seguranca.usuario (id, matricula, nome, senha_hash, papel)
+        VALUES ($1, $2, 'Perfil removido sintético', 'hash-fictício', 'secretario_adjunto')
+      `, [randomUUID(), `NEGADO-${randomUUID()}`])).rejects.toMatchObject({ code: '23514' });
+      await cliente.query('ROLLBACK TO SAVEPOINT perfil_removido');
+      await cliente.query('ROLLBACK');
+      transacaoAberta = false;
+    } finally {
+      if (transacaoAberta) await cliente.query('ROLLBACK');
       await cliente.end();
     }
   });
@@ -1419,7 +1473,11 @@ describe('fundação em recursos descartáveis', () => {
       expect((await chamada(admin, 'PATCH', `/api/v1/admin/usuarios/${admin.usuario.id}`, { papel: 'analista' })).status).toBe(409);
       const analista = await criar(admin, 'ANALISTA-SINTETICO', 'analista');
       await criar(admin, 'COORDENADOR-SINTETICO', 'coordenador');
-      await criar(admin, 'SECRETARIO-SINTETICO', 'secretario_adjunto');
+      const perfilRemovido = await chamada(admin, 'POST', '/api/v1/admin/usuarios', {
+        matricula: 'PERFIL-REMOVIDO-SINTETICO', nome: 'Perfil removido sintético',
+        papel: 'secretario_adjunto', senha: senhaInicial,
+      });
+      expect(perfilRemovido.status, perfilRemovido.corpo).toBe(400);
       const duplicado = await chamada(admin, 'POST', '/api/v1/admin/usuarios', {
         matricula: ' analista-sintetico ', nome: 'Outro sintético', papel: 'analista', senha: senhaInicial,
       });
@@ -1536,7 +1594,7 @@ describe('fundação em recursos descartáveis', () => {
         { texto: 'Matrícula do novo usuário: ', resposta: 'USUARIO-CLI-SINTETICO' },
         { texto: 'Nome do novo usuário: ', resposta: 'Usuário de linha de comando sintético' },
         { texto: 'E-mail do novo usuário (opcional): ', resposta: '' },
-        { texto: 'Perfil (analista, coordenador, secretario_adjunto ou admin): ', resposta: 'analista' },
+        { texto: 'Perfil (analista, coordenador ou admin): ', resposta: 'analista' },
         { texto: 'Senha inicial do novo usuário: ', resposta: senhaInicial },
         { texto: 'Confirme a senha inicial: ', resposta: senhaInicial },
         { texto: 'Digite CRIAR para confirmar: ', resposta: 'CRIAR' },
@@ -1639,7 +1697,7 @@ describe('fundação em recursos descartáveis', () => {
     await cliente.connect();
     const senhaBusca = 'SenhaBuscaSintetica!12345';
     const hashSenha = await gerarHashSenha(senhaBusca);
-    const perfis = ['analista', 'coordenador', 'secretario_adjunto', 'admin'] as const;
+    const perfis = ['analista', 'coordenador', 'admin'] as const;
     try {
       await cliente.query('BEGIN');
       try {
@@ -1776,7 +1834,7 @@ describe('fundação em recursos descartáveis', () => {
         const seguinte = paginaBuscaServidoresSchema.parse(JSON.parse(paginaSeguinte.corpo));
         expect(seguinte.itens.every((item) => !pagina.itens.some((primeiro) => primeiro.vinculoId === item.vinculoId))).toBe(true);
 
-        for (const papel of ['admin', 'analista', 'coordenador', 'secretario_adjunto']) {
+        for (const papel of ['admin', 'analista', 'coordenador']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão funcional sintética ausente.');
           const detalhe = await requisitarApi(portaHttps, caPem, {
@@ -1950,7 +2008,7 @@ describe('fundação em recursos descartáveis', () => {
     const cpf = cpfSintetico(900000001);
     const senha = 'CalculoFicticio!12345';
     const hashSenha = await gerarHashSenha(senha);
-    const perfis = ['analista', 'coordenador', 'secretario_adjunto', 'admin'] as const;
+    const perfis = ['analista', 'coordenador', 'admin'] as const;
     try {
       await cliente.query(`
         INSERT INTO nucleo.pessoa (id, cpf_cifrado, cpf_hash, nome, nome_busca)
@@ -2007,7 +2065,7 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: '/api/v1/calculos', corpo: entrada, ...admin,
         })).status).toBe(200);
-        for (const papel of ['analista', 'coordenador', 'secretario_adjunto']) {
+        for (const papel of ['analista', 'coordenador']) {
           const sessao = sessoes.get(papel);
           if (!sessao) throw new Error('Sessão funcional sintética ausente.');
           const resposta = await requisitarApi(portaHttps, caPem, {
@@ -2074,16 +2132,12 @@ describe('fundação em recursos descartáveis', () => {
 
         const motivo = 'Conferência fictícia das ocorrências por ano';
         const admissaoEsperada = '1980-01-01';
-        for (const papel of ['secretario_adjunto']) {
-          const sessao = sessoes.get(papel);
-          if (!sessao) throw new Error('Sessão sintética ausente.');
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, motivo, admissaoEsperada }, ...sessao,
-          })).status).toBe(403);
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'GET', rota: '/api/v1/documentos', cookie: sessao.cookie,
-          })).status).toBe(403);
-        }
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, motivo, admissaoEsperada }, ...admin,
+        })).status).toBe(403);
+        expect((await requisitarApi(portaHttps, caPem, {
+          metodo: 'GET', rota: '/api/v1/documentos', cookie: admin.cookie,
+        })).status).toBe(200);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: '/api/v1/documentos', corpo: { calculo: entrada, admissaoEsperada, motivo: ' ' }, ...analista,
         })).status).toBe(400);
@@ -2298,7 +2352,7 @@ describe('fundação em recursos descartáveis', () => {
               calculo: entradaPosterior, motivo: 'Revisão da admissão fictícia',
               admissaoEsperada: '1981-01-01', revisao: 1,
             },
-            ...analista,
+            ...coordenador,
           });
           expect(atualizacaoAdmissao.status, atualizacaoAdmissao.corpo).toBe(200);
           const atualizado = rascunhoDofSchema.parse(JSON.parse(atualizacaoAdmissao.corpo));
@@ -2470,23 +2524,10 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, { metodo: 'GET', rota: rotaDadosPrevia })).status).toBe(401);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaPrevia, cookie: coordenador.cookie,
-        })).status).toBe(404);
+        })).status).toBe(200);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaDadosPrevia, cookie: coordenador.cookie,
-        })).status).toBe(404);
-        for (const papel of ['secretario_adjunto']) {
-          const sessao = sessoes.get(papel);
-          if (!sessao) throw new Error('Sessão sintética ausente.');
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'GET', rota: rotaPrevia, cookie: sessao.cookie,
-          })).status).toBe(403);
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'GET', rota: rotaDadosPrevia, cookie: sessao.cookie,
-          })).status).toBe(403);
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'PATCH', rota: rotaBlocos, corpo: proposta, ...sessao,
-          })).status).toBe(403);
-        }
+        })).status).toBe(200);
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'PATCH', rota: rotaBlocos, corpo: proposta, cookie: analista.cookie,
         })).status).toBe(403);
@@ -2719,15 +2760,8 @@ describe('fundação em recursos descartáveis', () => {
           metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, cookie: analista.cookie,
         })).status).toBe(403);
         expect((await requisitarApi(portaHttps, caPem, {
-          metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...coordenador,
-        })).status).toBe(404);
-        for (const papel of ['secretario_adjunto']) {
-          const sessao = sessoes.get(papel);
-          if (!sessao) throw new Error('Sessão sintética ausente.');
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...sessao,
-          })).status).toBe(403);
-        }
+          metodo: 'PATCH', rota: rotaProcesso, corpo: { ...pedidoProcesso, processo: '12345678' }, ...coordenador,
+        })).status).toBe(400);
         for (const invalido of [
           { ...pedidoProcesso, processo: '12345678' },
           { ...pedidoProcesso, processo: '<script>' },
@@ -2739,7 +2773,7 @@ describe('fundação em recursos descartáveis', () => {
           })).status).toBe(400);
         }
         const salvoProcesso = await requisitarApi(portaHttps, caPem, {
-          metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...analista,
+          metodo: 'PATCH', rota: rotaProcesso, corpo: pedidoProcesso, ...coordenador,
         });
         expect(salvoProcesso.status, salvoProcesso.corpo).toBe(200);
         const documentoComProcesso = rascunhoDofSchema.parse(JSON.parse(salvoProcesso.corpo));
@@ -2874,7 +2908,6 @@ describe('fundação em recursos descartáveis', () => {
       { chave: 'outro-analista', papel: 'analista' },
       { chave: 'primeiro-coordenador', papel: 'coordenador' },
       { chave: 'segundo-coordenador', papel: 'coordenador' },
-      { chave: 'secretario', papel: 'secretario_adjunto' },
       { chave: 'administrador', papel: 'admin' },
     ].map((usuario) => ({ ...usuario, id: randomUUID(), matricula: `ENC-${usuario.chave.toUpperCase()}` }));
     try {
@@ -2961,11 +2994,6 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaPreconferencia, cookie: primeiro.cookie,
         })).status).toBe(404);
-        for (const chave of ['secretario']) {
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'GET', rota: rotaPreconferencia, cookie: sessao(chave).cookie,
-          })).status).toBe(403);
-        }
         const relatorioInicial = await verificar();
         expect(relatorioInicial).toMatchObject({
           documentoId: rascunho.id, revisao: 3, status: 'nao_conferido', conferenciaDisponivel: true,
@@ -3019,11 +3047,6 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, cookie: autor.cookie,
         })).status).toBe(403);
-        for (const chave of ['secretario']) {
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...sessao(chave),
-          })).status).toBe(403);
-        }
         for (const chave of ['outro-analista', 'primeiro-coordenador']) {
           expect((await requisitarApi(portaHttps, caPem, {
             metodo: 'POST', rota: rotaConfirmarInicio, corpo: confirmacaoInicial, ...sessao(chave),
@@ -3383,14 +3406,6 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: `${rota}/encaminhar`, corpo: pedido, cookie: autor.cookie,
         })).status).toBe(403);
-        for (const chave of ['secretario']) {
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'GET', rota: '/api/v1/documentos/coordenadores', cookie: sessao(chave).cookie,
-          })).status).toBe(403);
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'POST', rota: `${rota}/encaminhar`, corpo: pedido, ...sessao(chave),
-          })).status).toBe(403);
-        }
         const candidatos = await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: '/api/v1/documentos/coordenadores?limite=50', cookie: autor.cookie,
         });
@@ -3655,21 +3670,11 @@ describe('fundação em recursos descartáveis', () => {
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaUltimaDevolucao, cookie: sessao('outro-analista').cookie,
         })).status).toBe(404);
-        for (const chave of ['secretario']) {
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'GET', rota: rotaUltimaDevolucao, cookie: sessao(chave).cookie,
-          })).status).toBe(403);
-        }
         const motivoDevolucao = 'Ajuste fictício: revisar a data e os lançamentos.';
         const pedidoDevolucao = { revisao: antesDeDevolver.revisao, motivo: motivoDevolucao };
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...autor,
         })).status).toBe(403);
-        for (const chave of ['secretario']) {
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...sessao(chave),
-          })).status).toBe(403);
-        }
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: `${rota}/devolver`, corpo: pedidoDevolucao, ...segundo,
         })).status).toBe(404);
@@ -4089,7 +4094,6 @@ describe('fundação em recursos descartáveis', () => {
       { chave: 'autor', papel: 'analista' },
       { chave: 'destinatario', papel: 'coordenador' },
       { chave: 'outro', papel: 'coordenador' },
-      { chave: 'secretario', papel: 'secretario_adjunto' },
       { chave: 'administrador', papel: 'admin' },
     ].map((usuario) => ({
       ...usuario, id: randomUUID(), matricula: `CONFERENCIA-${usuario.chave.toUpperCase()}`,
@@ -4235,9 +4239,6 @@ describe('fundação em recursos descartáveis', () => {
         expect((await pedirConferencia(destinatario, revisao - 1, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(409);
         expect((await pedirConferencia(destinatario, revisao, previa.provaFonte, 'a'.repeat(64))).status).toBe(409);
         expect((await pedirConferencia(sessao('outro'), revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(404);
-        for (const chave of ['secretario']) {
-          expect((await pedirConferencia(sessao(chave), revisao, previa.provaFonte, relatorio.provaRelatorio)).status).toBe(403);
-        }
         expect((await requisitarApi(portaHttps, caPem, {
           metodo: 'POST', rota: `${rota}/conferir`,
           corpo: { revisao, provaFonte: previa.provaFonte, provaRelatorio: relatorio.provaRelatorio, confirmar: true },
@@ -4317,11 +4318,6 @@ describe('fundação em recursos descartáveis', () => {
         expect((await lista(autor)).some((item) => item.id === rascunho.id)).toBe(true);
         expect((await lista(destinatario)).some((item) => item.id === rascunho.id)).toBe(true);
         expect((await lista(sessao('outro'))).some((item) => item.id === rascunho.id)).toBe(false);
-        for (const chave of ['secretario']) {
-          expect((await requisitarApi(portaHttps, caPem, {
-            metodo: 'GET', rota: '/api/v1/documentos/conferidos', cookie: sessao(chave).cookie,
-          })).status).toBe(403);
-        }
         const rotaDadosPrevia = `${rota}/dados-previa-conferida`;
         const dadosAntesDaAlteracao = await requisitarApi(portaHttps, caPem, {
           metodo: 'GET', rota: rotaDadosPrevia, cookie: destinatario.cookie,

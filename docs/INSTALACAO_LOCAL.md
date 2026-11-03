@@ -1,4 +1,75 @@
-# Instalação e estado atual — 01/11/2026
+# Instalação e estado atual — 03/11/2026
+
+## Destino atual: instalação e aceite a confirmar
+
+Verificação somente leitura anterior, em 03/11/2026, na retomada da tarde:
+configuração externa e provisionamento agora existem; diagnóstico aprovado,
+com PostgreSQL 16 em loopback, login restrito e histórico completo até 023.
+TLS, lista de senhas, pasta PDF e Chromium acessíveis à conta verificadora.
+Página/health HTTPS responderam 200 e documentos sem sessão 401.
+A API está ligada em loopback, mas não sob a conta dedicada `sisdoc_exec`.
+Há um formato de processo configurado, ainda sujeito à conferência institucional.
+As quatro aprovações de templates v2 continuam pendentes.
+`SISDOC_CONFIG` não está persistida nos escopos User/Machine; definir no
+terminal de início conforme [Como ligar](COMO_LIGAR.md).
+Primeiro login/troca de senha e aceite funcional não foram verificados.
+Serviço automático e backup/recuperação continuam pendências separadas.
+**Não repetir setup nem o fluxo de conclusão abaixo.**
+
+Uma checagem observacional posterior, durante a preparação do release, encontrou
+o serviço PostgreSQL em execução, nenhum serviço SisDoc/Caddy registrado e um
+listener em `127.0.0.1:3443`. O caminho de configuração documentado não foi
+encontrado e `SISDOC_CONFIG` não está definido no terminal atual; health/TLS
+não foram retestados. A aplicação pode estar em execução manual. Confirme a
+configuração e o histórico de migrações antes de executar qualquer operação.
+
+Este checkout adiciona a migração obrigatória `024-perfil-secretario-adjunto`.
+O banco já inicializado até 023 não inicia o build novo até aplicar a
+migração com a aplicação parada, após backup validado. Os modelos WinSW/Caddy
+estão preparados em `ops/windows`, mas ainda não foram instalados ou validados
+como serviços; o início permanece manual. A configuração escolhida é Caddy
+somente local, sem liberar acesso LAN ou alterar firewall.
+
+### Histórico da preparação inicial, anterior a essa verificação
+
+Em 03/11/2026, o responsável confirmou que a VM é exclusiva do SisDoc e
+optou por instalação limpa, sem restaurar dados da origem.
+Código compilado e typecheck aprovados; PostgreSQL 16 ativo somente em
+`127.0.0.1`, TLS local confiável, conta executora não administrativa,
+lista de senhas e Chromium compartilhado preparados.
+Raiz operacional e banco/papéis SisDoc **ainda não inicializados**.
+Os registros de origem nas seções seguintes são históricos, não o estado
+operacional desta VM.
+
+Para concluir nesta máquina, a conta instaladora deve abrir PowerShell
+**como administrador** e executar o fluxo local protegido:
+
+```powershell
+node C:\ProgramData\SisDoc\provisionamento\concluir-instalacao.cjs
+```
+
+Esse arquivo é específico desta preparação, externo ao Git, e não substitui
+o instalador distribuído pelo projeto. Solicita a senha atual do usuário
+PostgreSQL `postgres` sem eco e depois matrícula/login, nome e senha do
+administrador inicial do SisDoc; exige confirmação `CRIAR`.
+Não enviar senhas ou arquivos de configuração pelo chat.
+Recusa banco/papéis preexistentes e raiz/provisionamento existentes.
+Credenciais técnicas são geradas localmente e guardadas no provisionamento
+restrito; o instalador compartilhado gera a identidade criptográfica nova.
+O fluxo não importa dados, aprova modelos ou inicia a API.
+
+Após sucesso, conferir diagnóstico também sob a conta executora,
+configurar máscaras institucionais de processo e realizar primeiro login
+com troca de senha antes do aceite. Chromium usa
+`C:\ProgramData\SisDoc\chromium` nesta VM; a variável correspondente já foi
+persistida no escopo Machine. Novos terminais recebem esse ambiente.
+Em falha após provisionar, preservar arquivos e conferir banco/papéis antes
+de repetir; não apagar raiz nem contornar a autenticação PostgreSQL.
+O fluxo de conclusão passou por verificação de sintaxe e cancelamento, mas
+**aguarda execução real pelo operador**. Evidências e limite da tentativa
+da suíte fundação em [Progresso](PROGRESSO.md).
+
+## Referência da instalação de origem
 
 Este documento descreve a instalação de origem e os requisitos do release
 atual. Não é um instalador automático nem evidência de homologação em outra
@@ -67,15 +138,16 @@ máquina antiga não configura a conta do destino. Reaplique ACLs locais.
 
 Windows Server/Server Core, execução desassistida e concorrência no destino
 **não estão certificados pela suíte executada na origem**. Server Core exige
-validação específica antes de adotar este guia. Serviço Windows da aplicação,
-backup agendado e restauração automatizada não estão implementados.
-Nenhum acesso LAN, proxy, firewall ou recurso externo foi autorizado.
+validação específica antes de adotar este guia. Modelos WinSW/Caddy foram
+preparados, mas não estão instalados nem validados operacionalmente. Backup
+agendado e restauração automatizada não estão implementados. Caddy foi
+escolhido para HTTPS somente em loopback; não configurar acesso LAN ou firewall.
 
 ## Instalação nova versus migração completa
 
 **Instalação nova:** provisionar banco/papéis/TLS/lista de senhas e uma raiz
 inexistente; depois `npm ci`, instalar Chromium e executar `npm run setup`
-em terminal interativo. O setup aplica até `023-modelos-oficiais`, gera
+em terminal interativo. O setup aplica até `024-perfil-secretario-adjunto`, gera
 chaves novas e administrador com troca obrigatória. Não cria PostgreSQL,
 banco, papéis, certificado, confiança Windows nem serviço da aplicação.
 A aprovação institucional continua separada.
@@ -105,5 +177,5 @@ Saída zero **não autoriza emissão nem substitui o aceite da restauração**.
 
 Para ligar, veja [Como ligar](COMO_LIGAR.md). Atualizações autorizadas exigem
 parar a aplicação, preservar cópia consistente, compilar e aplicar apenas
-migrações conhecidas com `npm run migrar`. O bootstrap exige a versão 023.
+migrações conhecidas com `npm run migrar`. O bootstrap exige a versão 024.
 Regressão anterior e validações desta preparação: [Progresso](PROGRESSO.md).

@@ -88,7 +88,7 @@ async function executar(): Promise<void> {
     const matricula = await entrada.perguntar('Matrícula do novo usuário: ');
     const nome = await entrada.perguntar('Nome do novo usuário: ');
     const email = await entrada.perguntar('E-mail do novo usuário (opcional): ');
-    const papel = await entrada.perguntar('Perfil (analista, coordenador, secretario_adjunto ou admin): ');
+    const papel = await entrada.perguntar('Perfil (analista, coordenador ou admin): ');
     const senha = await entrada.segredo('Senha inicial do novo usuário: ');
     const confirmacaoSenha = await entrada.segredo('Confirme a senha inicial: ');
     if (senha !== confirmacaoSenha) throw new Error('As senhas informadas não coincidem.');

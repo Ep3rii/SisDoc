@@ -197,12 +197,13 @@ export class DtcService {
         JOIN nucleo.pessoa p ON p.id = d.pessoa_id
         JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
         JOIN seguranca.usuario autor ON autor.id = d.criado_por
-        WHERE d.tipo = ANY($1::text[]) AND d.status = $2 AND (d.criado_por = $3 OR $4::boolean)
+        WHERE d.tipo = ANY($1::text[]) AND d.status = $2
+          AND (d.criado_por = $3 OR $4::boolean OR (d.status = 'rascunho' AND $5::boolean))
           AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x
             WHERE x.documento_id = d.id AND x.status = 'pendente')
         ORDER BY d.atualizado_em DESC, d.id LIMIT 50
       `, [consulta.tipo ? [consulta.tipo] : TIPOS_DTC, consulta.estado, sessao.usuario.id,
-        sessao.usuario.papel === 'coordenador' || sessao.usuario.papel === 'admin']);
+        sessao.usuario.papel === 'coordenador' || sessao.usuario.papel === 'admin', consulta.estado === 'rascunho']);
       await auditarConsultaFuncional(cliente, sessao, 'dtc_listadas', 'documento', null, null, ip);
       return {
         itens: linhas.rows.map((linha) => ({
@@ -217,7 +218,9 @@ export class DtcService {
   async obter(sessao: SessaoAutenticada, ip: string, id: string): Promise<DocumentoDtc> {
     const tentativa = await transacao<Tentativa<DocumentoDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
-      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'] });
+      const linha = await this.consulta.linha(cliente, sessao, id, {
+        estados: ['rascunho', 'conferido'], compartilharRascunho: true,
+      });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'DTC não encontrada.' } };
@@ -260,7 +263,9 @@ export class DtcService {
   async atualizar(sessao: SessaoAutenticada, ip: string, id: string, dados: AtualizarDtc): Promise<DocumentoDtc> {
     const tentativa = await transacao<Tentativa<DocumentoDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao', somenteAutor: true });
+      const linha = await this.consulta.linha(cliente, sessao, id, {
+        estados: ['rascunho'], bloquear: 'alteracao', compartilharRascunho: true,
+      });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho de DTC não encontrado.' } };
@@ -283,7 +288,9 @@ export class DtcService {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente salvar novamente.' } };
       }
-      const atual = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'], bloquear: 'alteracao', somenteAutor: true });
+      const atual = await this.consulta.linha(cliente, sessao, id, {
+        estados: ['rascunho'], bloquear: 'alteracao', compartilharRascunho: true,
+      });
       if (!atual) throw new Error('Rascunho de DTC não pôde ser recuperado.');
       if (!atual.admissao) return { falha: { tipo: 'invalido', mensagem: 'A data de admissão do vínculo não está informada na fonte.' } };
       const anterior = this.consulta.apresentar(atual);
@@ -303,7 +310,9 @@ export class DtcService {
       if (atualizado.rowCount !== 1) throw new Error('A atualização da DTC não pôde ser registrada.');
       await this.registrarAjustes(cliente, id, sessao.usuario.id, motivo, mudancas(anterior.conteudo, conteudo));
       await auditarConsultaFuncional(cliente, sessao, 'dtc_atualizada', 'documento', id, atual.pessoa_id, ip);
-      const relida = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho'], somenteAutor: true });
+      const relida = await this.consulta.linha(cliente, sessao, id, {
+        estados: ['rascunho'], compartilharRascunho: true,
+      });
       if (!relida) throw new Error('DTC atualizada não pôde ser recuperada.');
       return { valor: this.consulta.apresentar(relida) };
     });
@@ -314,7 +323,9 @@ export class DtcService {
   async previa(sessao: SessaoAutenticada, ip: string, id: string): Promise<PreviaDtc> {
     const tentativa = await transacao<Tentativa<PreviaDtc>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
-      const linha = await this.consulta.linha(cliente, sessao, id, { estados: ['rascunho', 'conferido'], bloquear: 'leitura' });
+      const linha = await this.consulta.linha(cliente, sessao, id, {
+        estados: ['rascunho', 'conferido'], bloquear: 'leitura', compartilharRascunho: true,
+      });
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'dtc_nao_encontrada', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'DTC não encontrada.' } };

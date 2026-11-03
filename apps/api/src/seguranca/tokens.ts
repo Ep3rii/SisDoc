@@ -42,8 +42,11 @@ export function csrfValido(token: string, recebido: string | undefined, chave: s
 }
 
 export function origemValida(req: IncomingMessage, config: Configuracao): boolean {
-  const esperada = new URL(`https://${config.tls.nome}:${config.porta}`).origin;
-  return req.headers.origin === esperada;
+  const esperadas = [
+    new URL(`https://${config.tls.nome}:${config.porta}`).origin,
+    config.proxy?.origemPublica,
+  ].filter((origem): origem is string => origem !== undefined);
+  return esperadas.includes(req.headers.origin ?? '');
 }
 
 export function cookieSessao(token: string): string {

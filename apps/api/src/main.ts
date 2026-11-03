@@ -1,7 +1,7 @@
 import { DatabaseError, Pool } from 'pg';
 import { criarAplicacao } from './aplicacao';
 import { carregarConfiguracao } from './configuracao';
-import { VERSAO_MODELOS_OFICIAIS } from './migracoes/modelos-oficiais';
+import { VERSAO_PERFIL_SECRETARIO_ADJUNTO } from './migracoes/perfil-secretario-adjunto';
 
 /** Valida instalação e migrações existentes, cria o pool único e inicia HTTPS somente em loopback. */
 async function iniciar(): Promise<void> {
@@ -19,7 +19,7 @@ async function iniciar(): Promise<void> {
   try {
     const resultado = await banco.query<{ atual: boolean }>(
       'SELECT EXISTS (SELECT 1 FROM seguranca.migracao WHERE versao = $1) AS atual',
-      [VERSAO_MODELOS_OFICIAIS],
+      [VERSAO_PERFIL_SECRETARIO_ADJUNTO],
     );
     migracaoAtual = resultado.rows[0].atual;
   } catch (erro) {
@@ -34,7 +34,7 @@ async function iniciar(): Promise<void> {
   }
   if (!migracaoAtual) {
     await banco.end();
-    throw new Error(`O banco não possui a migração ${VERSAO_MODELOS_OFICIAIS}; execute npm run migrar com o serviço parado e inicie novamente.`);
+    throw new Error(`O banco não possui a migração ${VERSAO_PERFIL_SECRETARIO_ADJUNTO}; execute npm run migrar com o serviço parado e inicie novamente.`);
   }
   let app;
   try {

@@ -1,5 +1,134 @@
 # Progresso da construção
 
+## Perfis, rascunhos e modelos de serviço — 03/11/2026
+
+Implementada a descontinuação do perfil Secretário Adjunto pela migração
+obrigatória `024-perfil-secretario-adjunto`: contas antigas são inativadas,
+convertidas para analista, têm sessões revogadas e a alteração é auditada.
+Analista, coordenador e administrador podem consultar/editar rascunhos DOF/DTC
+de terceiros; a edição compartilhada permanece limitada a rascunhos, e DOF
+com encaminhamento ativo continua bloqueada até recolhimento/devolução.
+
+Validação desta etapa: typecheck aprovado; testes de interface 16/16 e testes
+de permissões/tokens 5/5 aprovados. A suíte de fundação/migração não iniciou:
+o PostgreSQL descartável inicializa, mas recusa iniciar sob a conta Windows
+administrativa desta sessão. Nenhum teste acessou o banco operacional.
+
+Preparados modelos WinSW/Caddy. Ambos definem `LocalService`; Caddy depende
+do serviço SisDoc. XML passou pelo parser do Windows, mas Caddy não está
+instalado, então o Caddyfile e os serviços não foram validados em execução.
+Não foram instalados serviços nem alterados certificados, configuração,
+banco, firewall ou exposição de rede.
+
+Verificação observacional adicional: serviço PostgreSQL Windows em execução;
+serviços SisDoc/SisDocCaddy não encontrados; listener em `127.0.0.1:3443`.
+O caminho de configuração documentado não foi encontrado e `SISDOC_CONFIG`
+não está definido no terminal desta sessão. Health/TLS não foram retestados;
+essa observação não comprova instalação/aceite operacional. A migração 024
+segue pendente na instalação existente, conforme o último histórico conhecido
+até 023; confirmar novamente antes de aplicar.
+
+## Estado da instalação limpa na retomada da tarde — 03/11/2026
+
+Consulta de pendências motivou nova inspeção somente leitura. Configuração
+externa e provisionamento agora existem; não foi repetido setup.
+Diagnóstico aprovado: arquivos/TLS/lista/PDF/Chromium, PostgreSQL 16 local,
+login restrito e sequência até 023. Um formato de processo configurado;
+quatro aprovações de templates v2 continuam pendentes.
+Página/health HTTPS 200 e documentos sem sessão 401, sem ignorar TLS.
+Listeners 5432 e 3443 somente em `127.0.0.1`.
+Proprietário do processo da API não é a conta dedicada `sisdoc_exec`.
+`SISDOC_CONFIG` não persistida em User/Machine; pode ser definida por sessão.
+
+Esta evidência supera o bloqueio histórico de inicialização abaixo, sem
+atribuir à sessão a criação dos arquivos/banco ou o início do processo.
+Pendente validar execução/diagnóstico sob a conta dedicada, primeiro
+login/troca de senha e aceite funcional, conferir formato institucional e
+obter aprovação formal por tipo antes de emitir. Serviço automático,
+backup/recuperação e falha da suíte fundação continuam separados.
+Nenhum serviço, dado ou aprovação foi alterado nesta conferência.
+
+## Instalação limpa no destino: infraestrutura — 03/11/2026
+
+Após a preparação abaixo, o responsável confirmou VM exclusiva do SisDoc
+e solicitou **instalação limpa**, sem restaurar banco/chaves da origem.
+Esta escolha substitui a pendência de obter a captura para esta instalação;
+o procedimento de migração continua disponível para outros cenários.
+
+Preparado e validado nesta máquina:
+
+- Configuração PostgreSQL anterior preservada fora do Git; escuta alterada
+  de `*` para `127.0.0.1`. Serviço reiniciado e `pg_isready` aprovado;
+  listener confirmado somente em IPv4 loopback. SCRAM-SHA-256 preservado.
+- Diretórios externos com ACLs restritas e conta Windows executora sem
+  grupo administrativo. Credencial dessa conta protegida por DPAPI para
+  a conta instaladora, fora do checkout.
+- TLS `localhost`/`127.0.0.1` gerado localmente; par de chaves, nome/IP,
+  validade e confiança Windows conferidos. Somente certificado público
+  adicionado à confiança local; chave privada no diretório protegido.
+- Lista pública SecLists de senhas comuns e licença preservadas fora do Git.
+- Chromium instalado em cache compartilhado protegido e variável
+  `PLAYWRIGHT_BROWSERS_PATH` persistida no escopo Machine.
+- Processo real sob a conta executora confirmou leitura de código/TLS/lista,
+  acesso negado ao provisionamento, HTTPS com validação TLS e geração de
+  PDF em memória. Processo encerrado; arquivos auxiliares de validação removidos.
+
+Preparado fluxo local interativo protegido para concluir o provisionamento:
+solicita senha PostgreSQL sem eco, confere ausência de banco/papéis SisDoc,
+coleta administrador inicial, exige `CRIAR`, gera credenciais técnicas,
+persiste provisionamento exclusivo e chama o instalador compartilhado.
+Não aprova modelos nem importa dados. Sintaxe e cancelamento antes da
+autenticação conferidos sem criar banco, provisionamento ou raiz.
+**O fluxo completo ainda não foi executado**, pois a senha administrativa
+não está disponível à sessão; deve ser digitada pelo operador no terminal,
+nunca no chat. Comando em [Instalação](INSTALACAO_LOCAL.md).
+
+Validação adicional: cinco testes do diagnóstico passaram. A suíte fundação
+falhou no `beforeAll` de preparação descartável, reportando
+`Unknown Error: undefined`; **27 casos não executados**. Binários PostgreSQL
+embutidos respondem `--version`, mas a causa dessa falha não foi estabelecida.
+Não tratar essa tentativa como aprovação do instalador ou regressão completa.
+Nenhum teste foi apontado para o PostgreSQL operacional.
+
+**Ainda pendente/bloqueado:** autenticação PostgreSQL local autorizada,
+criação de banco/papéis e execução do setup, diagnóstico da instalação
+completa, configuração de processos institucionais, primeiro login com
+troca obrigatória de senha e partida/aceite da API sob conta executora.
+Não houve restauração, importação, seed, aprovação formal, publicação ou
+início da API. Aprovação v2, serviço automático e backup seguem separados.
+
+## Preparação do checkout no destino — 03/11/2026
+
+Inspecionado o checkout de referência `26faa91` na máquina de destino.
+Preservada alteração local preexistente em `package.json` (`allowScripts`).
+Node 24.21.0/npm 11.19.0 e PostgreSQL 16.15 disponíveis; serviço PostgreSQL
+ativo. A presença de builds/dependências antigos não foi tratada como
+instalação operacional concluída.
+
+O primeiro typecheck falhou por resolução ausente do workspace
+`@sisdoc/contratos`. Executado `npm ci --no-audit --no-fund` com o lock
+existente; após reinstalação, typecheck e build aprovados.
+Chromium Playwright iniciou e encerrou em modo headless.
+**5/5 testes do diagnóstico** aprovados pelo runner isolado do projeto.
+Aviso preexistente de bundle web acima de 500 KB permanece.
+
+O diagnóstico operacional chegou à configuração externa e falhou:
+`SISDOC_CONFIG` não está definida no processo nem nos escopos persistidos
+User/Machine; o diretório padrão externo da instalação não existe.
+Não foi localizado nem fornecido um caminho autorizado da captura da origem.
+Isso não demonstra ausência de cópias em outros volumes nem de banco existente.
+PostgreSQL foi observado escutando em `0.0.0.0` e `::`, não apenas loopback.
+Não foi alterada a configuração nem reiniciado o serviço, pois uso exclusivo
+e autorização para essa intervenção ainda não foram confirmados.
+
+**Preparado/testado:** dependências locais, tipos, build, Chromium e suíte
+direcionada. **Não publicado/não operacional:** sem setup, criação de banco,
+restauração, migração de schema, importação, aprovação ou partida da API.
+Pendente obter a captura protegida original (dump, configuração/chaves,
+PDFs, TLS, lista de senhas e provisionamento), conferir o release da captura,
+autorizar/revisar a escuta local, restaurar e executar diagnóstico/aceite.
+Nenhum segredo ou dado pessoal foi registrado nesta memória.
+
 ## Preparação de migração Windows Server — 01/11/2026
 
 Reanalisados checkout, bootstrap/setup, configuração, sequência de migrações,

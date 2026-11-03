@@ -62,6 +62,9 @@ Se configurar outra porta/nome TLS, use os valores da configuração aceita.
 Para desligar a aplicação iniciada no seu terminal, pressione `Ctrl+C`.
 Para ligar novamente, repita o passo 1.
 A aplicação ainda **não inicia automaticamente após reiniciar o Windows**.
+Há modelos de serviço WinSW e proxy Caddy preparados em `ops/windows`, mas
+eles ainda não foram instalados nem validados operacionalmente. Use o início
+manual acima até a ativação autorizada e documentada.
 
 Na operação diária, não execute `npm run setup`, testes ou importações para
 ligar o sistema. Build e migrações só são necessários após atualização do

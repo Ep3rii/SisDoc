@@ -75,12 +75,12 @@ export class RascunhosService {
         FROM documentos.documento d
         JOIN nucleo.pessoa p ON p.id = d.pessoa_id
         JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
-        WHERE (d.criado_por = $1 OR $4::boolean) AND d.tipo = 'DOF' AND d.status = 'rascunho'
+        WHERE d.tipo = 'DOF' AND d.status = 'rascunho'
           AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x
             WHERE x.documento_id = d.id AND x.status = 'pendente')
-          AND ($2::uuid IS NULL OR d.id > $2::uuid)
-        ORDER BY d.id LIMIT $3
-      `, [sessao.usuario.id, cursor ?? null, limite + 1, sessao.usuario.papel === 'admin']);
+          AND ($1::uuid IS NULL OR d.id > $1::uuid)
+          ORDER BY d.id LIMIT $2
+      `, [cursor ?? null, limite + 1]);
       await auditarConsultaFuncional(cliente, sessao, 'rascunhos_listados', 'documento', null, null, ip);
       return {
         itens: consulta.rows.slice(0, limite).map((linha) => ({
@@ -197,7 +197,7 @@ export class RascunhosService {
   ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
-      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'leitura', true);
+      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'leitura', true, 'rascunho', true);
       await auditarConsultaFuncional(cliente, sessao, linha ? 'rascunho_aberto' : 'rascunho_nao_encontrado',
         'documento', id, linha?.pessoa_id ?? null, ip);
       if (!linha) return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -215,7 +215,7 @@ export class RascunhosService {
   async ultimaDevolucao(sessao: SessaoAutenticada, ip: string, id: string): Promise<UltimaDevolucaoDof> {
     const tentativa = await transacao<Tentativa<UltimaDevolucaoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
-      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'leitura');
+      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'leitura', false, 'rascunho', true);
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -277,7 +277,9 @@ export class RascunhosService {
     const tentativa = await transacao<Tentativa<DadosPrevia>>(
       this.banco, async (cliente) => {
         await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
-        const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'leitura', true, estado);
+        const linha = await this.consulta.linha(
+          cliente, id, sessao.usuario.id, 'leitura', true, estado, estado === 'rascunho',
+        );
         if (!linha) {
           await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
           return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -286,7 +288,9 @@ export class RascunhosService {
           await auditarConsultaFuncional(cliente, sessao, 'previa_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
           return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e abra a prévia novamente.' } };
         }
-        const atual = await this.consulta.linha(cliente, id, sessao.usuario.id, 'leitura', true, estado);
+        const atual = await this.consulta.linha(
+          cliente, id, sessao.usuario.id, 'leitura', true, estado, estado === 'rascunho',
+        );
         if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a abertura da prévia.');
         const leitura = await this.consulta.lerFonte(cliente, atual, estado);
         if ('erro' in leitura) {
@@ -529,7 +533,7 @@ export class RascunhosService {
   async atualizar(sessao: SessaoAutenticada, ip: string, id: string, dados: AtualizarRascunhoDof): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      let linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      let linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -546,7 +550,7 @@ export class RascunhosService {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente salvar novamente.' } };
       }
-      const atual = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      const atual = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!atual) throw new Error('Rascunho não pôde ser recuperado ao proteger a leitura da fonte.');
       linha = atual;
       const anterior = await this.consulta.apresentar(cliente, linha);
@@ -591,7 +595,7 @@ export class RascunhosService {
         [entrada.inicio, entrada.fim, id]);
       await this.escrita.registrarAjustes(cliente, id, sessao.usuario.id, dados.motivo, alteracoes);
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_editado', 'documento', id, entrada.pessoaId, ip);
-      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id);
+      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
       if (!atualizado) throw new Error('Rascunho atualizado não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, atualizado) };
     });
@@ -607,7 +611,7 @@ export class RascunhosService {
   ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -680,7 +684,7 @@ export class RascunhosService {
       `, [sessao.usuario.id, id]);
       await this.escrita.registrarAjustes(cliente, id, sessao.usuario.id, dados.motivo, alteracoes);
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_blocos_editados', 'documento', id, linha.pessoa_id, ip);
-      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id);
+      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
       if (!atualizado) throw new Error('Rascunho com blocos atualizados não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, atualizado) };
     });
@@ -696,7 +700,7 @@ export class RascunhosService {
   ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -729,7 +733,7 @@ export class RascunhosService {
         { campo: 'processo', anterior: anterior.processo, novo: dados.processo },
       ]);
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_processo_editado', 'documento', id, linha.pessoa_id, ip);
-      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id);
+      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
       if (!atualizado) throw new Error('Rascunho com processo atualizado não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, atualizado) };
     });
@@ -742,7 +746,7 @@ export class RascunhosService {
   ): Promise<RascunhoDof> {
     const tentativa = await transacao<Tentativa<RascunhoDof>>(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('editar_rascunho'));
-      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      const linha = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!linha) {
         await auditarConsultaFuncional(cliente, sessao, 'rascunho_nao_encontrado', 'documento', id, null, ip);
         return { falha: { tipo: 'nao_encontrado', mensagem: 'Rascunho não encontrado.' } };
@@ -755,7 +759,7 @@ export class RascunhosService {
         await auditarConsultaFuncional(cliente, sessao, 'confirmacao_inicio_fonte_ocupada', 'documento', id, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente confirmar novamente.' } };
       }
-      const atual = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao');
+      const atual = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!atual) throw new Error('Rascunho não pôde ser recuperado durante a confirmação do início.');
       const rascunho = await this.consulta.apresentar(cliente, atual);
       if (rascunho.encaminhamento) {
@@ -783,7 +787,7 @@ export class RascunhosService {
           atualizado_em = now(), revisao = revisao + 1 WHERE id = $3
       `, [this.escrita.cifrar('documento', id, 'confirmacao_inicio_cifrada', confirmacao), sessao.usuario.id, id]);
       await auditarConsultaFuncional(cliente, sessao, 'inicio_ajustado_confirmado', 'documento', id, atual.pessoa_id, ip);
-      const confirmado = await this.consulta.linha(cliente, id, sessao.usuario.id);
+      const confirmado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
       if (!confirmado) throw new Error('Rascunho com início confirmado não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, confirmado) };
     });

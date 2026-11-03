@@ -1,0 +1,17 @@
+<service>
+  <id>SisDoc</id>
+  <name>SisDoc API</name>
+  <description>API local do SisDoc</description>
+  <executable>C:\Program Files\nodejs\node.exe</executable>
+  <arguments>apps\api\dist\main.js</arguments>
+  <workingdirectory>C:\SisDoc</workingdirectory>
+  <env name="SISDOC_CONFIG" value="C:\ProgramData\SisDoc\instalacao\config\aplicacao.json" />
+  <logpath>C:\ProgramData\SisDoc\logs</logpath>
+  <log mode="roll" />
+  <depend>postgresql-x64-16</depend>
+  <serviceaccount>
+    <localservice />
+  </serviceaccount>
+  <onfailure action="restart" delay="10 sec" />
+  <stoptimeout>30 sec</stoptimeout>
+</service>

@@ -74,11 +74,11 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
   return (
     <section aria-labelledby="rascunhos-titulo">
       <h2 id="rascunhos-titulo">{administrador ? (recebidos ? 'Todos os rascunhos encaminhados' : 'Todos os rascunhos de DOF')
-        : recebidos ? 'Rascunhos encaminhados a mim' : 'Meus rascunhos de DOF'}</h2>
+        : recebidos ? 'Rascunhos encaminhados a mim' : 'Rascunhos de DOF'}</h2>
       <p>{administrador ? 'O administrador pode acessar e editar rascunhos de qualquer autoria. Recolha encaminhamentos antes de alterar o conteúdo.'
         : recebidos
         ? 'Somente os rascunhos encaminhados a você estão disponíveis para consulta, conferência provisória e devolução.'
-        : 'Somente rascunhos de sua autoria são exibidos. Você pode encaminhá-los a um coordenador para análise.'}</p>
+        : 'Os rascunhos disponíveis podem ser editados pelos perfis habilitados. Rascunhos encaminhados ficam bloqueados até o recolhimento ou devolução.'}</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       <FiltrosLista filtro={filtro} antesAlterar={confirmarSaida} onAtualizar={() => setVersao((atual) => atual + 1)} />
       {falhou ? (
