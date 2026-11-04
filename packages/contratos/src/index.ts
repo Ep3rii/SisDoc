@@ -17,6 +17,7 @@ export * from './importacao';
 
 const porta = z.number().int().min(1).max(65535);
 const chave = z.string().regex(/^[A-Za-z0-9+/]{43}=$/);
+const origemHttps = z.url({ protocol: /^https$/ }).refine((valor) => new URL(valor).origin === valor);
 
 export const configuracaoSchema = z.strictObject({
   porta,
@@ -33,6 +34,9 @@ export const configuracaoSchema = z.strictObject({
     ca: z.string().min(1),
     nome: z.string().min(1),
   }),
+  proxy: z.strictObject({
+    origemPublica: origemHttps,
+  }).optional(),
   chaves: z.strictObject({
     cifra: chave,
     hmac: chave,

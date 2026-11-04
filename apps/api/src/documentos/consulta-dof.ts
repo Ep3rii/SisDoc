@@ -158,9 +158,10 @@ export class ConsultasDof {
     bloquear?: 'leitura' | 'alteracao',
     permitirEncaminhado = false,
     estado: 'rascunho' | 'conferido' = 'rascunho',
+    permitirEdicaoCompartilhada = false,
   ): Promise<LinhaRascunho | undefined> {
-    if (permitirEncaminhado && !bloquear) {
-      throw new Error('Acesso a encaminhamento requer bloqueio do rascunho.');
+    if ((permitirEncaminhado || permitirEdicaoCompartilhada) && !bloquear) {
+      throw new Error('Acesso compartilhado requer bloqueio do documento.');
     }
     const consulta = await cliente.query<LinhaRascunho>(`
       SELECT d.id, d.pessoa_id, d.vinculo_id, d.criado_por, p.nome, v.matricula,
@@ -174,11 +175,21 @@ export class ConsultasDof {
       JOIN documentos.regra_versao r ON r.id = d.regra_versao_id
       WHERE d.id = $1 AND (d.criado_por = $2 OR $6::boolean OR EXISTS (
         SELECT 1 FROM seguranca.usuario u WHERE u.id = $2 AND u.ativo AND u.papel = 'admin'
-      )) AND d.tipo = 'DOF' AND d.status = $7
+      ) OR (d.status = 'rascunho' AND $8::boolean)) AND d.tipo = 'DOF' AND d.status = $7
       ${bloquear === 'alteracao' ? 'FOR UPDATE OF d' : bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
-    `, [id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA), permitirEncaminhado, estado]);
+    `, [
+      id, autorId, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA),
+      permitirEncaminhado, estado, permitirEdicaoCompartilhada,
+    ]);
     const linha = consulta.rows[0];
     if (!linha || linha.criado_por === autorId) return linha;
+    if (estado === 'rascunho' && permitirEdicaoCompartilhada) {
+      const elegivel = await cliente.query(`
+        SELECT 1 FROM seguranca.usuario
+        WHERE id = $1 AND ativo AND papel IN ('analista', 'coordenador', 'admin')
+      `, [autorId]);
+      if ((elegivel.rowCount ?? 0) > 0) return linha;
+    }
     // Revalida após bloquear o documento, para não aceitar um encaminhamento recolhido durante a espera.
     const acesso = await cliente.query(`
       SELECT 1 FROM seguranca.usuario u WHERE u.id = $2 AND u.ativo AND u.papel = 'admin'

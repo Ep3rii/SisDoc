@@ -378,7 +378,7 @@ describe('Sincronização com a API externa (simulada)', () => {
     };
     await subirAplicacao(portaPadrao, undefined);
     for (const [chave, papel] of [
-      ['analista', 'analista'], ['coordenador', 'coordenador'], ['secretario', 'secretario_adjunto'], ['admin', 'admin'],
+      ['analista', 'analista'], ['coordenador', 'coordenador'], ['admin', 'admin'],
     ] as const) {
       await criarUsuario(chave, papel);
     }
@@ -502,14 +502,14 @@ describe('Sincronização com a API externa (simulada)', () => {
   });
 
   it('sem configuração: situação informa e o início é recusado com mensagem clara; permissões por papel', async () => {
-    for (const quem of ['analista', 'coordenador', 'secretario', 'admin']) {
+    for (const quem of ['analista', 'coordenador', 'admin']) {
       expect(await situacao(quem, portaPadrao)).toMatchObject({ configurada: false, avisoAtraso: false, ultimaSincronizacaoEm: null });
       expect((await situacao(quem)).configurada).toBe(true);
     }
     const recusa = await iniciar('completa', portaPadrao);
     expect(recusa.status, recusa.corpo).toBe(409);
     expect(JSON.parse(recusa.corpo).detail).toContain('não está configurada');
-    for (const quem of ['analista', 'coordenador', 'secretario']) {
+    for (const quem of ['analista', 'coordenador']) {
       for (const porta of [portaPadrao, portaSinc]) {
         const inicio = await requisitar({
           metodo: 'POST', rota: 'admin/sincronizacoes', sessao: sessao(quem), corpo: { tipo: 'completa' }, porta,
@@ -758,7 +758,6 @@ describe('Sincronização com a API externa (simulada)', () => {
         expect((await estado()).falhas_consecutivas).toBe(tentativa);
       }
       expect((await estado()).disjuntor_aberto_em).not.toBeNull();
-      expect((await situacao('secretario')).disjuntorAberto).toBe(true);
       const quantidade = api.requisicoes.length;
       const recusa = await iniciar('completa');
       expect(recusa.status).toBe(409);

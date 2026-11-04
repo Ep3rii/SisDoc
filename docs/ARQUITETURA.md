@@ -245,7 +245,7 @@ verifica TLS/Chromium/arquivos e abre apenas uma transação `READ ONLY` com
 o login da aplicação. Não usa credencial de migração, não exporta dados,
 não aplica schema e não inicia API/worker. Informa pendências de máscaras
 e aprovação de templates sem imprimir credenciais ou conteúdo pessoal.
-O bootstrap recusa instalação sem `023-modelos-oficiais`.
+O bootstrap recusa instalação sem `024-perfil-secretario-adjunto`.
 
 O guia de migração preserva o monólito local e a identidade cifra/HMAC,
 snapshot/numeração/aprovações no dump, mais PDFs/arquivos externos da mesma

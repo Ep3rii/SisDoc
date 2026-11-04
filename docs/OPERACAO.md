@@ -10,6 +10,13 @@
   `npm run verificar-instalacao` com a conta executora. Somente leitura,
   sem aprovação automática; não substitui ACLs e aceite da restauração.
 
+Os modelos WinSW e Caddy em `ops/windows` continuam sendo referência de
+implantação, mas o estado atual já possui API e Caddy ativos como processos
+diretos (sem registro WinSW). A execução observada usa `LocalService`, API em
+`127.0.0.1:3443` e proxy Caddy em `192.168.70.26:443`, com regra de firewall
+LAN em escopo restrito. Antes de converter para serviços, valide caminhos,
+certificados, ACLs e ordem de dependência (PostgreSQL -> SisDoc -> Caddy).
+
 ## Novos modelos de saída — versão 2
 
 Os formulários seguem as referências locais em
@@ -179,8 +186,8 @@ lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `023-modelos-oficiais` ao banco novo. O bootstrap exige
-essa migração; o diagnóstico confere a sequência completa do release.
+O setup aplica até `024-perfil-secretario-adjunto` ao banco novo. O bootstrap
+exige essa migração; o diagnóstico confere a sequência completa do release.
 Para atualizar uma instalação existente sob autorização, pare a aplicação,
 preserve uma cópia consistente conforme o guia de migração e execute na raiz
 do repositório:
@@ -364,7 +371,8 @@ a ação é auditada. Veja limites e regras em
 O limite de 50 itens por página não limita usuários simultâneos. A aferição
 de 64 sessões concorrentes por perfil e mistas usa apenas recursos
 descartáveis; veja [decisão 026](decisoes/026-cadastro-informatica-e-exportacao.md).
-A instalação permanece em loopback, sem acesso por outras máquinas.
+A API permanece em loopback, e o acesso de usuários pode ocorrer via proxy
+HTTPS em LAN restrita, conforme [decisão 032](decisoes/032-proxy-lan-restrito.md).
 
 A sincronização copia servidores e vínculos de uma API externa para o modelo
 canônico local (decisão 025). Ela é opcional: sem o bloco `sincronizacao` na

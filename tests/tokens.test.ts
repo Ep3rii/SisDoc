@@ -54,11 +54,17 @@ describe('tokens de sessão e CSRF', () => {
       banco: { host: '127.0.0.1', porta: 5432, nome: 'teste', usuario: 'teste', senha: 'sintetica' },
       tls: { certificado: 'cert', chave: 'chave', ca: 'ca', nome: 'sisdoc.local' },
       chaves: { cifra: randomBytes(32).toString('base64'), hmac: randomBytes(32).toString('base64') },
+      proxy: { origemPublica: 'https://localhost' },
     };
     const req = new IncomingMessage(new Socket());
     req.headers.origin = 'https://sisdoc.local:8443';
     expect(origemValida(req, config)).toBe(true);
-    for (const origem of ['http://sisdoc.local:8443', 'https://sisdoc.local', 'https://outro.local:8443', 'null']) {
+    req.headers.origin = 'https://localhost';
+    expect(origemValida(req, config)).toBe(true);
+    for (const origem of [
+      'http://sisdoc.local:8443', 'https://sisdoc.local', 'https://outro.local:8443',
+      'https://localhost/', 'https://localhost.evil', 'null',
+    ]) {
       req.headers.origin = origem;
       expect(origemValida(req, config)).toBe(false);
     }

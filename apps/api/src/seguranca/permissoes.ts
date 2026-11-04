@@ -4,8 +4,8 @@ import { z } from 'zod';
 export type Papel = z.infer<typeof papelSchema>;
 
 const matriz = {
-  consultar_pessoa: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
-  calcular: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
+  consultar_pessoa: ['analista', 'coordenador', 'admin'],
+  calcular: ['analista', 'coordenador', 'admin'],
   consultar_documentos: ['analista', 'coordenador', 'admin'],
   administrar_documentos: ['admin'],
   criar_rascunho: ['analista', 'coordenador'],
@@ -14,18 +14,18 @@ const matriz = {
   conferir: ['analista', 'coordenador', 'admin'],
   emitir: ['coordenador', 'admin'],
   cancelar_rascunho: ['analista', 'coordenador', 'admin'],
-  cancelar_emitido: ['secretario_adjunto', 'admin'],
-  consultar_emissoes: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
-  historico_terceiros: ['coordenador', 'secretario_adjunto', 'admin'],
-  pesquisa_avancada: ['coordenador', 'secretario_adjunto', 'admin'],
+  cancelar_emitido: ['admin'],
+  consultar_emissoes: ['analista', 'coordenador', 'admin'],
+  historico_terceiros: ['coordenador', 'admin'],
+  pesquisa_avancada: ['coordenador', 'admin'],
   gerenciar_blocos: ['admin'],
   gerenciar_templates: ['admin'],
   gerenciar_usuarios: ['admin'],
-  consultar_auditoria: ['secretario_adjunto', 'admin'],
+  consultar_auditoria: ['admin'],
   administrar_importacao: ['admin'],
   administrar_sincronizacao: ['admin'],
   editar_servidor: ['admin'],
-  consultar_situacao_sincronizacao: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
+  consultar_situacao_sincronizacao: ['analista', 'coordenador', 'admin'],
   sincronizar_individual: ['analista', 'coordenador', 'admin'],
 } as const satisfies Record<string, readonly Papel[]>;
 
@@ -50,7 +50,7 @@ export function permiteAcao(
   if (!contexto) return false;
   if (papel === 'admin') return true;
   const proprio = contexto.usuarioId === contexto.autorId;
-  if (acao === 'editar_rascunho') return proprio;
+  if (acao === 'editar_rascunho') return true;
   if (acao === 'cancelar_rascunho') return proprio || papel === 'coordenador';
   return proprio || (papel === 'coordenador' && contexto.encaminhado);
 }

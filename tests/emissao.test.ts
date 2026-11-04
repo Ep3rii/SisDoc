@@ -368,7 +368,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     worker = new WorkerPdfEmissao(poolAplicativo, config);
     for (const [chave, papel] of [
       ['analista', 'analista'], ['analista2', 'analista'], ['coordenador', 'coordenador'], ['coordenador2', 'coordenador'],
-      ['secretario', 'secretario_adjunto'], ['admin', 'admin'],
+      ['admin', 'admin'],
     ] as const) {
       await criarUsuario(chave, papel);
     }
@@ -460,7 +460,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
 
     const alvo = emissoesPendentes.shift();
     if (!alvo) throw new Error('DOF conferida sintética ausente.');
-    for (const quem of ['analista', 'secretario']) {
+    for (const quem of ['analista']) {
       expect((await emitir(alvo, randomUUID(), quem)).status).toBe(403);
     }
     expect((await emitir(alvo, randomUUID(), 'coordenador2')).status).toBe(404);
@@ -540,8 +540,6 @@ describe('emissão da DOF em recursos descartáveis', () => {
     expect(baixado.headers['content-disposition']).toBe(`attachment; filename="PESSOA_EMISSAO_FICTICIA_DOF_${snapshot.dataEmissao}.pdf"`);
     expect(baixado.bruto.subarray(0, 5).toString('latin1')).toBe('%PDF-');
     expect(await auditorias('pdf_baixado', emitida.emissaoId)).toBe(1);
-    expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf`, sessao: sessao('secretario') })).status)
-      .toBe(200);
     expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf`, sessao: sessao('coordenador2') })).status)
       .toBe(200);
     for (const quem of ['analista2']) {
@@ -658,9 +656,6 @@ describe('emissão da DOF em recursos descartáveis', () => {
     const geral = historicoEmissoesSchema.parse(JSON.parse((await historico('coordenador2', 'todos')).corpo));
     expect(geral.itens).toHaveLength(7);
     expect(geral.itens.every((item) => item.nome !== null && item.podeCopiar && !item.podeCancelar)).toBe(true);
-    const secretario = historicoEmissoesSchema.parse(JSON.parse((await historico('secretario', 'todos')).corpo));
-    expect(secretario.itens.every((item) => item.nome !== null && item.podeCancelar && !item.podeCopiar && item.podeBaixar))
-      .toBe(true);
     const admin = historicoEmissoesSchema.parse(JSON.parse((await historico('admin', 'todos')).corpo));
     expect(admin.itens).toHaveLength(7);
     expect(admin.itens.every((item) => item.nome !== null && item.matricula !== null && item.podeBaixar
@@ -676,7 +671,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
 
   it('copia a emissão como novo rascunho sem alterar o documento emitido', async () => {
     const origem = emissoes[0];
-    for (const quem of ['secretario']) {
+    for (const quem of ['admin']) {
       expect((await requisitar({
         metodo: 'POST', rota: `documentos/${origem.documentoId}/copia`, sessao: sessao(quem), corpo: { confirmar: true },
       })).status).toBe(403);
@@ -719,17 +714,17 @@ describe('emissão da DOF em recursos descartáveis', () => {
     expect(coordenador.status, coordenador.corpo).toBe(201);
   });
 
-  it('cancela emissão somente por secretário ou administrador, com motivo cifrado', async () => {
+  it('cancela emissão somente por administrador, com motivo cifrado', async () => {
     const alvo = emissoes[2];
     const rota = `documentos/${alvo.documentoId}/cancelar`;
     const motivo = 'Cancelamento sintético por erro material';
     for (const quem of ['analista', 'coordenador']) {
       expect((await requisitar({ metodo: 'POST', rota, sessao: sessao(quem), corpo: { motivo, confirmar: true } })).status).toBe(403);
     }
-    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('secretario'), corpo: { motivo: ' ', confirmar: true } })).status)
+    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo: { motivo: ' ', confirmar: true } })).status)
       .toBe(400);
-    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('secretario'), corpo: { motivo } })).status).toBe(400);
-    const cancelado = await requisitar({ metodo: 'POST', rota, sessao: sessao('secretario'), corpo: { motivo, confirmar: true } });
+    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo: { motivo } })).status).toBe(400);
+    const cancelado = await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo: { motivo, confirmar: true } });
     expect(cancelado.status, cancelado.corpo).toBe(200);
     expect(situacaoEmissaoSchema.parse(JSON.parse(cancelado.corpo))).toMatchObject({
       emissaoId: alvo.emissaoId, status: 'cancelado', numero: alvo.numero,
@@ -738,7 +733,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     const linha = await banco().query<{
       status: string; cancelado_por: string; motivo_cancelamento_cifrado: Buffer;
     }>('SELECT status, cancelado_por, motivo_cancelamento_cifrado FROM documentos.documento WHERE id = $1', [alvo.documentoId]);
-    expect(linha.rows[0]).toMatchObject({ status: 'cancelado', cancelado_por: idUsuario('secretario') });
+    expect(linha.rows[0]).toMatchObject({ status: 'cancelado', cancelado_por: idUsuario('admin') });
     expect(linha.rows[0].motivo_cancelamento_cifrado.toString('latin1')).not.toContain('Cancelamento');
     expect(protetor.decifrar(linha.rows[0].motivo_cancelamento_cifrado, {
       schema: 'documentos', tabela: 'documento', registroId: alvo.documentoId, campo: 'motivo_cancelamento_cifrado',
@@ -751,7 +746,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     await expect(banco().query("UPDATE documentos.documento SET status = 'emitido' WHERE id = $1", [alvo.documentoId]))
       .rejects.toBeDefined();
     const historico = historicoEmissoesSchema.parse(JSON.parse((await requisitar({
-      metodo: 'GET', rota: 'historico?tipo=DOF&escopo=todos', sessao: sessao('secretario'),
+      metodo: 'GET', rota: 'historico?tipo=DOF&escopo=todos', sessao: sessao('admin'),
     })).corpo));
     expect(historico.itens.find((item) => item.emissaoId === alvo.emissaoId)).toMatchObject({
       status: 'cancelado', podeCancelar: false,
@@ -774,7 +769,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
       aplicativo: { usuario: 'sisdoc_aplicativo', senha: senhaAplicativo },
     };
     const atualizado = await migrar(provisionamento);
-    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '023-modelos-oficiais' });
+    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '024-perfil-secretario-adjunto' });
     expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total)
       .toBe(SEQUENCIA_MIGRACOES.length + 1);
 
@@ -791,7 +786,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
           nome text NOT NULL,
           email text,
           senha_hash text NOT NULL,
-          papel text NOT NULL CHECK (papel IN ('analista', 'coordenador', 'secretario_adjunto', 'admin')),
+          papel text NOT NULL CHECK (papel IN ('analista', 'coordenador', 'admin')),
           ativo boolean NOT NULL DEFAULT true,
           tentativas_falhas integer NOT NULL DEFAULT 0 CHECK (tentativas_falhas >= 0),
           bloqueado_ate timestamptz,
@@ -818,11 +813,12 @@ describe('emissão da DOF em recursos descartáveis', () => {
           '018-edicao-cadastro', '019-planilhas-legado', '020-listagem-servidores', '021-revisao-periodos-ipam',
           '022-destinatario-coordenador',
           '023-modelos-oficiais',
+          '024-perfil-secretario-adjunto',
         ],
-        versaoAtual: '023-modelos-oficiais',
+        versaoAtual: '024-perfil-secretario-adjunto',
       });
       const segundaExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '023-modelos-oficiais' });
+      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '024-perfil-secretario-adjunto' });
       const privilegios = await anterior.query<{ inserir: boolean; aprovar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.emissao', 'snapshot_cifrado', 'INSERT') AS inserir,
           has_table_privilege('sisdoc_aplicativo', 'documentos.aprovacao_modelo', 'INSERT') AS aprovar

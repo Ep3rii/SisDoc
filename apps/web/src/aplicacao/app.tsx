@@ -134,16 +134,14 @@ export function App() {
             <button type="button" className="menu-toggle" aria-expanded={menuAberto} aria-controls="navegacao-principal"
               onClick={() => setMenuAberto((valor) => !valor)}>Menu</button>
             <nav id="navegacao-principal" aria-label="Navegação">
-              {(sessao.usuario.papel === 'admin' || sessao.usuario.papel === 'secretario_adjunto') && <>
-                <p className="grupo-menu">{sessao.usuario.papel === 'admin' ? 'Administração' : 'Supervisão'}</p>
-                {sessao.usuario.papel === 'admin' && <>
+              {sessao.usuario.papel === 'admin' && <>
+                <p className="grupo-menu">Administração</p>
                   <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
                     onClick={() => navegar('usuarios')}>Usuários</button>
                   <button type="button" aria-current={tela === 'importacao' ? 'page' : undefined}
                     onClick={() => navegar('importacao')}>Importação e exportação</button>
                   <button type="button" aria-current={tela === 'sincronizacao' ? 'page' : undefined}
                     onClick={() => navegar('sincronizacao')}>Sincronização</button>
-                </>}
                 <button type="button" aria-current={tela === 'auditoria' ? 'page' : undefined}
                   onClick={() => navegar('auditoria')}>Auditoria</button>
               </>}
@@ -153,7 +151,7 @@ export function App() {
                   onClick={() => navegar('busca')}>Buscar servidores<span>Dados de referência · DOF e DTC</span></button>
                 <p className="grupo-menu">DOFs</p>
                 {podeSalvar && <>
-                  <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>{sessao.usuario.papel === 'admin' ? 'Todos os rascunhos' : 'Meus rascunhos'}</button>
+                  <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>Rascunhos</button>
                   <button type="button" aria-current={tela === 'conferidos' ? 'page' : undefined} onClick={() => navegar('conferidos')}>DOFs conferidas</button>
                 </>}
                 {podeEmitir && <button type="button"
@@ -236,7 +234,7 @@ export function App() {
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
               <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />
             )}
-            {((sessao.usuario.papel === 'secretario_adjunto' || sessao.usuario.papel === 'admin') && tela === 'auditoria') && (
+            {(sessao.usuario.papel === 'admin' && tela === 'auditoria') && (
               <Auditoria onErro={tratarErro} />
             )}
           </>

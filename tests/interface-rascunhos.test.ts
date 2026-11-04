@@ -34,7 +34,7 @@ const csrf = 'a'.repeat(43);
 const nome = 'Pessoa Ficticia';
 const matricula = 'FICTICIA-1';
 
-type PapelTeste = 'analista' | 'coordenador' | 'secretario_adjunto' | 'admin';
+type PapelTeste = 'analista' | 'coordenador' | 'admin';
 type Simulacao = {
   papel: PapelTeste;
   admissao: string | null;
@@ -186,7 +186,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
         if (!estado.admissao) return responder(rota, 400, { detail: 'Admissão ausente na fixture.' });
         return responder(rota, 200, resultadoSintetico(solicitarCalculoDofSchema.parse(requisicao.postDataJSON()), estado.admissao));
       }
-      if (caminho.startsWith('/api/v1/documentos') && !['analista', 'coordenador'].includes(estado.papel)) {
+      if (caminho.startsWith('/api/v1/documentos') && !['analista', 'coordenador', 'admin'].includes(estado.papel)) {
         return responder(rota, 403, { detail: 'Perfil sem permissão para rascunhos.' });
       }
       if (caminho === '/api/v1/documentos/coordenadores' && metodo === 'GET') {
@@ -497,7 +497,7 @@ async function selecionarAba(pagina: Page, nome: 'Dados do servidor' | 'Período
 }
 
 async function abrirRascunho(pagina: Page) {
-  await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).click();
+  await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
   await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
   await pagina.getByRole('heading', { name: 'Resultado salvo' }).waitFor();
 }
@@ -602,7 +602,7 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.locator('.dados-servidor').getByText('Mãe fictícia <img src=x>', { exact: true }).isVisible()).toBe(true);
     await pagina.setViewportSize({ width: 375, height: 812 });
     await pagina.getByRole('button', { name: 'Menu', exact: true }).click();
-    expect(await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).isVisible()).toBe(true);
+    expect(await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).isVisible()).toBe(true);
     expect(await pagina.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
   });
 
@@ -646,11 +646,11 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('3');
     let avisoSaida = '';
     pagina.once('dialog', (dialogo) => { avisoSaida = dialogo.message(); void dialogo.dismiss(); });
-    await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).click();
+    await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
     expect(avisoSaida).toContain('gravação estiver em andamento');
     expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('3');
     pagina.once('dialog', (dialogo) => void dialogo.accept());
-    await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).click();
+    await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
     await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
     expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('2');
 
@@ -696,7 +696,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('44 ano(s) no intervalo efetivo.', { exact: false }).waitFor();
     estado.admissao = null;
     pagina.once('dialog', (dialogo) => void dialogo.accept());
-    await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).click();
+    await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
     await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
     await pagina.getByText('A edição está indisponível até a correção na fonte.', { exact: false }).waitFor();
     expect(await pagina.getByLabel('Início do período').isDisabled()).toBe(true);
@@ -1293,26 +1293,26 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.getByRole('button', { name: 'Conferir', exact: true }).count()).toBe(0);
   });
 
-  it('restringe controles por perfil e apresenta falha de listagem com retentativa e paginação', async () => {
-    estado.papel = 'secretario_adjunto';
+  it('permite que os perfis de edição trabalhem com rascunhos e preserva controles administrativos', async () => {
+    estado.papel = 'analista';
     await pagina.goto(endereco);
     await pagina.getByText('Operador Ficticio').waitFor();
-    expect(await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).count()).toBe(1);
     await iniciarCalculo(pagina);
     await calcularTabela(pagina);
-    expect(await pagina.getByRole('button', { name: 'Salvar rascunho' }).count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Salvar rascunho' }).count()).toBe(1);
     pagina.once('dialog', (dialogo) => void dialogo.accept());
     estado.papel = 'admin';
     await pagina.reload();
     await pagina.getByRole('heading', { name: 'Administração de usuários' }).waitFor();
     expect(await pagina.getByRole('button', { name: 'Buscar servidores' }).count()).toBe(1);
-    expect(await pagina.getByRole('button', { name: 'Todos os rascunhos', exact: true }).count()).toBe(1);
-    expect(await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).count()).toBe(0);
+    await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
+    await pagina.getByRole('heading', { name: 'Todos os rascunhos de DOF' }).waitFor();
 
     estado.papel = 'coordenador';
     await pagina.reload();
     estado.falhaListagem = true;
-    await pagina.getByRole('button', { name: 'Meus rascunhos', exact: true }).click();
+    await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
     await pagina.getByRole('alert').getByText('Falha sintética de listagem.').waitFor();
     estado.falhaListagem = false;
     estado.extras = 26;

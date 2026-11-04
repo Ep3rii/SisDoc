@@ -1,7 +1,7 @@
 # Pontos de memória do projeto
 
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
-Atualizada em **01/11/2026**, após preparar instalação/migração Windows Server.
+Atualizada em **03/11/2026**, após preparar a infraestrutura da instalação limpa.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
 
 ## 1. Objetivo e permissões
@@ -40,6 +40,26 @@ recursos CLI ficam na pasta `importacao`.
 Detalhes e invariantes de extração: [Arquitetura](../ARQUITETURA.md).
 
 ## 3. Último estado validado
+
+### Perfis, rascunhos e serviços Windows — 03/11/2026
+
+Implementada a migração obrigatória `024-perfil-secretario-adjunto`, a
+descontinuação do perfil sem transferir permissões exclusivas e o acesso
+compartilhado de consulta/edição restrito a rascunhos DOF/DTC. Encaminhamento
+DOF ativo continua bloqueando edição; conferência, emissão e outras transições
+não foram ampliadas.
+
+Validados: typecheck; 16 testes de interface; cinco testes de permissões e
+tokens. A suíte de fundação/migração não iniciou porque o PostgreSQL embutido
+recusa execução sob a conta Windows administrativa da sessão.
+
+Estado observado em 03/11/2026 20:42 (somente leitura): diagnóstico
+`npm run verificar-instalacao` aprovado e histórico confirmado até
+`024-perfil-secretario-adjunto`; API ativa em `127.0.0.1:3443` e Caddy ativo
+em `192.168.70.26:443`, ambos sob `NT AUTHORITY\LOCAL SERVICE`.
+A rota de health responde 200 e rota privada sem sessão responde 401 no
+caminho direto da API e via proxy. Caddy está em processo manual (sem serviço
+WinSW registrado). Aprovação formal dos templates v2 continua pendente.
 
 - Fatias funcionais 5–7 implementadas; fatias 8–9 e recursos externos
   adicionais continuam extras, sujeitos a autorização.
@@ -106,7 +126,12 @@ Mapeamento parcial da sincronização preserva campos canônicos sem alias.
 
 ## 6. Operação e materiais locais
 
-A instalação é HTTPS em loopback: `https://localhost:3443/`.
+A instalação aceita dois pontos de acesso HTTPS:
+- direto na API em loopback: `https://localhost:3443/`;
+- proxy Caddy na LAN (escopo restrito por firewall): `https://192.168.70.26/`.
+Base de decisão: [031](../decisoes/031-servicos-locais-caddy.md) e
+[032](../decisoes/032-proxy-lan-restrito.md).
+
 Início manual e atualização: [Como ligar](../COMO_LIGAR.md) e
 [Operação](../OPERACAO.md). Não iniciar segunda cópia com a porta ocupada;
 verificar PID/comando antes de parar somente o processo correto.
@@ -117,8 +142,29 @@ Migração completa para Windows Server é preparada em
 cifra/HMAC, PDFs e arquivos externos da mesma captura; reaplicar ACLs por
 conta do destino e instalar Chromium no contexto correto. Não executar
 setup sobre restauração. `npm run verificar-instalacao` usa `SISDOC_CONFIG`
-e diagnóstico somente leitura; bootstrap exige 023. Captura/restauração
+e diagnóstico somente leitura; bootstrap exige 024. Captura/restauração
 operacional e aceite no Windows Server ainda não foram executados.
+
+No destino, em 03/11/2026, o responsável confirmou VM exclusiva e escolheu
+**instalação limpa**, substituindo a intenção de restaurar a origem.
+Dependências reinstaladas; typecheck/build e cinco testes do diagnóstico
+aprovados. PostgreSQL 16 restringido a `127.0.0.1` e serviço reiniciado.
+Diretórios externos protegidos, TLS local confiável, lista de senhas com
+licença e Chromium compartilhado preparados. Conta executora não
+administrativa validada: acesso a código/TLS/lista, provisionamento negado,
+HTTPS e PDF em memória aprovados. Fluxo local interativo de conclusão
+disponível fora do Git; detalhes em [Instalação](../INSTALACAO_LOCAL.md).
+Na validação mais recente, configuração/provisionamento já existem e o
+diagnóstico somente leitura passou: banco/login restrito e histórico completo
+até 024, arquivos/TLS/PDF/Chromium acessíveis. Página/health HTTPS 200 e
+privados 401. API e Caddy ativos sob a conta dedicada (`LocalService`), porém
+como processos diretos (sem serviços WinSW registrados); não repetir setup.
+Pendente validar execução sob conta dedicada, primeiro login/troca e aceite
+funcional, conferir um formato de processo configurado e aprovar formalmente
+os quatro templates v2. `SISDOC_CONFIG` não persistida: definir por sessão.
+Serviço automático e backup/recuperação continuam separados.
+Tentativa adicional da suíte fundação falhou na preparação dos recursos
+descartáveis (27 casos não executados); não declarar regressão aprovada.
 
 Configuração, chaves e certificados ficam fora do Git; nunca copiar seu
 conteúdo para memórias. A pasta `Modelos e Documentação/imagens modelo/`

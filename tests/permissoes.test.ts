@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ACOES, perfilPermiteAcao, permiteAcao, type Acao, type Papel } from '../apps/api/dist/seguranca/permissoes.js';
 
-const papeis: Papel[] = ['analista', 'coordenador', 'secretario_adjunto', 'admin'];
+const papeis: Papel[] = ['analista', 'coordenador', 'admin'];
 const esperado: Record<Acao, Papel[]> = {
-  consultar_pessoa: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
-  calcular: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
+  consultar_pessoa: ['analista', 'coordenador', 'admin'],
+  calcular: ['analista', 'coordenador', 'admin'],
   consultar_documentos: ['analista', 'coordenador', 'admin'],
   administrar_documentos: ['admin'],
   criar_rascunho: ['analista', 'coordenador'],
@@ -13,18 +13,18 @@ const esperado: Record<Acao, Papel[]> = {
   conferir: ['analista', 'coordenador', 'admin'],
   emitir: ['coordenador', 'admin'],
   cancelar_rascunho: ['analista', 'coordenador', 'admin'],
-  cancelar_emitido: ['secretario_adjunto', 'admin'],
-  consultar_emissoes: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
-  historico_terceiros: ['coordenador', 'secretario_adjunto', 'admin'],
-  pesquisa_avancada: ['coordenador', 'secretario_adjunto', 'admin'],
+  cancelar_emitido: ['admin'],
+  consultar_emissoes: ['analista', 'coordenador', 'admin'],
+  historico_terceiros: ['coordenador', 'admin'],
+  pesquisa_avancada: ['coordenador', 'admin'],
   gerenciar_blocos: ['admin'],
   gerenciar_templates: ['admin'],
   gerenciar_usuarios: ['admin'],
-  consultar_auditoria: ['secretario_adjunto', 'admin'],
+  consultar_auditoria: ['admin'],
   administrar_importacao: ['admin'],
   administrar_sincronizacao: ['admin'],
   editar_servidor: ['admin'],
-  consultar_situacao_sincronizacao: ['analista', 'coordenador', 'secretario_adjunto', 'admin'],
+  consultar_situacao_sincronizacao: ['analista', 'coordenador', 'admin'],
   sincronizar_individual: ['analista', 'coordenador', 'admin'],
 };
 
@@ -38,13 +38,13 @@ describe('matriz de perfis', () => {
     }
   });
 
-  it('mantém edição por autoria e exige encaminhamento para conferir ou emitir de terceiros', () => {
+  it('permite editar rascunhos entre perfis e exige encaminhamento para conferir ou emitir de terceiros', () => {
     const proprio = { usuarioId: 'usuario', autorId: 'usuario', encaminhado: false };
     const terceiro = { usuarioId: 'usuario', autorId: 'outro', encaminhado: false };
     const encaminhado = { ...terceiro, encaminhado: true };
     expect(permiteAcao('analista', 'editar_rascunho', proprio)).toBe(true);
-    expect(permiteAcao('coordenador', 'editar_rascunho', terceiro)).toBe(false);
-    expect(permiteAcao('coordenador', 'editar_rascunho', encaminhado)).toBe(false);
+    expect(permiteAcao('coordenador', 'editar_rascunho', terceiro)).toBe(true);
+    expect(permiteAcao('coordenador', 'editar_rascunho', encaminhado)).toBe(true);
     expect(permiteAcao('coordenador', 'conferir', terceiro)).toBe(false);
     expect(permiteAcao('coordenador', 'conferir', encaminhado)).toBe(true);
     expect(permiteAcao('coordenador', 'emitir', encaminhado)).toBe(true);

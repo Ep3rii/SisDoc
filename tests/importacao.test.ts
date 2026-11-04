@@ -746,7 +746,7 @@ describe('Importação de planilhas e base legada', () => {
   it('atende 64 usuários simultâneos por perfil e mistos sobre 20 mil vínculos via HTTPS', async () => {
     const senhaHash = await gerarHashSenha(senhaUsuarios);
     const grupos = new Map<string, Sessao[]>();
-    for (const papel of ['analista', 'coordenador', 'secretario_adjunto', 'admin']) {
+    for (const papel of ['analista', 'coordenador', 'admin']) {
       const sessoes: Sessao[] = [];
       for (let indice = 0; indice < 64; indice += 1) {
         const matricula = `CARGA-${papel}-${indice}`;

@@ -62,7 +62,7 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
         <label>Situação<select value={estado} onChange={(evento) => {
           if (confirmarSaida()) setEstado(evento.target.value === 'conferido' ? 'conferido' : 'rascunho');
         }}>
-          <option value="rascunho">{papel === 'coordenador' || papel === 'admin' ? 'Rascunhos' : 'Meus rascunhos'}</option>
+          <option value="rascunho">Rascunhos</option>
           <option value="conferido">Conferidas</option>
         </select></label>
       </FiltrosLista>

@@ -1,0 +1,10 @@
+{$SISDOC_PROXY_HOST:localhost} {
+	bind 127.0.0.1
+	tls {$SISDOC_TLS_CERT} {$SISDOC_TLS_KEY}
+
+	reverse_proxy https://127.0.0.1:{$SISDOC_API_PORT:3443} {
+		transport http {
+			tls_server_name {$SISDOC_TLS_NAME}
+		}
+	}
+}

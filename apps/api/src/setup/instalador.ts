@@ -389,7 +389,7 @@ export async function instalar(entrada: OpcoesInstalacao): Promise<string> {
         nome text NOT NULL,
         email text,
         senha_hash text NOT NULL,
-        papel text NOT NULL CHECK (papel IN ('analista', 'coordenador', 'secretario_adjunto', 'admin')),
+        papel text NOT NULL CHECK (papel IN ('analista', 'coordenador', 'admin')),
         ativo boolean NOT NULL DEFAULT true,
         tentativas_falhas integer NOT NULL DEFAULT 0 CHECK (tentativas_falhas >= 0),
         bloqueado_ate timestamptz,

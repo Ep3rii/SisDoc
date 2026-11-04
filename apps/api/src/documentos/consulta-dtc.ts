@@ -127,7 +127,12 @@ export class ConsultasDtc {
     cliente: PoolClient,
     sessao: SessaoAutenticada,
     id: string,
-    opcoes: { estados: Array<'rascunho' | 'conferido'>; bloquear?: 'leitura' | 'alteracao'; somenteAutor?: boolean },
+    opcoes: {
+      estados: Array<'rascunho' | 'conferido'>;
+      bloquear?: 'leitura' | 'alteracao';
+      somenteAutor?: boolean;
+      compartilharRascunho?: boolean;
+    },
   ): Promise<LinhaDtc | undefined> {
     const acessoTerceiros = sessao.usuario.papel === 'admin'
       || (sessao.usuario.papel === 'coordenador' && !opcoes.somenteAutor);
@@ -145,11 +150,11 @@ export class ConsultasDtc {
       LEFT JOIN seguranca.usuario conferente ON conferente.id = d.conferido_por
       JOIN documentos.regra_versao r ON r.id = d.regra_versao_id
       WHERE d.id = $1 AND d.tipo = ANY($6::text[]) AND d.status = ANY($7::text[])
-        AND (d.criado_por = $2 OR $8::boolean)
+        AND (d.criado_por = $2 OR $8::boolean OR (d.status = 'rascunho' AND $9::boolean))
       ${opcoes.bloquear === 'alteracao' ? 'FOR UPDATE OF d' : opcoes.bloquear === 'leitura' ? 'FOR SHARE OF d' : ''}
     `, [
       id, sessao.usuario.id, REGRAS_PLANILHA.codigo, REGRAS_PLANILHA.versao, JSON.stringify(REGRAS_PLANILHA),
-      TIPOS_DTC, opcoes.estados, acessoTerceiros,
+      TIPOS_DTC, opcoes.estados, acessoTerceiros, opcoes.compartilharRascunho ?? false,
     ]);
     return consulta.rows[0];
   }
