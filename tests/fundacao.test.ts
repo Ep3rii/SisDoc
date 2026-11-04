@@ -65,6 +65,7 @@ import { gerarHashSenha } from '../apps/api/dist/seguranca/senhas.js';
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
 import { validarDestinos } from '../scripts/isolar-testes.cjs';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { sidServicoTeste } from './ambiente-windows';
 import { previaDofSintetica } from './dof-sintetica.js';
 import { gerarPessoasSinteticas } from '../tools/anonimizar/fixtures.js';
 
@@ -100,7 +101,7 @@ async function verificarAcl(raiz: string): Promise<void> {
       [System.Security.AccessControl.FileSystemRights]::Delete -bor
       [System.Security.AccessControl.FileSystemRights]::ChangePermissions -bor
       [System.Security.AccessControl.FileSystemRights]::TakeOwnership)
-    $servico = @($config | Where-Object { $_.Tipo -eq 'Allow' -and $_.Sid -eq 'S-1-5-19' })
+    $servico = @($config | Where-Object { $_.Tipo -eq 'Allow' -and $_.Sid -eq '${sidServicoTeste}' })
     if ($servico.Count -eq 0 -or @($servico | Where-Object {
       ($_.Direitos -band [System.Security.AccessControl.FileSystemRights]::ReadData) -eq 0 -or
       ($_.Direitos -band $proibidos) -ne 0
@@ -108,12 +109,12 @@ async function verificarAcl(raiz: string): Promise<void> {
       throw 'Permissões da conta de serviço na configuração são inválidas.'
     }
     if (@($pdf | Where-Object {
-      $_.Tipo -eq 'Allow' -and $_.Sid -eq 'S-1-5-19' -and
+      $_.Tipo -eq 'Allow' -and $_.Sid -eq '${sidServicoTeste}' -and
       ($_.Direitos -band [System.Security.AccessControl.FileSystemRights]::WriteData) -ne 0
     }).Count -eq 0) {
       throw 'Conta de serviço não pode gravar PDFs.'
     }
-    if (@($backup | Where-Object { $_.Tipo -eq 'Allow' -and $_.Sid -eq 'S-1-5-19' }).Count -ne 0) {
+    if (@($backup | Where-Object { $_.Tipo -eq 'Allow' -and $_.Sid -eq '${sidServicoTeste}' }).Count -ne 0) {
       throw 'Conta de serviço possui acesso indevido a backup.'
     }
   `;
@@ -372,8 +373,8 @@ async function conferirSqlSintetico(cliente: Client, documentoId: string, usuari
 
 describe('fundação em recursos descartáveis', () => {
   it('mantém a sequência de migrações alinhada ao release dos modelos oficiais', () => {
-    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('024-perfil-secretario-adjunto');
-    expect(SEQUENCIA_MIGRACOES.at(-8)?.versao).toBe('017-documentos-admin');
+    expect(SEQUENCIA_MIGRACOES.at(-1)?.versao).toBe('025-historico-servidor');
+    expect(SEQUENCIA_MIGRACOES.at(-9)?.versao).toBe('017-documentos-admin');
   });
 
   let temporario = '';
@@ -457,7 +458,7 @@ describe('fundação em recursos descartáveis', () => {
         usuario: 'sisdoc_aplicativo', senha: senhaAplicativo,
       },
       tls: { certificado, chave, ca, nome: nomeTls },
-      sidServico: 'S-1-5-19',
+      sidServico: sidServicoTeste,
       listaSenhas,
       processos: { mascaras: ['####/####'] },
       administrador: { matricula: 'ADMIN-FICTICIO', nome: 'Operador Fictício', senha: senhaAdmin },
@@ -642,7 +643,7 @@ describe('fundação em recursos descartáveis', () => {
     });
   });
 
-  it('recusa inicialização sem a migração de retirada de perfil mesmo com a versão 023 registrada', async () => {
+  it('recusa inicialização sem a migração de histórico mesmo com a versão anterior registrada', async () => {
     const cliente = new Client({
       host: '127.0.0.1', port: portaBanco, database: 'sisdoc_ocupado',
       user: 'sisdoc_migrador', password: senhaMigrador,
@@ -652,7 +653,7 @@ describe('fundação em recursos descartáveis', () => {
       await cliente.query(`
         CREATE SCHEMA seguranca;
         CREATE TABLE seguranca.migracao (versao text PRIMARY KEY);
-        INSERT INTO seguranca.migracao VALUES ('023-modelos-oficiais');
+        INSERT INTO seguranca.migracao VALUES ('024-perfil-secretario-adjunto');
         GRANT USAGE ON SCHEMA seguranca TO sisdoc_aplicativo;
         GRANT SELECT ON seguranca.migracao TO sisdoc_aplicativo;
       `);
@@ -663,7 +664,7 @@ describe('fundação em recursos descartáveis', () => {
       await expect(execFile(process.execPath, [path.join(process.cwd(), 'apps', 'api', 'dist', 'main.js')], {
         env: { ...ambiente(), SISDOC_CONFIG: arquivo }, timeout: 10000, windowsHide: true,
       })).rejects.toMatchObject({
-        stderr: expect.stringContaining('não possui a migração 024-perfil-secretario-adjunto'),
+        stderr: expect.stringContaining('não possui a migração 025-historico-servidor'),
       });
     } finally {
       await cliente.query('DROP TABLE seguranca.migracao; DROP SCHEMA seguranca');
@@ -832,7 +833,7 @@ describe('fundação em recursos descartáveis', () => {
         INSERT INTO seguranca.sessao (id_hash, usuario_id, expira_em, ultimo_uso)
         VALUES ($1, $2, now() + interval '1 hour', now())
       `, [randomBytes(32), usuarioId]);
-      await cliente.query('DELETE FROM seguranca.migracao WHERE versao = $1', ['024-perfil-secretario-adjunto']);
+      await cliente.query('DELETE FROM seguranca.migracao WHERE versao = ANY($1::text[])', [['024-perfil-secretario-adjunto', '025-historico-servidor']]);
 
       expect(await aplicarRetiradaPerfilSecretarioAdjunto(cliente, 'sisdoc_aplicativo')).toBe(true);
       expect((await cliente.query<{ papel: string; ativo: boolean }>(

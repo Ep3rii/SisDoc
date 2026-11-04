@@ -13,16 +13,18 @@ const tipos: Record<TipoImportacao, string> = {
   eventos_funcionais: 'Atos e eventos funcionais',
 };
 
-export function PromocaoLegado({ csrf, loteInicial, onErro, onAplicado, renderRelatorio }: {
+export function PromocaoLegado({ csrf, loteInicial, onErro, onAplicado, renderRelatorio, tipoInicial, fixarLote = false }: {
   csrf: string;
   loteInicial: string | null;
   onErro: (erro: unknown) => void;
   onAplicado: () => void;
   renderRelatorio: (relatorio: RelatorioImportacao) => ReactNode;
+  tipoInicial?: TipoImportacao;
+  fixarLote?: boolean;
 }) {
   const [lotes, setLotes] = useState<LotePlanilhaLegado[] | null>(null);
   const [loteId, setLoteId] = useState(loteInicial ?? '');
-  const [tipo, setTipo] = useState<TipoImportacao>('dados_funcionais');
+  const [tipo, setTipo] = useState<TipoImportacao>(tipoInicial ?? 'dados_funcionais');
   const [previa, setPrevia] = useState<PreviaLegado | null>(null);
   const [mapeamento, setMapeamento] = useState<Record<string, number | null>>({});
   const [resultado, setResultado] = useState<RelatorioPromocaoLegado | null>(null);
@@ -114,7 +116,7 @@ export function PromocaoLegado({ csrf, loteInicial, onErro, onAplicado, renderRe
     <p>O lote original permanece cifrado no Legado. A conversão conserva a origem e preenche campos vazios,
       sem sobrescrever dados existentes ou edições manuais.</p>
     <div className="grade-busca">
-      <label>Lote para disponibilizar<select value={loteId} disabled={ocupado} onChange={(evento) => {
+      <label>Lote para disponibilizar<select value={loteId} disabled={ocupado || fixarLote} onChange={(evento) => {
         setPrevia(null); setResultado(null); setLoteId(evento.target.value);
       }}>
         <option value="">Selecionar lote legado</option>

@@ -20,7 +20,8 @@ import { gerarExportacao } from './exportador';
 import { ErroFormato, sugerirMapeamento } from './formatos';
 import { importarLinhas } from './importador';
 import { exportarPlanilhaLegado, importarPlanilhaLegado, lerPlanilhaLegado, listarPlanilhasLegado } from './planilha-legado';
-import { ErroPlanilha, escreverXlsx, lerPlanilha, LIMITE_ARQUIVO_BYTES } from './planilhas';
+import { ErroPlanilha, escreverXlsx, lerPlanilha, listarAbasXlsx, LIMITE_ARQUIVO_BYTES } from './planilhas';
+import { ErroXmlImportacao } from './xml';
 import { assinarValidacaoLegado, colunasConversaoLegado, mapearPlanilhaLegado } from './promocao-legado';
 
 export class ImportacaoService {
@@ -28,6 +29,13 @@ export class ImportacaoService {
 
   constructor(private readonly banco: Pool, configuracao: Configuracao) {
     this.protetor = new ProtetorDados(configuracao.chaves);
+  }
+  async abas(sessao: SessaoAutenticada, conteudo: Buffer) {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
+      try { return listarAbasXlsx(conteudo); }
+      catch (erro) { if (erro instanceof ErroPlanilha) throw new UnprocessableEntityException(erro.message); throw erro; }
+    });
   }
 
   async exportar(sessao: SessaoAutenticada, ip: string, dados: ExportarDados): Promise<Buffer> {
@@ -138,15 +146,16 @@ export class ImportacaoService {
     if (conteudo.length === 0) throw new BadRequestException('Envie um arquivo CSV ou XLSX com conteúdo.');
     let linhas: string[][];
     try {
-      linhas = lerPlanilha(conteudo).linhas;
+      linhas = lerPlanilha(conteudo, consulta.aba).linhas;
     } catch (erro) {
-      if (erro instanceof ErroPlanilha) throw new UnprocessableEntityException(erro.message);
+      if (erro instanceof ErroPlanilha || erro instanceof ErroXmlImportacao) throw new UnprocessableEntityException(erro.message);
       throw erro;
     }
     if (consulta.destino === 'legado') {
       return transacao(this.banco, async (cliente) => {
         await confirmarSessao(cliente, sessao, papeisPermitidos('administrar_importacao'));
-        return importarPlanilhaLegado(cliente, this.protetor, linhas, conteudo, consulta, sessao.usuario.id, ip);
+        const identidade = consulta.aba ? Buffer.concat([Buffer.from(`sisdoc/aba/v1:${JSON.stringify(consulta.aba)}\0`), conteudo]) : conteudo;
+        return importarPlanilhaLegado(cliente, this.protetor, linhas, identidade, consulta, sessao.usuario.id, ip);
       });
     }
     const cliente = await this.banco.connect();
@@ -158,7 +167,7 @@ export class ImportacaoService {
         canal: 'tela',
         usuarioId: sessao.usuario.id,
         gravar: consulta.modo === 'gravar',
-        hashArquivo: hashArquivo(conteudo),
+        hashArquivo: hashArquivo(consulta.aba ? Buffer.concat([Buffer.from(`sisdoc/aba/v1:${JSON.stringify(consulta.aba)}\0`), conteudo]) : conteudo),
         antes: (transacaoAtual) => confirmarSessao(transacaoAtual as PoolClient, sessao, papeisPermitidos('administrar_importacao')),
         ip,
         referenciasCompletas: true,

@@ -105,6 +105,7 @@ export const referenciaServidorSchema = z.strictObject({
   vinculoId: z.uuid(),
   revisaoPessoa: z.string().regex(/^[1-9][0-9]{0,18}$/),
   revisaoVinculo: z.string().regex(/^[1-9][0-9]{0,18}$/),
+  removidoNaFonte: z.boolean(),
   cadastro: z.strictObject({
     nome: textoCadastro(200),
     cpf: cpfSchema,

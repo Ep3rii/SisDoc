@@ -4,6 +4,8 @@ import {
   ROTULOS_CATEGORIA_INSS,
   ROTULOS_DTC,
   validarConteudoDtc,
+  conteudoDtcSchema, referenciaServidorSchema, aplicarAjustesCadastro, fonteEmissaoDtcSchema,
+  type FonteEmissaoDtc, type ReferenciaServidor,
   type CargoComissionado,
   type CategoriaFuncionalInss,
   type ConteudoDtc,
@@ -12,12 +14,30 @@ import {
   type PeriodoDtc,
   type TipoDtc
 } from '@sisdoc/contratos';
-import { useState, type FormEvent } from 'react';
-import { api } from '../infraestrutura/api';
+import { useEffect, useState, type FormEvent } from 'react';
+import { api, requisitar, validar } from '../infraestrutura/api';
+import { calcularDtc } from '@sisdoc/calculo';
+import { renderizarDocumentoDtc } from '@sisdoc/templates';
+import { AjustesDeclaracao } from '../compartilhado/ajustes-declaracao';
+import { PreviaDocumento } from '../compartilhado/previa-documento';
+import { CorrecaoNoDocumento } from '../cadastro/correcao-no-documento';
 import { anosDoPeriodo } from './anos-dtc';
 import { cargoVazio, DESCRICOES, inssPadrao, periodoVazio, Servidor, textoOuNulo } from './contexto';
 
-/** Edita conteúdo DTC local sem substituir a prévia da revisão salva antes da gravação. */
+function fonteDaReferencia(referencia: ReferenciaServidor, periodosIpam: FonteEmissaoDtc['periodosIpam']): FonteEmissaoDtc {
+  const cadastro = referencia.cadastro;
+  return validar(fonteEmissaoDtcSchema, {
+    rg: cadastro.rgNumero, rgOrgao: cadastro.rgOrgao, rgExpedicao: cadastro.rgExpedicao,
+    nome: cadastro.nome, cpf: cadastro.cpf, nascimento: cadastro.nascimento,
+    nomeMae: cadastro.nomeMae, nomePai: cadastro.nomePai, pisPasep: cadastro.pisPasep,
+    tituloEleitor: cadastro.tituloEleitor, endereco: cadastro.endereco,
+    matricula: cadastro.matricula, regimeJuridico: cadastro.regimeJuridico,
+    cargo: cadastro.cargo, referencia: cadastro.referencia, orgao: cadastro.orgao, admissao: cadastro.admissao,
+    consultadoEm: new Date().toISOString(), periodosIpam, removidoNaFonte: referencia.removidoNaFonte,
+  });
+}
+
+/** Edita conteúdo DTC local e recalcula a prévia sem gravar a cada alteração. */
 export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCancelar, onErro, onLimpar, onPendente }: {
   tipo: TipoDtc;
   inicial: ConteudoDtc;
@@ -34,7 +54,27 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
   const [motivo, setMotivo] = useState('');
   const [confirmacao, setConfirmacao] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  const [fonte, setFonte] = useState<FonteEmissaoDtc | null>(null);
+  useEffect(() => {
+    let corrente = true;
+    requisitar(`servidores/${servidor.pessoaId}/referencias?${new URLSearchParams({ vinculoId: servidor.vinculoId, tipo: 'periodos_ipam', limite: '50' })}`)
+      .then((resultado) => {
+        const referencia = validar(referenciaServidorSchema, resultado);
+        if (referencia.proximoCursor) throw new Error('Há mais de 50 períodos IPAM. Revise as referências antes de preparar a prévia.');
+        const periodosIpam = referencia.registros.filter((item) => item.campos.removido_na_fonte_em === null)
+          .map((item) => ({ inicio: item.campos.mes_inicio, fim: item.campos.mes_fim }));
+        const periodosValidados = fonteEmissaoDtcSchema.shape.periodosIpam.parse(periodosIpam);
+        const completa = fonteDaReferencia(referencia, periodosValidados);
+        if (corrente) setFonte(completa);
+      }).catch((erro: unknown) => { if (corrente) onErro(erro); });
+    return () => { corrente = false; };
+  }, [servidor.pessoaId, servidor.vinculoId, onErro]);
   const problemas = validarConteudoDtc(tipo, conteudo);
+  const validado = conteudoDtcSchema.safeParse(conteudo);
+  const fonteEdicao = fonte ? aplicarAjustesCadastro(fonte, conteudo.ajustesCadastro) : null;
+  const calculoLocal = validado.success && fonteEdicao?.admissao && problemas.length === 0
+    ? calcularDtc(tipo, validado.data, fonteEdicao.admissao, new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }))
+    : { erro: 'Complete identificação, datas e campos obrigatórios. A prévia não usa totais antigos.' };
 
   /** Atualiza conteúdo local e ativa a proteção global contra perda de edição. */
   function alterar(novo: ConteudoDtc) {
@@ -87,7 +127,14 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
 
   const inss = conteudo.inss;
   return (
-    <form className="editor-dof" onSubmit={(evento) => void salvar(evento)} aria-label={`Editor da ${ROTULOS_DTC[tipo]}`}
+    <section className="area-dof"><div className="editor-dof">
+      {fonte && <CorrecaoNoDocumento pessoaId={servidor.pessoaId} vinculoId={servidor.vinculoId} csrf={csrf}
+        bloqueado={ocupado || JSON.stringify(inicial) !== JSON.stringify(conteudo)} onErro={onErro} onPendente={onPendente}
+        onAtualizado={(dados) => {
+          setFonte(fonteDaReferencia(dados, fonte.periodosIpam));
+          onPendente(true);
+        }} />}
+      <form className="editor-dof" onSubmit={(evento) => void salvar(evento)} aria-label={`Editor da ${ROTULOS_DTC[tipo]}`}
       onInvalidCapture={(evento) => {
         if (evento.target instanceof HTMLElement) {
           const grupo = evento.target.closest('details');
@@ -97,6 +144,9 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
       <p className="identificador-documento">{documento ? `Rascunho · revisão ${documento.revisao}` : 'Novo rascunho'}</p>
       <h2>{ROTULOS_DTC[tipo]} — {servidor.nome}</h2>
       <p>Matrícula {servidor.matricula}. {DESCRICOES[tipo]}</p>
+      {fonte && <AjustesDeclaracao fonte={fonte} ajustes={conteudo.ajustesCadastro ?? {}} bloqueado={ocupado}
+        onAlterar={(ajustesCadastro) => alterar({ ...conteudo, ajustesCadastro })} />}
+      {!fonte && <p role="status">Carregando dados do servidor...</p>}
       <fieldset>
         <legend><strong>Períodos ({conteudo.periodos.length} de {MAXIMO_PERIODOS_DTC})</strong></legend>
         {conteudo.periodos.map((periodo, indice) => (
@@ -215,6 +265,15 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
           {ocupado ? 'Salvando...' : 'Salvar rascunho'}</button>
         <button type="button" className="secundario" disabled={ocupado} onClick={onCancelar}>Cancelar</button>
       </div>
-    </form>
+    </form></div>
+    <aside className="painel-previa previa-documento" aria-label="Prévia do documento">
+      <p>Prévia de edição não salva · sem validade oficial. A conferência exige a revisão salva.</p>
+      {'erro' in calculoLocal ? <p className="aviso erro" role="status">{calculoLocal.erro}</p> :
+        fonteEdicao && <PreviaDocumento titulo={`Prévia da ${ROTULOS_DTC[tipo]}`} html={renderizarDocumentoDtc({
+          classificacao: 'previa', tipo, numeroFormatado: null, dataEmissao: null,
+          processo: conteudo.processo, fonte: fonteEdicao, conteudo, resultado: calculoLocal.resultado,
+          rodape: 'Prévia de edição local, sem validade oficial.',
+        })} />}
+    </aside></section>
   );
 }

@@ -1,4 +1,4 @@
-import type { RespostaSessao } from '@sisdoc/contratos';
+import { notificacoesDeclaracoesSchema, type NotificacoesDeclaracoes, type RespostaSessao } from '@sisdoc/contratos';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Auditoria } from '../administracao/auditoria';
 import { nomesPerfis, Usuarios } from '../administracao/usuarios';
@@ -11,7 +11,8 @@ import { Historico } from '../documentos/historico';
 import { ConferidosDof } from '../dof/conferidos-dof';
 import { RascunhosDof } from '../dof/rascunhos-dof';
 import { TelaDtc } from '../dtc/dtc';
-import { api, ErroApi } from '../infraestrutura/api';
+import { api, ErroApi, requisitar, validar } from '../infraestrutura/api';
+import { Retornos } from '../documentos/retornos';
 import { ImportacaoAdmin } from '../transferencia/importacao';
 import { AvisoSincronizacao, EstadoSincronizacao, SincronizacaoAdmin } from '../transferencia/sincronizacao';
 
@@ -21,12 +22,14 @@ export function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'conferidos' | 'historico'
+  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'retornos' | 'conferidos' | 'historico'
     | 'DTC_IPAM' | 'DTC_COMISSIONADO' | 'DTC_INSS' | 'sincronizacao' | 'importacao'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [menuAberto, setMenuAberto] = useState(false);
   const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
+  const [notificacoes, setNotificacoes] = useState<NotificacoesDeclaracoes | null>(null);
+  const [erroNotificacoes, setErroNotificacoes] = useState(false);
   const pendencias = useRef(false);
   const registrarPendencia = useCallback((valor: boolean) => {
     pendencias.current = valor;
@@ -47,6 +50,38 @@ export function App() {
     }
     setErro(problema instanceof Error ? problema.message : 'Erro inesperado. Contate o administrador.');
   }, [registrarPendencia]);
+
+  useEffect(() => {
+    if (!sessao || sessao.usuario.trocaSenhaObrigatoria) { setNotificacoes(null); return; }
+    let ativa = true;
+    let ocupado = false;
+    let pendente = false;
+    async function atualizar() {
+      if (!ativa || document.visibilityState === 'hidden') return;
+      if (ocupado) { pendente = true; return; }
+      ocupado = true;
+      try {
+        const dados = validar(notificacoesDeclaracoesSchema, await requisitar('notificacoes/declaracoes'));
+        if (ativa) { setNotificacoes(dados); setErroNotificacoes(false); }
+      } catch (erro: unknown) {
+        if (ativa) { setNotificacoes(null); setErroNotificacoes(true); if (erro instanceof ErroApi && erro.status === 401) tratarErro(erro); }
+      } finally {
+        ocupado = false;
+        if (pendente && ativa) { pendente = false; void atualizar(); }
+      }
+    }
+    void atualizar();
+    const intervalo = window.setInterval(() => void atualizar(), 30000);
+    window.addEventListener('sisdoc:alteracao', atualizar);
+    window.addEventListener('focus', atualizar);
+    document.addEventListener('visibilitychange', atualizar);
+    return () => {
+      ativa = false; window.clearInterval(intervalo);
+      window.removeEventListener('sisdoc:alteracao', atualizar);
+      window.removeEventListener('focus', atualizar);
+      document.removeEventListener('visibilitychange', atualizar);
+    };
+  }, [sessao, tratarErro]);
 
   useEffect(() => {
     /** Solicita confirmação nativa ao fechar a página enquanto houver edição pendente. */
@@ -154,8 +189,16 @@ export function App() {
                   <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>Rascunhos</button>
                   <button type="button" aria-current={tela === 'conferidos' ? 'page' : undefined} onClick={() => navegar('conferidos')}>DOFs conferidas</button>
                 </>}
-                {podeEmitir && <button type="button"
-                  aria-current={tela === 'encaminhados' ? 'page' : undefined} onClick={() => navegar('encaminhados')}>{sessao.usuario.papel === 'admin' ? 'Todos os encaminhados' : 'Encaminhados a mim'}</button>}
+                {podeEmitir && <button type="button" className="aba-notificada"
+                  aria-current={tela === 'encaminhados' ? 'page' : undefined} onClick={() => navegar('encaminhados')}>
+                  {sessao.usuario.papel === 'admin' ? 'Todos os encaminhados' : 'Encaminhados a mim'}
+                  {notificacoes && notificacoes.encaminhados > 0 && <span className="contador-notificacao" aria-label={`${notificacoes.encaminhados} declarações encaminhadas pendentes`}>{notificacoes.encaminhados}</span>}
+                </button>}
+                {podeSalvar && <button type="button" className="aba-notificada" aria-current={tela === 'retornos' ? 'page' : undefined}
+                  onClick={() => navegar('retornos')}>Retornos para ajustes
+                  {notificacoes && notificacoes.retornos > 0 && <span className="contador-notificacao" aria-label={`${notificacoes.retornos} declarações devolvidas pendentes`}>{notificacoes.retornos}</span>}
+                </button>}
+                {erroNotificacoes && <p role="status">Contagem de notificações indisponível. A atualização será tentada novamente.</p>}
                 {podeSalvar && <>
                   <p className="grupo-menu">DTCs</p>
                   <button type="button" aria-current={tela === 'DTC_IPAM' ? 'page' : undefined}
@@ -213,6 +256,8 @@ export function App() {
               consulta={consulta}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf} administrador={sessao.usuario.papel === 'admin'}
+              onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
+            {podeSalvar && tela === 'retornos' && <Retornos key={chaveTela} csrf={sessao.csrf} papel={sessao.usuario.papel}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'conferidos' && <ConferidosDof key={chaveTela} csrf={sessao.csrf}
               administrador={sessao.usuario.papel === 'admin'} podeDevolver={podeEmitir} podeEmitir={podeEmitir}

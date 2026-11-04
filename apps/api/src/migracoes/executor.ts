@@ -11,6 +11,7 @@ const versoesConhecidas = [
   '022-destinatario-coordenador',
   '023-modelos-oficiais',
   '024-perfil-secretario-adjunto',
+  '025-historico-servidor',
 ] as const;
 export type VersaoMigracao = typeof versoesConhecidas[number];
 

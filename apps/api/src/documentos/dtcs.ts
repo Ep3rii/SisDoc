@@ -61,17 +61,19 @@ function normalizar(conteudo: ConteudoDtc): ConteudoDtc {
     inss: conteudo.inss,
     processo: conteudo.processo,
     confirmarInicioAjustado: conteudo.confirmarInicioAjustado,
+    ...(conteudo.ajustesCadastro ? { ajustesCadastro: conteudo.ajustesCadastro } : {}),
   });
 }
 
 /** Identifica grupos efetivamente alterados para auditar valores anteriores e novos cifrados. */
 function mudancas(anterior: ConteudoDtc | null, novo: ConteudoDtc): Mudanca[] {
   const resultado: Mudanca[] = [];
-  const campos: Array<keyof ConteudoDtc> = ['periodos', 'cargos', 'inss', 'processo', 'confirmarInicioAjustado'];
+  const campos: Array<keyof ConteudoDtc> = ['periodos', 'cargos', 'inss', 'processo', 'confirmarInicioAjustado', 'ajustesCadastro'];
   for (const campo of campos) {
-    const valorAnterior = anterior ? anterior[campo] : null;
-    if (JSON.stringify(valorAnterior) !== JSON.stringify(novo[campo])) {
-      resultado.push({ campo: `dtc.${campo}`, anterior: valorAnterior, novo: novo[campo] });
+    const valorAnterior = anterior?.[campo] ?? null;
+    const valorNovo = novo[campo] ?? null;
+    if (JSON.stringify(valorAnterior) !== JSON.stringify(valorNovo)) {
+      resultado.push({ campo: `dtc.${campo}`, anterior: valorAnterior, novo: valorNovo });
     }
   }
   return resultado;
@@ -245,8 +247,9 @@ export class DtcService {
       }
       const vinculo = await this.admissao(cliente, dados.pessoaId, dados.vinculoId);
       if (!vinculo) return { falha: { tipo: 'nao_encontrado', mensagem: 'Vínculo não encontrado para esta pessoa.' } };
-      if (!vinculo.admissao) return { falha: { tipo: 'invalido', mensagem: 'A data de admissão do vínculo não está informada na fonte.' } };
-      const calculo = calcularDtc(dados.tipo, conteudo, vinculo.admissao, dataEmSaoPaulo(new Date()));
+      const admissao = conteudo.ajustesCadastro?.admissao ?? vinculo.admissao;
+      if (!admissao) return { falha: { tipo: 'invalido', mensagem: 'Informe a admissão na fonte ou nesta declaração.' } };
+      const calculo = calcularDtc(dados.tipo, conteudo, admissao, dataEmSaoPaulo(new Date()));
       if ('erro' in calculo) return { falha: { tipo: 'invalido', mensagem: calculo.erro } };
       const id = await this.inserir(
         cliente, sessao, dados.tipo, dados.pessoaId, dados.vinculoId, conteudo, calculo.resultado, 'Criação do rascunho de DTC.',
@@ -292,9 +295,10 @@ export class DtcService {
         estados: ['rascunho'], bloquear: 'alteracao', compartilharRascunho: true,
       });
       if (!atual) throw new Error('Rascunho de DTC não pôde ser recuperado.');
-      if (!atual.admissao) return { falha: { tipo: 'invalido', mensagem: 'A data de admissão do vínculo não está informada na fonte.' } };
+      const admissao = conteudo.ajustesCadastro?.admissao ?? atual.admissao;
+      if (!admissao) return { falha: { tipo: 'invalido', mensagem: 'Informe a admissão na fonte ou nesta declaração.' } };
       const anterior = this.consulta.apresentar(atual);
-      const calculo = calcularDtc(atual.tipo, conteudo, atual.admissao, dataEmSaoPaulo(new Date()));
+      const calculo = calcularDtc(atual.tipo, conteudo, admissao, dataEmSaoPaulo(new Date()));
       if ('erro' in calculo) return { falha: { tipo: 'invalido', mensagem: calculo.erro } };
       await this.gravarFilhos(cliente, id, conteudo);
       const atualizado = await cliente.query(`
@@ -648,12 +652,13 @@ export class DtcService {
       if (!await tentarBloqueioFonte(cliente)) {
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente copiar novamente.' } };
       }
-      if (!linha.admissao) {
+      const admissao = snapshot.conteudo.ajustesCadastro?.admissao ?? linha.admissao;
+      if (!admissao) {
         return { falha: { tipo: 'conflito', mensagem: 'A admissão do vínculo não está informada na fonte. Solicite a correção antes de copiar.' } };
       }
       // A cópia é um novo pedido: processo e confirmação do início ajustado devem ser informados de novo.
       const conteudo = normalizar({ ...snapshot.conteudo, processo: null, confirmarInicioAjustado: false });
-      const calculo = calcularDtc(linha.tipo, conteudo, linha.admissao, dataEmSaoPaulo(new Date()));
+      const calculo = calcularDtc(linha.tipo, conteudo, admissao, dataEmSaoPaulo(new Date()));
       if ('erro' in calculo) return { falha: { tipo: 'invalido', mensagem: calculo.erro } };
       const id = await this.inserir(
         cliente, sessao, linha.tipo, linha.pessoa_id, linha.vinculo_id, conteudo, calculo.resultado,

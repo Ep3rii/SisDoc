@@ -43,6 +43,7 @@ export async function requisitar(
       ? dados.detail : 'Não foi possível concluir a operação. Contate o administrador.';
     throw new ErroApi(resposta.status, detalhe);
   }
+  if (metodo !== 'GET') window.dispatchEvent(new Event('sisdoc:alteracao'));
   return dados;
 }
 

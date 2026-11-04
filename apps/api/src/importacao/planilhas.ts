@@ -1,4 +1,5 @@
 import { crc32, inflateRawSync } from 'node:zlib';
+import { lerXmlImportacao } from './xml';
 
 export const LIMITE_ARQUIVO_BYTES = 64 * 1024 * 1024;
 const LIMITE_DESCOMPACTADO_BYTES = 256 * 1024 * 1024;
@@ -12,10 +13,13 @@ function ehXlsx(conteudo: Buffer): boolean {
   return conteudo.length >= 4 && conteudo.readUInt32LE(0) === 0x04034b50;
 }
 
-export function lerPlanilha(conteudo: Buffer): Planilha {
+export function lerPlanilha(conteudo: Buffer, aba?: string): Planilha {
   if (conteudo.length === 0) throw new ErroPlanilha('O arquivo está vazio.');
   if (conteudo.length > LIMITE_ARQUIVO_BYTES) throw new ErroPlanilha('O arquivo excede o limite de 64 MB.');
-  return ehXlsx(conteudo) ? lerXlsx(conteudo) : lerCsv(conteudo);
+  if (ehXlsx(conteudo)) return lerXlsx(conteudo, aba);
+  if (aba) throw new ErroPlanilha('Seleção de aba só se aplica a XLSX.');
+  const inicio = conteudo.toString('utf8').replace(/^\uFEFF/, '').trimStart();
+  return inicio.startsWith('<') ? lerXmlImportacao(conteudo) : lerCsv(conteudo);
 }
 
 function detectarDelimitador(texto: string): string {
@@ -167,10 +171,16 @@ function indiceColuna(referencia: string): number {
   return indice - 1;
 }
 
-function caminhoPrimeiraPlanilha(conteudo: Buffer, entradas: Map<string, EntradaZip>, consumido: { bytes: number }): string {
+function caminhoPrimeiraPlanilha(conteudo: Buffer, entradas: Map<string, EntradaZip>, consumido: { bytes: number }, aba?: string): string {
   const livro = extrair(conteudo, entradas, 'xl/workbook.xml', consumido);
   const relacoes = extrair(conteudo, entradas, 'xl/_rels/workbook.xml.rels', consumido);
-  const idRelacao = livro ? /<sheet\b[^>]*\br:id="([^"]+)"/.exec(livro)?.[1] : undefined;
+  const folhas = livro ? [...livro.matchAll(/<sheet\b[^>]*>/g)].map((item) => ({
+    nome: decodificarXml(/\bname="([^"]+)"/.exec(item[0])?.[1] ?? ''),
+    relacao: /\br:id="([^"]+)"/.exec(item[0])?.[1],
+  })) : [];
+  const selecionada = aba ? folhas.find((item) => item.nome === aba) : folhas[0];
+  if (aba && !selecionada) throw new ErroPlanilha('A aba selecionada não existe neste XLSX.');
+  const idRelacao = selecionada?.relacao;
   if (idRelacao && relacoes) {
     for (const relacao of relacoes.matchAll(/<Relationship\b[^>]*>/g)) {
       if (relacao[0].includes(`Id="${idRelacao}"`)) {
@@ -179,10 +189,22 @@ function caminhoPrimeiraPlanilha(conteudo: Buffer, entradas: Map<string, Entrada
       }
     }
   }
+  if (aba) throw new ErroPlanilha('Não foi possível resolver a aba selecionada neste XLSX.');
   return 'xl/worksheets/sheet1.xml';
 }
 
-export function lerXlsx(conteudo: Buffer): Planilha {
+export function listarAbasXlsx(conteudo: Buffer): string[] {
+  if (!ehXlsx(conteudo)) throw new ErroPlanilha('Seleção de abas exige um arquivo XLSX.');
+  if (conteudo.length > LIMITE_ARQUIVO_BYTES) throw new ErroPlanilha('O arquivo excede 64 MB.');
+  const entradas = lerZip(conteudo);
+  const livro = extrair(conteudo, entradas, 'xl/workbook.xml', { bytes: 0 });
+  if (!livro) throw new ErroPlanilha('O XLSX não contém livro legível.');
+  const abas = [...livro.matchAll(/<sheet\b[^>]*\bname="([^"]+)"[^>]*>/g)].map((item) => decodificarXml(item[1]));
+  if (!abas.length || new Set(abas).size !== abas.length) throw new ErroPlanilha('Abas inexistentes ou ambíguas.');
+  return abas;
+}
+
+export function lerXlsx(conteudo: Buffer, aba?: string): Planilha {
   const entradas = lerZip(conteudo);
   const consumido = { bytes: 0 };
   const compartilhadas: string[] = [];
@@ -190,7 +212,7 @@ export function lerXlsx(conteudo: Buffer): Planilha {
   if (textos) {
     for (const item of textos.matchAll(/<si\b[^>]*?(?:\/>|>([\s\S]*?)<\/si>)/g)) compartilhadas.push(textoRico(item[1] ?? ''));
   }
-  const planilha = extrair(conteudo, entradas, caminhoPrimeiraPlanilha(conteudo, entradas, consumido), consumido);
+  const planilha = extrair(conteudo, entradas, caminhoPrimeiraPlanilha(conteudo, entradas, consumido, aba), consumido);
   if (!planilha) throw new ErroPlanilha('O arquivo XLSX não contém planilha legível.');
   const linhas: string[][] = [];
   for (const linhaXml of planilha.matchAll(/<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g)) {

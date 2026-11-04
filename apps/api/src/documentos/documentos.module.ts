@@ -11,11 +11,13 @@ import { EmissoesController } from './emissoes.controller';
 import { RascunhosService } from './rascunhos';
 import { RascunhosController } from './rascunhos.controller';
 import { WorkerPdfEmissao } from './worker-pdf-emissao';
+import { InteracoesController, InteracoesService } from './interacoes';
 
 /** Mantém rascunhos, DTC, emissões e worker no mesmo limite transacional e de ciclo de vida. */
 @Module({
-  controllers: [RascunhosController, EmissoesController, DtcController, AdminDocumentosController],
+  controllers: [RascunhosController, EmissoesController, DtcController, AdminDocumentosController, InteracoesController],
   providers: [
+    { provide: InteracoesService, useFactory: (banco: Pool, configuracao: Configuracao) => new InteracoesService(banco, configuracao), inject: [BANCO, CONFIGURACAO] },
     {
       provide: RascunhosService,
       useFactory: (banco: Pool, configuracao: Configuracao) => new RascunhosService(banco, configuracao),

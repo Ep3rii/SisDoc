@@ -15,8 +15,9 @@ legada em PostgreSQL e, futuramente, a API da folha). Desenho registrado na
 
 Na interface administrativa, **Importação e exportação** está organizada
 em **Importar**, **Disponibilizar Legado**, **Exportar** e **Histórico**.
-Upload e relatório ficam em Importar; mapeamento, prévia e confirmação de
-promoção ficam em Disponibilizar Legado. As abas preservam o estado, mas não
+Upload e relatório ficam em Importar; ao escolher Núcleo com mapeamento,
+recepção protegida, mapeamento, validação e promoção ocorrem na mesma aba.
+Disponibilizar Legado continua disponível para lotes anteriores. As abas preservam o estado, mas não
 gravam dados. Histórico reúne conferência por origem e lotes, com filtro
 somente dos lotes carregados. Veja [operação](OPERACAO.md#organização-das-telas).
 
@@ -42,8 +43,11 @@ por (origem, matrícula); a pessoa é única por CPF, independentemente da orige
 
 - **CSV UTF-8** (com ou sem BOM), separador `;` ou `,` detectado pelo
   cabeçalho, aspas no padrão RFC 4180.
-- **XLSX**: lida a primeira planilha; células de data no formato serial do
-  Excel são convertidas.
+- **XLSX**: primeira aba por padrão na CLI; na importação web, consulte e
+  selecione a aba antes de validar. Nome inexistente ou relação inválida
+  da aba selecionada é erro, nunca leitura silenciosa de outra aba.
+  Células de data no formato serial do Excel são convertidas.
+- **XML SisDoc v1**, detalhado abaixo; não é importador universal de XML.
 - Tamanho máximo: **64 MB** por arquivo (CLI e tela).
 - O cabeçalho é a primeira linha não vazia. Nomes são comparados sem acento,
   sem espaços/sublinhados e sem diferenciar maiúsculas; colunas
@@ -252,9 +256,105 @@ Para mover a instalação completa com usuários/aprovações/numeração, use o
 [procedimento Windows Server](MIGRACAO_WINDOWS_SERVER.md), não reimportação
 de planilhas nem setup sobre o banco restaurado.
 
+## XML SisDoc v1 e seleção de abas
+
+Modelo mínimo sintético, UTF-8:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<sisdoc xmlns="urn:sisdoc:importacao:1" versao="1">
+  <registro>
+    <MATRICULA>FICTICIA-001</MATRICULA>
+    <NOME>Pessoa inteiramente fictícia</NOME>
+    <CARGO>Cargo fictício</CARGO>
+  </registro>
+</sisdoc>
+```
+
+O exemplo demonstra estrutura, não uma linha cadastral válida: dados
+funcionais exigem também CPF válido. O namespace pode ser omitido.
+Cada `registro` contém campos simples e únicos; campos ausentes ficam
+vazios. Entidades XML padrão e CDATA são aceitas como texto, sem executar
+HTML. DTD, entidades externas, instruções de processamento, atributos de
+campos e estruturas aninhadas são recusados. Nenhuma consulta de rede/arquivo
+é feita pelo parser. XML de um fornecedor precisa ser convertido para este
+perfil ou ter um adaptador versionado aprovado; não altere a raiz ao acaso.
+
+Limites XML: 64 MB, 100 mil registros, 256 campos, profundidade 3 e 8.000
+caracteres por campo. UTF-8 inválido, campos repetidos e XML malformado
+produzem erro explícito, sem expor o conteúdo do arquivo na mensagem.
+
+`POST /api/v1/admin/importacoes/abas` recebe XLSX bruto e devolve seus nomes
+de abas; requer administrador/CSRF. Upload aceita `aba=<nome exato>` para
+XLSX. Com seleção explícita, a identidade do lote é SHA-256 de
+`sisdoc/aba/v1:` + nome JSON + byte NUL + arquivo, distinguindo abas do mesmo
+arquivo. Sem seleção, conserva SHA-256 do arquivo e primeira aba.
+
+## Histórico funcional e financeiro local
+
+No Cadastro, selecione pessoa/vínculo e abra **Histórico funcional e
+financeiro**. Todos os perfis funcionais consultam; somente administrador
+cria, corrige com motivo, importa e exporta. Conteúdo e revisões ficam
+cifrados; o histórico de alterações é append-only.
+
+- Funcional: `ferias`, `licenca`, `abono_pecuniario`,
+  `abono_permanencia`, `outro`; situação `informado`, `concedido`,
+  `gozado` ou `cancelado`. Férias exigem início/fim e período aquisitivo;
+  licença exige espécie e intervalo. Dias/saldos e efeitos são informados,
+  não concessões automáticas nem entradas automáticas no cálculo DOF/DTC.
+  Sobreposições geram aviso de revisão, sem soma de dias.
+- Financeiro: grupo `financeiro`, tipo `lancamento`; situações `previsto`,
+  `informado`, `pago`, `estornado`. Competência `AAAA-MM`, rubrica,
+  natureza `provento|desconto`, modalidade `normal|complementar|retroativa`
+  e valor decimal string com ponto e duas casas (`1234.56`).
+  `pago` exige data de pagamento; retroativo exige competência de origem.
+  Não são aceitos valores de ponto flutuante, vírgula ou negativos.
+- Pagamento e fato funcional são registros distintos. `relacionadoId` e
+  `eventoId` identificam registros existentes do mesmo vínculo. Estorno
+  exige pagamento correspondente com mesmo valor/natureza; estorno
+  duplicado ou edição incompatível do pagamento estornado são bloqueados.
+
+Importação é por vínculo explicitamente selecionado, com origem técnica,
+modelo canônico, validação e confirmação. Há downloads de cabeçalhos CSV
+na própria tela; XLSX/XML usam os mesmos nomes de campos. Cabeçalhos ignoram
+caixa/acentos/espaços/sublinhados; desconhecidos/duplicados são erros.
+Datas devem estar em `AAAA-MM-DD`; identificador `idOrigem` é obrigatório.
+Campos opcionais ausentes ficam `null`; efeitos ficam `nao_informado`.
+A origem da linha, quando informada, deve ser a mesma do upload.
+
+Modelo financeiro sintético:
+
+```csv
+GRUPO;TIPO;SITUACAO;DESCRICAO;COMPETENCIA;RUBRICA;NATUREZA;VALOR;FOLHA;IDORIGEM
+financeiro;lancamento;informado;Lançamento fictício;2024-01;FICTICIA;provento;0.10;normal;EXEMPLO-1
+```
+
+A assinatura da validação vincula arquivo/linhas, pessoa/vínculo, origem,
+sessão e revisões atuais. Confirmação revalida relações. Repetir origem/id
+com mesmo conteúdo é inalterado; divergência preserva o registro existente
+e exige correção manual. Rejeitados não são aplicados; o relatório informa
+quantidades/linhas. As linhas aceitas são gravadas atomicamente e conservam
+lote protegido/linha de origem. Limite de 100 mil registros por arquivo.
+
+Rotas: `GET|POST servidores/:pessoa/historico`,
+`PATCH servidores/:pessoa/historico/:id`,
+`GET servidores/:pessoa/historico/:id/revisoes`,
+`POST servidores/:pessoa/historico/importar` (arquivo bruto, query
+`vinculoId,origem,modo,aba?,validacao?`) e
+`POST servidores/:pessoa/historico/exportar` (`{vinculoId}`).
+Todas sob `/api/v1`, autenticadas/auditadas; escritas exigem CSRF.
+
+Filtros e subtotais da tela se referem à **página carregada**, não ao banco
+inteiro. Subtotais são brutos dos pagamentos visíveis, sem compensação de
+estornos nem inferência de direitos. Exportação XLSX administrativa inclui
+todo o vínculo até 10 mil registros, sem truncamento; preserva valor como
+texto exato e metadados. O arquivo não é cifrado, não substitui backup e,
+por conter metadados extras, não é modelo de reimportação direta.
+
 ## Garantias
 
-- **Idempotência**: cada lote guarda o SHA-256 do arquivo. Repetir o mesmo
+- **Idempotência**: cada lote guarda o SHA-256 do arquivo (ou identidade da
+  aba explicitamente selecionada, conforme acima). Repetir o mesmo
   arquivo (mesmo tipo e origem) não grava nada e informa o lote anterior.
   Arquivos diferentes comparam um `hash_conteudo` (HMAC) por registro:
   registros iguais ficam inalterados; só mudanças são atualizadas.

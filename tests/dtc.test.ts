@@ -20,6 +20,8 @@ import {
   resultadoTransicaoDtcSchema,
   situacaoEmissaoSchema,
   snapshotEmissaoDtcSchema,
+  registroHistoricoSchema, resultadoHistoricoServidorSchema, revisoesHistoricoSchema,
+  relatorioImportacaoHistoricoSchema, sugestoesCadastroSchema, notificacoesDeclaracoesSchema,
   type Configuracao,
   type SituacaoEmissao,
   type TipoDtc,
@@ -42,6 +44,7 @@ import { registrarAprovacaoModelo } from '../apps/api/dist/setup/aprovacao-model
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
 import { migrar } from '../apps/api/dist/setup/migrar.js';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { sidServicoTeste } from './ambiente-windows';
 
 const senhaMigrador = 'MigracaoDtcFicticia!12345';
 const senhaAplicativo = 'AplicativoDtcFicticio!12345';
@@ -240,9 +243,9 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
   }
 
   async function requisitar(opcoesPedido: {
-    metodo: 'GET' | 'POST' | 'PATCH'; rota: string; corpo?: unknown; sessao?: Sessao; provaFonte?: string; chave?: string;
+    metodo: 'GET' | 'POST' | 'PATCH'; rota: string; corpo?: unknown; arquivo?: Buffer; sessao?: Sessao; provaFonte?: string; chave?: string;
   }): Promise<Resposta> {
-    const conteudo = opcoesPedido.corpo === undefined ? undefined : JSON.stringify(opcoesPedido.corpo);
+    const conteudo = opcoesPedido.arquivo ?? (opcoesPedido.corpo === undefined ? undefined : JSON.stringify(opcoesPedido.corpo));
     return new Promise((resolve, reject) => {
       const pedido = https.request({
         host: '127.0.0.1',
@@ -256,7 +259,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
         timeout: 30000,
         headers: {
           Origin: `https://${nomeTls}:${portaHttps}`,
-          ...(conteudo === undefined ? {} : { 'Content-Type': 'application/json' }),
+          ...(conteudo === undefined ? {} : { 'Content-Type': opcoesPedido.arquivo ? 'application/octet-stream' : 'application/json' }),
           ...(opcoesPedido.sessao ? { Cookie: opcoesPedido.sessao.cookie, 'X-CSRF-Token': opcoesPedido.sessao.csrf } : {}),
           ...(opcoesPedido.provaFonte === undefined ? {} : { 'X-Sisdoc-Fonte-Dof': opcoesPedido.provaFonte }),
           ...(opcoesPedido.chave === undefined ? {} : { 'Idempotency-Key': opcoesPedido.chave }),
@@ -462,7 +465,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
         usuario: 'sisdoc_aplicativo', senha: senhaAplicativo,
       },
       tls: { certificado, chave, ca, nome: nomeTls },
-      sidServico: 'S-1-5-19',
+      sidServico: sidServicoTeste,
       listaSenhas,
       processos: { mascaras: ['####/####'] },
       administrador: { matricula: 'ADMIN-DTC-FICTICIO', nome: 'Operador Fictício', senha: senhaAdmin },
@@ -575,7 +578,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       });
       const editado = { ...conteudo, processo: '4321/8765' };
       expect((await requisitar({
-        metodo: 'PATCH', rota: `dtc/${criado.id}`, sessao: sessao('analista2'), corpo: { ...editado, revisao: 1, motivo: 'Correção' },
+        metodo: 'PATCH', rota: `dtc/${criado.id}`, sessao: sessao('analista2'), corpo: { ...editado, revisao: 1, motivo: '' },
       })).status).toBe(400);
       expect((await requisitar({
         metodo: 'PATCH', rota: `dtc/${criado.id}`, sessao: sessao('analista'), corpo: { ...editado, revisao: 1 },
@@ -898,10 +901,11 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
           '022-destinatario-coordenador',
           '023-modelos-oficiais',
           '024-perfil-secretario-adjunto',
+          '025-historico-servidor',
         ],
-        versaoAtual: '024-perfil-secretario-adjunto',
+        versaoAtual: '025-historico-servidor',
       });
-      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '024-perfil-secretario-adjunto' });
+      expect(await migrar(provisionamento)).toEqual({ aplicadas: [], versaoAtual: '025-historico-servidor' });
       const privilegios = await anterior.query<{ conferencia: boolean; tabela: boolean; categoria: boolean; apagar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'conferido_por', 'INSERT') AS conferencia,
           has_table_privilege('sisdoc_aplicativo', 'documentos.conferencia_dtc', 'INSERT') AS tabela,
@@ -1135,5 +1139,88 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       leitor.release();
       await escritor.end();
     }
+  });
+  it('mantém ajustes exclusivos, sugestões, prévia, conferência e retorno DTC coerentes', async () => {
+    const fonte = await criarFonte('Pessoa do ajuste sintético');
+    const pedido = { ...corpoDtc('DTC_IPAM', fonte, 1),
+      ajustesCadastro: { nome: 'Nome ajustado somente na declaração', cargo: 'Cargo ajustado fictício', admissao: '1980-02-01' },
+      confirmarInicioAjustado: true };
+    const resposta = await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao('analista'), corpo: pedido });
+    expect(resposta.status, resposta.corpo).toBe(201);
+    const criado = documentoDtcSchema.parse(JSON.parse(resposta.corpo));
+    expect(criado.nome).toBe(pedido.ajustesCadastro.nome);
+    expect(criado.resultado.admissaoConsiderada).toBe('1980-02-01');
+    const dados = await previa(criado.id);
+    expect(dados.fonte).toMatchObject({ nome: pedido.ajustesCadastro.nome, cargo: pedido.ajustesCadastro.cargo, admissao: '1980-02-01' });
+    const cadastro = await requisitar({ metodo: 'GET', rota: `servidores/${fonte.pessoaId}/referencias?vinculoId=${fonte.vinculoId}`, sessao: sessao('analista') });
+    expect(JSON.parse(cadastro.corpo).cadastro.nome).toBe('Pessoa do ajuste sintético');
+    const sugestoes = await requisitar({ metodo: 'GET', rota: `servidores/${fonte.pessoaId}/sugestoes`, sessao: sessao('admin') });
+    expect(sugestoesCadastroSchema.parse(JSON.parse(sugestoes.corpo)).itens[0].ajustes).toEqual(pedido.ajustesCadastro);
+    const conferido = await conferir(criado.id, 'analista');
+    const devolvido = await requisitar({ metodo: 'POST', rota: `dtc/${criado.id}/devolver`, sessao: sessao('admin'),
+      corpo: { revisao: conferido.revisao, motivo: 'Revisão fictícia para retorno ao autor' } });
+    expect(devolvido.status, devolvido.corpo).toBe(200);
+    const contagem = await requisitar({ metodo: 'GET', rota: 'notificacoes/declaracoes', sessao: sessao('analista') });
+    expect(contagem.status, contagem.corpo).toBe(200);
+    expect(notificacoesDeclaracoesSchema.parse(JSON.parse(contagem.corpo)).retornos).toBeGreaterThan(0);
+    const retornos = await requisitar({ metodo: 'GET', rota: 'notificacoes/retornos', sessao: sessao('analista') });
+    expect(JSON.parse(retornos.corpo).itens.some((item: { id: string }) => item.id === criado.id)).toBe(true);
+    const atual = await requisitar({ metodo: 'GET', rota: `dtc/${criado.id}`, sessao: sessao('analista') });
+    const reaberto = documentoDtcSchema.parse(JSON.parse(atual.corpo));
+    const removido = await requisitar({ metodo: 'PATCH', rota: `dtc/${criado.id}`, sessao: sessao('analista'),
+      corpo: { ...reaberto.conteudo, ajustesCadastro: {}, revisao: reaberto.revisao, motivo: 'Remoção fictícia dos ajustes locais' } });
+    expect(removido.status, removido.corpo).toBe(200);
+    expect(documentoDtcSchema.parse(JSON.parse(removido.corpo)).nome).toBe('Pessoa do ajuste sintético');
+    const depois = await requisitar({ metodo: 'GET', rota: 'notificacoes/retornos', sessao: sessao('analista') });
+    expect(JSON.parse(depois.corpo).itens.some((item: { id: string }) => item.id === criado.id)).toBe(false);
+  });
+  it('protege histórico cifrado, revisões, estornos, exportação e importação idempotente por vínculo', async () => {
+    const fonte = await criarFonte('Pessoa do histórico sintético');
+    const rota = `servidores/${fonte.pessoaId}/historico`;
+    const registro = registroHistoricoSchema.parse({
+      grupo: 'financeiro', tipo: 'lancamento', situacao: 'pago', descricao: 'Pagamento inteiramente sintético',
+      inicio: null, fim: null, aquisitivoInicio: null, aquisitivoFim: null, diasInformados: null, especieLicenca: null, ato: null,
+      efeitoTempo: 'nao_informado', efeitoRemuneracao: 'nao_informado', competencia: '2024-01', competenciaOrigem: null,
+      pagamento: '2024-01-31', rubrica: 'RUBRICA-FICTICIA', natureza: 'provento', valor: '1234.56', folha: 'normal',
+      origem: 'fixture', idOrigem: 'PAGAMENTO-FICTICIO', eventoId: null, relacionadoId: null,
+    });
+    const corpo = { vinculoId: fonte.vinculoId, registro, motivo: 'Registro de pagamento inteiramente fictício' };
+    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('analista'), corpo })).status).toBe(403);
+    const criado = await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo });
+    expect(criado.status, criado.corpo).toBe(201);
+    const item = resultadoHistoricoServidorSchema.parse(JSON.parse(criado.corpo)).item;
+    const cifrado = await banco().query<{ conteudo_cifrado: Buffer }>('SELECT conteudo_cifrado FROM nucleo.historico_servidor WHERE id = $1', [item.id]);
+    expect(cifrado.rows[0].conteudo_cifrado.includes(Buffer.from(registro.descricao))).toBe(false);
+    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo })).status).toBe(409);
+    const estorno = { ...corpo, registro: { ...registro, situacao: 'estornado', relacionadoId: item.id, idOrigem: 'ESTORNO-FICTICIO' } };
+    const estornado = await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo: estorno });
+    expect(estornado.status, estornado.corpo).toBe(201);
+    expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo: { ...estorno, registro: { ...estorno.registro, idOrigem: 'OUTRO-ESTORNO' } } })).status).toBe(409);
+    const mudar = await requisitar({ metodo: 'PATCH', rota: `${rota}/${item.id}`, sessao: sessao('admin'),
+      corpo: { ...corpo, revisao: 1, registro: { ...registro, valor: '1.00' } } });
+    expect(mudar.status).toBe(409);
+    const revisoes = await requisitar({ metodo: 'GET', rota: `${rota}/${item.id}/revisoes`, sessao: sessao('analista') });
+    expect(revisoes.status, revisoes.corpo).toBe(200);
+    expect(revisoesHistoricoSchema.parse(JSON.parse(revisoes.corpo)).itens[0].alteracao.novo).toEqual(registro);
+    expect((await requisitar({ metodo: 'POST', rota: `${rota}/exportar`, sessao: sessao('analista'), corpo: { vinculoId: fonte.vinculoId } })).status).toBe(403);
+    const exportado = await requisitar({ metodo: 'POST', rota: `${rota}/exportar`, sessao: sessao('admin'), corpo: { vinculoId: fonte.vinculoId } });
+    expect(exportado.status).toBe(200);
+    expect(exportado.bruto.subarray(0, 2).toString()).toBe('PK');
+    const arquivo = Buffer.from('GRUPO;TIPO;SITUACAO;DESCRICAO;COMPETENCIA;RUBRICA;NATUREZA;VALOR;FOLHA;IDORIGEM\nfinanceiro;lancamento;informado;Sintético;2024-01;FICTICIA;provento;0.10;normal;IMPORT-1\n');
+    const importar = async (modo: string, validacao?: string) => requisitar({ metodo: 'POST', rota: `${rota}/importar?${new URLSearchParams({
+      vinculoId: fonte.vinculoId, origem: 'fixture-import', modo, ...(validacao ? { validacao } : {}),
+    })}`, sessao: sessao('admin'), arquivo });
+    const validado = await importar('validar');
+    expect(validado.status, validado.corpo).toBe(201);
+    const prova = relatorioImportacaoHistoricoSchema.parse(JSON.parse(validado.corpo));
+    expect(prova).toMatchObject({ inseridos: 1, rejeitados: 0 });
+    const aplicado = await importar('gravar', prova.validacao);
+    expect(aplicado.status, aplicado.corpo).toBe(201);
+    expect(relatorioImportacaoHistoricoSchema.parse(JSON.parse(aplicado.corpo)).loteId).not.toBeNull();
+    expect((await importar('gravar', prova.validacao)).status).toBe(409);
+    const repetir = relatorioImportacaoHistoricoSchema.parse(JSON.parse((await importar('validar')).corpo));
+    expect(repetir).toMatchObject({ inseridos: 0, inalterados: 1 });
+    const outraFonte = await criarFonte('Outra pessoa sintética do histórico');
+    expect((await requisitar({ metodo: 'GET', rota: `servidores/${outraFonte.pessoaId}/historico/${item.id}/revisoes`, sessao: sessao('admin') })).status).toBe(404);
   });
 });

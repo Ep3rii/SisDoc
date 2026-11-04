@@ -13,8 +13,10 @@ export const enviarImportacaoQuerySchema = z.strictObject({
   origem: origemImportacaoSchema,
   modo: z.enum(['validar', 'gravar']).default('validar'),
   destino: z.enum(['nucleo', 'legado']).default('nucleo'),
+  aba: z.string().min(1).max(200).optional(),
 });
 export type EnviarImportacaoQuery = z.infer<typeof enviarImportacaoQuerySchema>;
+export const abasImportacaoSchema = z.array(z.string().min(1).max(200)).min(1);
 
 export const exportarDadosSchema = z.strictObject({
   tipo: tipoImportacaoSchema,

@@ -12,6 +12,7 @@ import {
   type FonteDtc,
   type TipoDtc
 } from '@sisdoc/contratos';
+import { aplicarAjustesCadastro } from '@sisdoc/contratos';
 import { type PoolClient } from 'pg';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { ProtetorDados } from '../seguranca/protecao-dados';
@@ -180,7 +181,8 @@ export class ConsultasDtc {
       pendencias.push('Confirme o ajuste do início do período à data de posse.');
     }
     if (!linha.regra_atual) pendencias.push('A versão de regra deste documento não é a vigente; crie uma cópia.');
-    if (linha.admissao !== resultado.admissaoConsiderada) {
+    const admissao = conteudo.ajustesCadastro?.admissao ?? linha.admissao;
+    if (admissao !== resultado.admissaoConsiderada) {
       pendencias.push('A admissão mudou na fonte; salve o rascunho novamente para recalcular.');
     }
     return documentoDtcSchema.parse({
@@ -188,9 +190,9 @@ export class ConsultasDtc {
       tipo: linha.tipo,
       pessoaId: linha.pessoa_id,
       vinculoId: linha.vinculo_id,
-      nome: linha.nome,
-      matricula: linha.matricula,
-      admissao: linha.admissao,
+      nome: conteudo.ajustesCadastro?.nome ?? linha.nome,
+      matricula: conteudo.ajustesCadastro?.matricula ?? linha.matricula,
+      admissao,
       status: linha.status,
       revisao: linha.revisao,
       criadoEm: linha.criado_em.toISOString(),
@@ -253,7 +255,8 @@ export class ConsultasDtc {
       if ('erro' in leitura) return { erro: 'fonte' };
       valores[chave] = leitura.valor;
     }
-    const fonte = fonteDtcSchema.safeParse({
+    const entrada = conteudoDtcSchema.parse(this.ler('documento', linha.id, 'entrada_cifrada', linha.entrada_cifrada));
+    const fonte = fonteDtcSchema.safeParse(aplicarAjustesCadastro({
       documentoId: linha.id,
       revisao: linha.revisao,
       provaFonte: this.assinarFonte(linha, revisoes).toString('hex'),
@@ -273,7 +276,7 @@ export class ConsultasDtc {
       admissao: linha.admissao,
       periodosIpam: ipam,
       removidoNaFonte: origem.removido,
-    });
+    }, entrada.ajustesCadastro));
     if (!fonte.success) return { erro: 'fonte' };
     return { fonte: fonte.data, fonteSelecionadaAlterada: linha.status === 'conferido'
       ? !await this.fonteConferidaCorresponde(cliente, linha, revisoes) : null };

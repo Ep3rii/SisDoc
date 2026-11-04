@@ -2,6 +2,7 @@ import {
   criarRascunhoDofSchema,
   dataFuncionalSchema,
   solicitarCalculoDofSchema,
+  aplicarAjustesCadastro, referenciaServidorSchema, type ReferenciaServidor, type AjustesCadastro,
   type AnoCalculo,
   type DadosFontePreviaDof,
   type ProvaFontePreviaDof,
@@ -9,8 +10,9 @@ import {
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
-import { api, ErroApi } from '../infraestrutura/api';
+import { useEffect, useId, useRef, useState, useMemo, type FormEvent } from 'react';
+import { calcularPreviaDof, nivelDof } from '@sisdoc/calculo';
+import { api, ErroApi, requisitar, validar } from '../infraestrutura/api';
 import { campos, tamanhoPagina, type Aba, type Campo, type Props, type Tabela, type ValoresAno } from './contexto-editor-dof';
 
 /** Coordena cálculo, gravação, revisões e pendências; o estado da prévia continua montado ao trocar abas. */
@@ -22,8 +24,18 @@ export function useEditorDof({
   const [aba, setAba] = useState<Aba>(rascunhoInicial ? 'tabela' : 'periodo');
   const [destinoPrevia, setDestinoPrevia] = useState<HTMLDivElement | null>(null);
   const [fontePrevia, setFontePrevia] = useState<DadosFontePreviaDof | null>(null);
-  const admissaoAlterada = Boolean(rascunhoInicial && admissao !== rascunhoInicial.resultado.admissaoConsiderada);
-  const [admissaoAtual, setAdmissaoAtual] = useState(admissao);
+  const [referencia, setReferencia] = useState<ReferenciaServidor | null>(null);
+  const [ajustesCadastro, setAjustesCadastro] = useState<AjustesCadastro>(rascunhoInicial?.entrada.ajustesCadastro ?? {});
+  useEffect(() => {
+    let corrente = true;
+    requisitar(`servidores/${pessoaId}/referencias?${new URLSearchParams({ vinculoId, tipo: 'eventos_funcionais', limite: '1' })}`)
+      .then((dados) => { if (corrente) setReferencia(validar(referenciaServidorSchema, dados)); })
+      .catch((erro: unknown) => { if (corrente) onErro(erro); });
+    return () => { corrente = false; };
+  }, [pessoaId, vinculoId, onErro]);
+  const admissaoAlterada = Boolean(rascunhoInicial &&
+    (rascunhoInicial.entrada.ajustesCadastro?.admissao ?? admissao) !== rascunhoInicial.resultado.admissaoConsiderada);
+  const [admissaoAtual, setAdmissaoAtual] = useState(rascunhoInicial?.entrada.ajustesCadastro?.admissao ?? admissao);
   const [inicio, setInicio] = useState(rascunhoInicial?.entrada.inicio ?? admissao ?? '');
   const [fim, setFim] = useState(rascunhoInicial?.entrada.fim ?? '');
   const [tabela, setTabela] = useState<Tabela | null>(() => {
@@ -197,6 +209,7 @@ export function useEditorDof({
       pessoaId, vinculoId, inicio, fim, anos: tabela.anos.map(ano),
       ...(acumuladoAnterior ? { acumuladoAnterior } : {}),
       confirmacaoDados: confirmado,
+      ajustesCadastro,
     });
     if (!validacao.success) {
       onErro(new ErroApi(400, 'Confira os valores anuais, o acumulado anterior e a confirmação dos dados.'));
@@ -307,5 +320,48 @@ export function useEditorDof({
     ['Admissão na fonte', admissaoAtual ?? 'Não informado'],
     ['Órgão de origem', fontePrevia ? fontePrevia.orgao ?? 'Não informado' : 'Não consultado'],
   ];
-  return { id, rascunho, nome, matricula, admissaoAtual, somenteLeitura, podeSalvar, onErro, onLimpar, resultado, aba, setAba, dadosServidor, csrf, calculoPendente, blocosPendentes, encaminhamentoPendente, operacaoEncaminhamento, operacaoConferencia, ocupado, edicaoIndisponivel, setRascunho, onPendente, marcarProcesso, bloqueioCalculo, inicio, setInicio, setTabela, invalidar, fim, setFim, preparar, calcular, tabela, inicioEfetivo, anteriorTs, setAnteriorTs, anteriorPf, setAnteriorPf, origemAnterior, setOrigemAnterior, pagina, anosPagina, abrangencias, valores, atualizar, setPagina, confirmado, setConfirmado, marcarCalculo, resultadoSalvo, mensagem, pedidoCalculado, salvar, bloqueioSalvar, anosExcluidos, confirmouRemocao, setConfirmouRemocao, motivo, setMotivo, destinoPrevia, setFontePrevia, processoPendente, marcarBlocos, setProvaPrevia, setOcupado, provaPrevia, marcarConferencia, onFechar, marcarEncaminhamento, setOperacaoEncaminhamento, setDestinoPrevia, confirmarSaida, rascunhoInicial };
+  const fonteCadastro: Omit<DadosFontePreviaDof, 'documentoId' | 'revisao' | 'provaFonte'> | null = referencia ? {
+    ...referencia.cadastro, consultadoEm: rascunho?.atualizadoEm ?? new Date().toISOString(),
+    nivel: nivelDof(referencia.cadastro.referencia ?? '').nivel || null,
+    avisoNivel: null, removidoNaFonte: referencia.removidoNaFonte,
+  } : null;
+  const fonteReferencia = fonteCadastro ?? fontePrevia ?? { nome, matricula, admissao: admissaoAtual };
+  const fonteEdicao = aplicarAjustesCadastro(fonteReferencia, ajustesCadastro);
+  const fonteCompleta = fonteCadastro ? aplicarAjustesCadastro(fonteCadastro, ajustesCadastro) : null;
+  if (fonteCompleta) {
+    const nivel = nivelDof(fonteCompleta.referencia ?? '');
+    fonteCompleta.nivel = nivel.nivel || null;
+    fonteCompleta.avisoNivel = nivel.avisos.join(' ') || null;
+  }
+  const previaLocal = useMemo(() => {
+    if (!admissaoAtual || !tabela || tabela.inicio !== inicio || tabela.fim !== fim) return { erro: 'Informe um período válido e prepare a tabela anual.' };
+    if (!confirmado && tabela.anos.some((ano) => campos.some(([campo]) => !(valores[ano]?.[campo] ?? '').trim()))) {
+      return { erro: 'Há dias não informados. Preencha os valores ou confirme o tratamento dos vazios como zero.' };
+    }
+    const entrada = solicitarCalculoDofSchema.safeParse({
+      pessoaId, vinculoId, inicio, fim, confirmacaoDados: true, ajustesCadastro,
+      anos: tabela.anos.map((ano) => ({
+        ano, abrangencia: abrangencias[ano] ?? 'intervalo_declarado',
+        ...Object.fromEntries(campos.map(([campo]) => [campo, Number(valores[ano]?.[campo] || 0)])),
+      })),
+      ...(inicio > admissaoAtual ? { acumuladoAnterior: {
+        ts: anteriorTs.trim() ? Number(anteriorTs) : NaN, pf: anteriorPf.trim() ? Number(anteriorPf) : NaN, origem: origemAnterior,
+      } } : {}),
+    });
+    if (!entrada.success) return { erro: 'Confira datas, identificação, dias anuais e acumulados. A prévia não usa totais antigos.' };
+    return calcularPreviaDof(entrada.data, admissaoAtual, new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }));
+  }, [pessoaId, vinculoId, inicio, fim, tabela, valores, confirmado, ajustesCadastro, admissaoAtual, abrangencias, anteriorTs, anteriorPf, origemAnterior]);
+  function alterarCadastro(ajustes: AjustesCadastro) {
+    setAjustesCadastro(ajustes);
+    setAdmissaoAtual(ajustes.admissao ?? referencia?.cadastro.admissao ?? admissao);
+    invalidar();
+  }
+  function atualizarReferencia(dados: ReferenciaServidor) {
+    setReferencia(dados);
+    const novaAdmissao = ajustesCadastro.admissao ?? dados.cadastro.admissao;
+    if (novaAdmissao !== admissaoAtual) setTabela(null);
+    setAdmissaoAtual(novaAdmissao);
+    invalidar();
+  }
+  return { setReferencia: atualizarReferencia, ajustesCadastro, alterarCadastro, fonteEdicao, fonteReferencia, fonteCompleta, referencia, previaLocal, id, rascunho, nome, matricula, admissaoAtual, somenteLeitura, podeSalvar, onErro, onLimpar, resultado, aba, setAba, dadosServidor, csrf, calculoPendente, blocosPendentes, encaminhamentoPendente, operacaoEncaminhamento, operacaoConferencia, ocupado, edicaoIndisponivel, setRascunho, onPendente, marcarProcesso, bloqueioCalculo, inicio, setInicio, setTabela, invalidar, fim, setFim, preparar, calcular, tabela, inicioEfetivo, anteriorTs, setAnteriorTs, anteriorPf, setAnteriorPf, origemAnterior, setOrigemAnterior, pagina, anosPagina, abrangencias, valores, atualizar, setPagina, confirmado, setConfirmado, marcarCalculo, resultadoSalvo, mensagem, pedidoCalculado, salvar, bloqueioSalvar, anosExcluidos, confirmouRemocao, setConfirmouRemocao, motivo, setMotivo, destinoPrevia, setFontePrevia, processoPendente, marcarBlocos, setProvaPrevia, setOcupado, provaPrevia, marcarConferencia, onFechar, marcarEncaminhamento, setOperacaoEncaminhamento, setDestinoPrevia, confirmarSaida, rascunhoInicial };
 }

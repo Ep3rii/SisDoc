@@ -1,16 +1,42 @@
-# Avaliação técnica de UI/UX — 01/11/2026
+# Avaliação técnica de UI/UX — 04/11/2026
 
 ## Método e limites
 
-Avaliação da estrutura React/CSS de todas as telas principais e dos testes
-de navegador com dados sintéticos. A página operacional foi aberta para
-inspeção; não foram feitas alterações em documentos reais. Não é um teste
-de usabilidade com operadores, nem uma certificação de acessibilidade.
+Revisão React/CSS e testes de navegador com dados sintéticos, complementados
+por inspeção de capturas DOF em 1366×768, 1920×1080 e 390×844.
+Os três editores DTC foram testados com a CSP real. Cadastro/histórico/importação
+foram analisados no código e em integrações API; isso não equivale a teste
+visual completo dessas telas. Não houve edição de documentos operacionais.
+Não é teste de usabilidade com operadores nem certificação de acessibilidade.
+As melhorias desta evolução estão no código validado, **ainda não publicadas**.
+Situação operacional em [Progresso](PROGRESSO.md).
 
 O layout tem uma base coerente: menu por perfil, busca global, tabelas
 paginadas, confirmação de ações sensíveis e editor com prévia lateral.
-Os principais problemas são densidade excessivamente espaçada, textos
-operacionais repetidos, ações concorrentes e hierarquia entre lista/editor.
+Os principais problemas remanescentes são espaço vertical consumido por
+orientações/controles, formulários extensos, rótulos técnicos e hierarquia
+entre lista/editor. No modo página inteira, uma A4 cabe no espaço disponível,
+mas fica pequena em 1366×768: largura e ampliação são necessárias para leitura.
+Em 390px, menu/cabeçalho/avisos ocupam boa parte da primeira tela.
+
+## Próximas melhorias recomendadas — não implementadas
+
+| Prioridade | Área | Recomendação e aceite |
+|---|---|---|
+| Alta | Hierarquia dos editores | Consolidar avisos repetidos e recolher orientações secundárias. Manter sempre visíveis escopo local, estado não salvo e próximo passo, sem esconder pendências de conferência. |
+| Alta | DTC | Abas Identificação, Períodos, Cargos/Documentação e Conferência, com resumo dos totais. Mudar de aba não pode perder lançamentos ou invalidar silenciosamente a prévia. |
+| Alta | Importação Núcleo | Indicador de etapas Arquivo → Aba/perfil → Mapeamento → Diferenças → Confirmação. Destacar quantidades, divergências e preservação de correções antes de aplicar. |
+| Alta | Histórico funcional/financeiro | Trocar códigos por rótulos de negócio; seleção assistida de evento/pagamento relacionado em vez de digitar UUID. Manter rastreabilidade disponível ao expandir. |
+| Alta | Consulta histórica | Filtros globais por competência/período/rubrica e paginação com totais globais calculados no servidor. Nunca chamar o subtotal da página de saldo ou direito. |
+| Média | Prévia ampliada | Completar gestão de foco, retorno ao acionador e isolamento do fundo; testar teclado/leitor de tela. Escape e fechamento por botão já funcionam, mas não caracterizam modal acessível completo. |
+| Média | Menu/móvel | Recolher categorias e compactar cabeçalho/avisos; manter contadores legíveis sem depender só de cor. Validar tarefas reais em 390px, não apenas ausência de overflow. |
+| Média | Sugestões cadastrais | Comparação lado a lado: valor atual, valor sugerido, documento/revisão e alcance. Resolução deve continuar administrativa e explícita. |
+| Média | Desempenho inicial | Carregar administração, importação e editores por demanda. Bundle candidato: cerca de 1.030 kB minificado/248 kB gzip; não aumentar o limite do bundler para esconder o aviso. |
+
+Aceite com operadores: localizar um vínculo, ajustar somente a declaração,
+identificar a sugestão cadastral, corrigir o cadastro com motivo e tratar um
+retorno. Medir passos/erros sem registrar dados pessoais. Verificar zoom 200%,
+leitor de tela, foco e controles móveis; esses cenários não foram certificados.
 
 ## Ajustes aplicados
 
@@ -19,8 +45,18 @@ operacionais repetidos, ações concorrentes e hierarquia entre lista/editor.
   **Atualizar prévia** substitui abrir/fechar. Respostas de revisões antigas
   são descartadas; erros têm mensagem e retentativa. Conferência continua
   dependente de dados e prova válidos, não apenas de exibir a prévia.
-- DTC mantém a prévia da revisão salva ao editar; os novos valores do
-  formulário aparecem após salvar. Esse estado é informado explicitamente.
+- DOF e DTC têm prévia de edição local a cada alteração válida, sem gravação
+  por tecla. Entradas inválidas retiram totais antigos e mostram pendências.
+  Conferência continua usando a prova da revisão/fonte salvas, não o HTML local.
+- Ajustar nesta declaração é o escopo padrão; referência e restauração ficam
+  junto ao campo. Corrigir cadastro local é uma ação administrativa separada.
+  Sugestões derivadas dos ajustes salvos aparecem no cadastro.
+- Visualizador compartilhado com largura/página, zoom, proporção e ampliação.
+  A validação corrigiu altura sobre o rodapé, ciclo síncrono de medição e
+  cabeçalho encobrindo o botão de recolher. Em móvel, a prévia usa altura
+  própria e rolagem da página, sem tentar caber abaixo de um formulário extenso.
+- Contadores circulares nos cantos superiores direitos de Encaminhados e
+  Retornos, com nomes acessíveis. Contam pendências de ação; abrir não zera.
 - Tabelas usam fonte de 13 px, espaçamento de células menor, ações e
   campos anuais compactos, linhas alternadas e destaque ao passar o mouse.
   Não há ocultação ou truncamento de dados pessoais.
@@ -42,28 +78,28 @@ operacionais repetidos, ações concorrentes e hierarquia entre lista/editor.
   O vínculo escolhido na lista é selecionado automaticamente. Cadastro
   completo, referências, vínculos, períodos e cargos têm grupos recolhíveis;
   documentação INSS separada das licenças e das confirmações. Na DTC,
-  grupos preservam lançamentos e a prévia continua mostrando a revisão salva.
+  grupos preservam lançamentos e a prévia de edição acompanha o formulário.
 - Exclusão física, cancelamento e devolução separados visualmente das ações
   principais, sem retirar motivos, confirmação ou controles de autorização.
 - Orientações antigas de emissão indisponível na DOF substituídas pelo fluxo
   Salvar → Conferir → Emitir, sem liberar emissão direta de rascunhos.
 
-A tabela abaixo conserva a avaliação original e propostas que excedem
-esses ajustes (como filtros globais, novas abas DTC e menus de ações).
+A tabela abaixo atualiza a avaliação por tela; recomendações não equivalem
+a recursos publicados.
 
 | Tela | Diagnóstico | Melhoria recomendada | Prioridade |
 |---|---|---|---|
 | Login / troca de senha | Formulário simples e concentrado; estados de erro já existem. | Mostrar requisito de 10 caracteres junto ao campo, permitir revelar senha com botão acessível e manter erros vinculados ao campo. | Média |
-| Menu / cabeçalho | Categorias por tarefa melhoraram a navegação; menu longo e subtítulos consomem altura. | Categorias recolhíveis, indicação clara da tela atual e contadores de pendências autorizadas; não carregar dados de áreas sem permissão. | Média |
+| Menu / cabeçalho | Categorias e contadores melhoram orientação; menu longo e subtítulos consomem altura. | Categorias recolhíveis e cabeçalho compacto; preservar indicação da tela e pendências autorizadas. | Média |
 | Buscar servidores | Lista inicial é útil; avisos repetidos precedem os resultados, e detalhes ficam extensos. | Uma barra única de filtros com origem/órgão, matrícula primeiro, quantidade exibida e ação de limpar filtro; detalhes em abas Cadastro, Vínculos e Referências. | Alta |
 | Cadastro / referências | Dados completos disponíveis, mas campos técnicos aparecem como rótulos e o vínculo exige seleção adicional. | Rótulos de negócio, agrupamento de identificação, documentos e vínculo; abrir o vínculo escolhido na lista sem seleção redundante. Manter todos os valores acessíveis. | Alta |
-| DOF — cálculo/editor | Abas, totais fixos e prévia lateral são adequados. A tabela anual é larga; mensagens de emissão ainda dizem indisponível em um fluxo já entregue. | Separar deduções e incorporações em grupos claros; identificar valores ainda não salvos; substituir mensagens antigas por orientação ao fluxo Conferir → Emitir, sem habilitar emissão antes da conferência. | Alta |
+| DOF — cálculo/editor | Abas, totais fixos, ajustes e prévia instantânea são adequados. A tabela anual é larga e orientações consomem altura. | Separar deduções/incorporações e consolidar avisos sem perder identificação de pendências; preservar Salvar → Conferir → Emitir. | Alta |
 | Rascunhos / encaminhados | Listas e ações são claras; falta filtro por servidor, situação e responsável. | Barra de filtros consistente, datas compactas e ação primária Abrir; indicadores de revisão/encaminhamento sem depender só de cor. | Alta |
 | DOF conferida | Prévia automática já existe, mas emissão e devolução disputam espaço. | Prévia lateral e área de decisão com Emitir como ação principal; devolução em seção própria, sempre mantendo motivo e confirmação. | Alta |
-| DTC — editor | Prévia foi preservada durante edição; formulário longo por períodos/cargos. | Abas Identificação, Períodos, Incorporações, Documentação e Conferência; resumo persistente de totais e aviso de prévia da revisão salva. | Alta |
+| DTC — editor | Prévia instantânea implementada; formulário longo por períodos/cargos. | Abas de edição, resumo persistente e diferenciação explícita entre prévia local e prova salva. | Alta |
 | Histórico / PDF | Muitas ações na última coluna e ausência de filtros de período/servidor. | Filtros por matrícula, número, tipo, situação e datas; Baixar PDF como ação direta e demais ações em menu acessível. Separar exclusão física visualmente do cancelamento. | Alta |
 | Usuários | Criação ocupa o topo mesmo quando a tarefa é localizar/editar; dois formulários ampliam a página. | Lista primeiro, busca por nome/matrícula e botão Novo usuário; criação/edição em painel contextual. Redefinição de senha em seção separada. | Média |
-| Importação / exportação | Fluxo seguro e explícito, mas upload, conversão, exportação, totais e histórico formam uma página muito longa. | Abas Importar, Disponibilizar Legado, Exportar e Histórico; assistente com etapa atual; mapeamento recolhível e resumo de válidos/rejeitados antes da confirmação. | Alta |
+| Importação / exportação | Abas, XML e mapeamento no Núcleo disponíveis no código; etapas ainda exigem muita leitura. | Assistente com etapa atual, mapeamento recolhível e resumo de válidos/rejeitados/divergências antes da confirmação. | Alta |
 | Prévia do Legado / ocorrências | 20 colunas exigem rolagem; erros completos podem ser baixados, mas é difícil encontrar um campo. | Congelar linha/cabeçalho e matrícula; filtros por tipo de ocorrência e busca por linha; mostrar extras preservados separadamente. Não mascarar valores operacionais. | Alta |
 | Sincronização | Estado da integração e ações ficam juntos; configuração ausente ainda exibe comandos desabilitados. | Cartão de situação resumido, última execução e próximo passo; detalhes técnicos e erros em expansão. Diferenciar completa de incremental com explicação breve. | Média |
 | Auditoria | Identificadores UUID e códigos de ação são pouco legíveis; não há filtros. | Filtros por período, usuário e ação; rótulos compreensíveis com identificador técnico disponível ao expandir/copiar. Não acrescentar senhas, tokens ou valores pessoais aos logs. | Alta |
@@ -95,10 +131,13 @@ bloqueio de CSS arbitrário e scripts inseridos na prévia DTC.
 2. Concluído: filtros da lista carregada, grupos cadastrais e abas de transferência.
 3. Concluído: grupos DTC e separação das ações destrutivas. Próximos opcionais:
    filtros globais, abas DTC, menus de ações e compactação do menu.
-4. Validar com operadores: localizar servidor, corrigir referência, salvar,
+4. Código validado nesta evolução: ajustes/sugestões, prévia instantânea,
+   visualizador e contadores. Máximo observado de 135,3 ms com 45 anos,
+   200 blocos e 20.000 caracteres válidos, abaixo da meta de 200 ms.
+5. Validar com operadores: localizar servidor, corrigir referência, salvar,
    conferir e emitir; medir passos, tempo e erros sem registrar dados pessoais.
 
-Aceite sugerido: prévia automática após cada gravação/reabertura, ausência
+Aceite sugerido: prévia automática a cada alteração válida e reabertura, ausência
 de dados de outra revisão, navegação por teclado, layout sem overflow da
 página em 375 px (rolagem interna das tabelas permitida), controles móveis
 de 44 px, zoom de 200% sem perda de ações e nenhuma informação completa

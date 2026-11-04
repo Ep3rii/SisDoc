@@ -1,5 +1,91 @@
 # Progresso da construção
 
+## Evolução autorizada do Núcleo — 04/11/2026
+
+Implementado o [plano aprovado](PLANO_EVOLUCAO_NUCLEO.md), conforme
+[decisão 033](decisoes/033-edicao-contextual-e-historico-local.md):
+
+- Identificação editável DOF/três DTCs, com ajustes na entrada cifrada da
+  declaração, sem escrever no cadastro/fonte externa. Remoção restaura referência.
+  Cálculo, prévia, conferência, snapshot e cópia usam os mesmos valores efetivos.
+- Correção canônica local administrativa separada e sugestões no cadastro
+  derivadas dos ajustes salvos. Cancelar correção não invalida a declaração.
+- Prévia local a cada alteração válida, sem salvar por tecla; entrada inválida
+  mostra pendência em vez de totais antigos. Zoom, página/largura, proporção e
+  ampliação, inclusive saída por Escape. Corrigidas sobreposição ao rodapé,
+  ciclo de medição e ampliação encoberta pelo cabeçalho.
+- Círculos nas abas Encaminhados/Retornos e lista de retornos. Contagem global
+  autorizada, atualizada por escrita/foco/30 segundos; abrir não limpa pendência.
+- Núcleo reutiliza o mapeamento do Legado na própria tela. XML SisDoc v1,
+  seleção explícita de aba XLSX e limites/erros sem fallback silencioso.
+- Histórico funcional/financeiro por vínculo, com férias, licenças e abonos,
+  cifragem/revisões append-only, valores exatos em centavos, estornos vinculados,
+  importação validada/idempotente, consulta de revisões e exportação XLSX.
+  Não calcula folha/direitos nem totais globais a partir de página parcial.
+
+Integração corrigiu ainda a instalação limpa que aplicava apenas até 023:
+agora usa a sequência compartilhada completa. Reconsultas DOF após escrita
+preservam lock de alteração; auditoria DTC normaliza opcionais ausentes.
+Regras de emissão/aprovação e permissões canônicas foram preservadas.
+
+### Evidências de validação
+
+- `npm run typecheck` aprovado e builds API/web aprovados.
+- Seletor combinado: interface-rascunhos 17, interface-dtc 4, evolução-núcleo 17,
+  permissões/tokens 5: **43/43 aprovados**.
+- PostgreSQL descartável sob LocalService: emissão 13, DTC 20 e importação 12:
+  **45 aprovados, um excluído**. Inclui instalação/migração 025, quatro PDFs
+  sintéticos, ajuste de CPF/nome/admissão no snapshot/cópia DOF, sugestões/retornos,
+  cifragem/revisões/estornos e exportação/importação histórica idempotente.
+- Um teste de carga preexistente excluído: cria 3 × 16 = 48 sessões, mas exige 64.
+  Não é uma regressão completa aprovada. Fundação completa permanece sem aceite:
+  a CLI recompila o projeto e LocalService não pode sobrescrever código.
+- Medidas máximas edição–exibição: 56,6 ms em 45 anos; **135,3 ms** com 45 anos,
+  200 blocos e 20.000 caracteres válidos (meta <200 ms); 250,3 ms com 6.600
+  delimitadores malformados (entrada inválida, limite <1 s).
+- Navegador com CSP real, escape/sandbox e erros JavaScript monitorados.
+  Geometria DOF em 1366×768, 1920×1080 e 390×844; inspeção de capturas sintéticas.
+  Três DTCs verificam identificação instantânea e persistência ao reabrir.
+  [Avaliação UI/UX atualizada](AVALIACAO_UI_UX.md).
+
+### Instalação preservada; publicação pendente
+
+**Não aplicado operacionalmente:** migração 025, novas telas/API e reinício.
+Sem importações/testes fictícios na base operacional, sem aprovação de modelos.
+Confirmação específica para backup protegido/migração/publicação solicitada,
+mas responsável indisponível: publicação adiada, sem presumir autorização.
+
+Os builds de validação haviam substituído os artefatos usados pela instalação.
+Reconstruídos isoladamente os cinco workspaces no Git `f788a6d`; repostos
+somente os artefatos gerados, com SHA-256 conferido, preservando todas as fontes
+novas e alterações preexistentes. Página HTTPS confirmada no bundle anterior
+`index-6QKYBrdf.js`; health 200, privado sem sessão 401 e serviços Running.
+Nenhum serviço foi reiniciado; o banco operacional continua em 024.
+Novo build no checkout altera novamente os artefatos servidos: a próxima
+publicação exige janela controlada, backup verificado, migração e reinício.
+Tarefa agendada, PostgreSQLs de teste, cópia temporária do navegador e fontes
+isoladas de reconstrução encerrados/removidos. ACLs temporárias de atributos
+dos dois executáveis de teste restauradas; sem ampliar escrita no código.
+Sem commit/push nesta etapa. Aviso de bundle candidato >500 kB permanece
+recomendação de otimização, não erro ocultado por aumento do limite.
+
+Reverificação em 04/11/2026 após 04:20: serviços SisDoc/SisDocCaddy Running,
+health HTTPS 200, privado sem sessão 401 e `git diff --check` sem erros.
+Guia operacional corrigido para distinguir o candidato que exige 025 da
+instalação preservada em 024. Implementação/análise UI/UX entregues; publicação
+permanece uma operação separada, sem autorização presumida.
+
+## Reinício dos serviços Windows — 03/11/2026 22:54
+
+Confirmados SisDoc e SisDocCaddy registrados e ativos como serviços Windows
+sob `LocalService`, substituindo o registro anterior de processos manuais.
+Reinício solicitado pelo responsável: proxy parado, API reiniciada e proxy
+religado na ordem de dependência. PostgreSQL permaneceu ativo, sem reinício.
+Após a operação, serviços em Running, API em loopback na porta 3443 e proxy
+na interface LAN na porta 443. HTTPS via proxy: health 200 e rota privada sem
+sessão 401. Curl validou certificado/nome com `--ssl-no-revoke`; revogação não
+foi verificada. Não houve build, migração, alteração de dados ou aprovação.
+
 ## Perfis, rascunhos e modelos de serviço — 03/11/2026
 
 Implementada a descontinuação do perfil Secretário Adjunto pela migração

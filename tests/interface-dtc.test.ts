@@ -43,7 +43,7 @@ function documentoSintetico(tipo: TipoDtc, conteudo: ConteudoDtc, revisao = 1) {
   const calculo = calcularDtc(tipo, conteudo, '2020-01-01', '2026-10-31');
   if ('erro' in calculo) throw new Error(calculo.erro);
   return documentoDtcSchema.parse({
-    id: documentoId, tipo, pessoaId, vinculoId, nome, matricula, admissao: '2020-01-01',
+    id: documentoId, tipo, pessoaId, vinculoId, nome: conteudo.ajustesCadastro?.nome ?? nome, matricula, admissao: '2020-01-01',
     status: 'rascunho', revisao, criadoEm: '2026-10-31T12:00:00.000Z', atualizadoEm: '2026-10-31T12:00:00.000Z',
     autorNome: 'Autor fictício', conferidoPorNome: null, conferidoEm: null,
     conteudo, resultado: calculo.resultado, mascarasProcesso: ['####/####'], pendencias: [],
@@ -87,6 +87,7 @@ describe('Editor DTC', () => {
       let documento = documentoSintetico(tipo, conteudoSintetico(tipo));
       let enviado: Record<string, unknown> | null = null;
       const erros: string[] = [];
+      pagina.on('pageerror', (erro) => erros.push(erro.message));
       await pagina.route('**/api/v1/**', async (rota) => {
         const url = new URL(rota.request().url());
         let resposta: unknown;
@@ -95,6 +96,8 @@ describe('Editor DTC', () => {
             papel: 'admin', trocaSenhaObrigatoria: false }, csrf };
         } else if (url.pathname === '/api/v1/admin/usuarios') {
           resposta = { itens: [], proximoCursor: null };
+        } else if (url.pathname === '/api/v1/notificacoes/declaracoes') {
+          resposta = { encaminhados: 0, retornos: 0 };
         } else if (url.pathname === '/api/v1/sincronizacao/situacao') {
           resposta = { configurada: false, ultimaSincronizacaoEm: null, horasDesdeUltima: null,
             limiteHoras: 24, avisoAtraso: false, disjuntorAberto: false };
@@ -103,6 +106,17 @@ describe('Editor DTC', () => {
             orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false }], proximoCursor: null };
         } else if (url.pathname === `/api/v1/servidores/${pessoaId}`) {
           resposta = { pessoa: { id: pessoaId, nome, cpf: cpfSintetico(920000011) }, vinculos: [], proximoCursor: null };
+        } else if (url.pathname === `/api/v1/servidores/${pessoaId}/referencias`) {
+          resposta = {
+            pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1', removidoNaFonte: false,
+            cadastro: {
+              nome, cpf: cpfSintetico(920000011), nascimento: null, nomeMae: null, nomePai: null,
+              pisPasep: null, rgNumero: null, rgOrgao: null, rgExpedicao: null, tituloEleitor: null, endereco: null,
+              matricula, regimeJuridico: null, cargo: null, classe: null, nivel: null, referencia: null,
+              setor: null, orgaoCodigo: null, orgao: null, admissao: '2020-01-01', desligamento: null,
+            },
+            pessoa: { Nome: nome }, registros: [], proximoCursor: null,
+          };
         } else if (url.pathname === '/api/v1/dtc') {
           const { id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome } = documento;
           resposta = { itens: [{ id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome }] };
@@ -148,14 +162,18 @@ describe('Editor DTC', () => {
           return { fonte: getComputedStyle(elemento).fontFamily, executou: elemento.dataset.executou ?? null };
         })).toEqual({ fonte: 'Arial, sans-serif', executou: null });
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
-        expect(await pagina.locator(`iframe[title="Prévia da ${ROTULOS_DTC[tipo]}"]`).isVisible()).toBe(true);
+        await pagina.getByRole('heading', { name: new RegExp(`${ROTULOS_DTC[tipo]} —`) }).waitFor();
+        await quadro.locator('body').waitFor();
+        await pagina.getByLabel('Nome completo', { exact: true }).fill('Nome ajustado na DTC fictícia');
+        await quadro.getByText('Nome ajustado na DTC fictícia', { exact: true }).waitFor();
+        expect(enviado).toBeNull();
         await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();
         expect(await pagina.getByLabel('PB em 2020', { exact: true }).isVisible()).toBe(false);
         await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();
         await pagina.getByLabel('PB em 2020', { exact: true }).fill('40');
         await pagina.getByLabel('PV em 2020', { exact: true }).fill('50');
         await pagina.getByLabel('Licença-prêmio em 2020', { exact: true }).fill('60');
-        expect(await pagina.getByText('Prévia da revisão salva 1.', { exact: false }).isVisible()).toBe(true);
+        expect(await pagina.getByText('Prévia de edição não salva', { exact: false }).isVisible()).toBe(true);
         await pagina.getByLabel('Fim', { exact: true }).fill('2022-12-31');
         expect(await pagina.getByLabel('PB em 2020', { exact: true }).inputValue()).toBe('40');
         expect(await pagina.getByLabel('PV em 2020', { exact: true }).inputValue()).toBe('50');
@@ -165,12 +183,13 @@ describe('Editor DTC', () => {
         await pagina.getByLabel('Motivo da alteração').fill('Conferência fictícia das incorporações');
         await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
         await pagina.getByRole('button', { name: 'Editar rascunho' }).waitFor();
-        expect(enviado).toMatchObject({ revisao: 1, periodos: [{ anos: [
+        expect(enviado).toMatchObject({ revisao: 1, ajustesCadastro: { nome: 'Nome ajustado na DTC fictícia' }, periodos: [{ anos: [
           { ano: 2020, faltas: 1, ts: 2, pf: 3, ip: 4, outros: 5, pb: 40, pv: 50, licencaPremio: 60 },
           { ano: 2021, pb: 10, pv: 20, licencaPremio: 30 }, { ano: 2022, pb: 0, pv: 0, licencaPremio: 0 },
         ] }] });
         expect(documento.resultado.totais).toMatchObject({ pb: 50, pv: 70, licencaPremio: 90 });
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
+        expect(await pagina.getByLabel('Nome completo', { exact: true }).inputValue()).toBe('Nome ajustado na DTC fictícia');
         expect(await pagina.getByLabel('PB em 2020', { exact: true }).inputValue()).toBe('40');
         expect(erros).toEqual([]);
       } finally {

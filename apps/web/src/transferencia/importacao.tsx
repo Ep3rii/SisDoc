@@ -1,5 +1,6 @@
 import {
   conferenciaImportacaoSchema,
+  abasImportacaoSchema,
   exportarDadosSchema,
   paginaLotesImportacaoSchema,
   planilhasLegadoSchema,
@@ -129,8 +130,8 @@ function dataHora(valor: string | null): string {
   return valor ? new Date(valor).toLocaleString('pt-BR') : '—';
 }
 
-async function enviarArquivo(csrf: string, tipo: TipoImportacao, origem: string, modo: 'validar' | 'gravar', arquivo: File, destino: 'nucleo' | 'legado'): Promise<RelatorioImportacao | RelatorioPlanilhaLegado> {
-  const consulta = new URLSearchParams({ tipo, origem, modo, destino });
+async function enviarArquivo(csrf: string, tipo: TipoImportacao, origem: string, modo: 'validar' | 'gravar', arquivo: File, destino: 'nucleo' | 'legado', aba?: string): Promise<RelatorioImportacao | RelatorioPlanilhaLegado> {
+  const consulta = new URLSearchParams({ tipo, origem, modo, destino, ...(aba ? { aba } : {}) });
   let resposta: Response;
   try {
     resposta = await fetch(`/api/v1/admin/importacoes?${consulta.toString()}`, {
@@ -216,6 +217,9 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   const [destino, setDestino] = useState<'nucleo' | 'legado'>('nucleo');
   const [origem, setOrigem] = useState('planilha');
   const [arquivo, setArquivo] = useState<File | null>(null);
+  const [mapear, setMapear] = useState(true);
+  const [abas, setAbas] = useState<string[] | null>(null);
+  const [abaArquivo, setAbaArquivo] = useState('');
   const [relatorio, setRelatorio] = useState<RelatorioImportacao | null>(null);
   const [relatorioLegado, setRelatorioLegado] = useState<RelatorioPlanilhaLegado | null>(null);
   const [validadoPara, setValidadoPara] = useState<string | null>(null);
@@ -242,7 +246,23 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
     return () => { ativa = false; };
   }, [cursor, versao, onErro]);
 
-  const assinatura = arquivo ? `${destino}|${tipo}|${origem}|${arquivo.name}|${arquivo.size}|${arquivo.lastModified}` : null;
+  const assinatura = arquivo ? `${destino}|${mapear}|${abaArquivo}|${tipo}|${origem}|${arquivo.name}|${arquivo.size}|${arquivo.lastModified}` : null;
+  const xlsx = arquivo?.name.toLowerCase().endsWith('.xlsx') ?? false;
+  async function consultarAbas() {
+    if (!arquivo) return;
+    setEnviando(true);
+    try {
+      const resposta = await fetch('/api/v1/admin/importacoes/abas', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/octet-stream', 'X-CSRF-Token': csrf }, body: arquivo,
+      });
+      const dados: unknown = await resposta.json();
+      if (!resposta.ok) throw new ErroApi(resposta.status, typeof dados === 'object' && dados !== null && 'detail' in dados && typeof dados.detail === 'string' ? dados.detail : 'Não foi possível consultar as abas.');
+      const nomes = validar(abasImportacaoSchema, dados);
+      setAbas(nomes); setAbaArquivo(nomes[0]); setValidadoPara(null);
+    } catch (erro: unknown) { onErro(erro); }
+    finally { setEnviando(false); }
+  }
 
   const processar = async (modo: 'validar' | 'gravar') => {
     if (!arquivo) return;
@@ -250,10 +270,12 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
       onErro(new ErroApi(413, 'O arquivo excede o limite de 64 MB.'));
       return;
     }
-    if (modo === 'gravar' && !window.confirm(`Gravar a planilha da origem "${origem}" no schema ${destino}? ${destino === 'legado' ? 'Cabeçalhos e linhas serão preservados, sem conversão para o núcleo.' : 'Os dados serão validados e consolidados no núcleo.'}`)) return;
+    const recepcao = destino === 'legado' || mapear;
+    if (xlsx && !abaArquivo) { onErro(new ErroApi(400, 'Consulte e selecione a aba do XLSX antes de validar.')); return; }
+    if (modo === 'gravar' && !window.confirm(`Gravar a recepção da origem "${origem}"? ${recepcao ? 'Cabeçalhos e linhas serão preservados em lote local protegido. Aplicar no Núcleo exige validar e confirmar o mapeamento.' : 'Os dados serão validados e consolidados no Núcleo.'}`)) return;
     setEnviando(true);
     try {
-      const resultado = await enviarArquivo(csrf, tipo, origem, modo, arquivo, destino);
+      const resultado = await enviarArquivo(csrf, tipo, origem, modo, arquivo, recepcao ? 'legado' : 'nucleo', abaArquivo || undefined);
       if ('destino' in resultado) { setRelatorioLegado(resultado); setRelatorio(null); }
       else { setRelatorio(resultado); setRelatorioLegado(null); }
       if (modo === 'validar') setValidadoPara(assinatura);
@@ -274,7 +296,7 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   return (
     <section aria-labelledby="importacao-titulo">
       <h2 id="importacao-titulo">Importação e exportação de dados</h2>
-      <p>Legado: guarde o XLSX/CSV original e use o assistente abaixo para disponibilizar os dados para DOF/DTC.
+      <p>Legado: guarde o XLSX/CSV/XML original e use o assistente abaixo para disponibilizar os dados para DOF/DTC.
         Núcleo: importação direta no formato canônico. Valide e confira o relatório antes de confirmar qualquer gravação.</p>
       <p className="aviso">Dados existentes e edições manuais são preservados. Campos vazios podem ser completados;
         divergências ficam indicadas para revisão, sem substituição automática.</p>
@@ -293,17 +315,26 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
               {(Object.keys(nomesTipo) as TipoImportacao[]).map((chave) => <option key={chave} value={chave}>{nomesTipo[chave]}</option>)}
             </select>
           </label>}
+          {destino === 'nucleo' && <label className="marcador"><input type="checkbox" checked={mapear} onChange={(e) => {
+            setMapear(e.target.checked); setValidadoPara(null); setRelatorio(null); setRelatorioLegado(null); setLoteParaConverter(null);
+          }} />Mapear colunas antes de aplicar ao Núcleo (recomendado)</label>}
           <label>Origem
             <input value={origem} maxLength={63} pattern="[a-z0-9][a-z0-9_.\-]*" required
               onChange={(evento) => { setOrigem(evento.target.value.toLowerCase()); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
           </label>
           <label>Arquivo
-            <input ref={campoArquivo} type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
-              onChange={(evento) => { setArquivo(evento.target.files?.[0] ?? null); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
+            <input ref={campoArquivo} type="file" accept=".csv,.xlsx,.xml,text/csv,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
+              onChange={(evento) => { setArquivo(evento.target.files?.[0] ?? null); setAbas(null); setAbaArquivo(''); setLoteParaConverter(null); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
           </label>
+          {xlsx && <><button type="button" disabled={enviando || !arquivo} onClick={() => void consultarAbas()}>Consultar abas do XLSX</button>
+            <label>Aba a importar<select disabled={enviando || !abas} value={abaArquivo} onChange={(e) => { setAbaArquivo(e.target.value); setValidadoPara(null); setLoteParaConverter(null); }}>
+              <option value="">Consulte as abas para selecionar</option>{abas?.map((nome) => <option key={nome} value={nome}>{nome}</option>)}
+            </select></label></>}
+          <p>XML: estrutura SisDoc versão 1, com registros e campos simples. Arquivos de outros sistemas precisam ser adaptados a esse modelo.</p>
           <div className="acoes">
             <button type="submit" disabled={enviando || !arquivo}>{enviando ? 'Processando...' : 'Validar arquivo'}</button>
-            <button type="button" disabled={enviando || !arquivo || validadoPara !== assinatura} onClick={() => void processar('gravar')}>Gravar importação</button>
+            <button type="button" disabled={enviando || !arquivo || validadoPara !== assinatura} onClick={() => void processar('gravar')}>
+              {destino === 'nucleo' && mapear ? 'Guardar recepção para mapear' : 'Gravar importação'}</button>
           </div>
         </form>
       </div>
@@ -315,7 +346,11 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
         {relatorioLegado.loteId && <p>Lote: {relatorioLegado.loteId}</p>}
         {relatorioLegado.loteExistente && <p>Arquivo já importado: {relatorioLegado.loteExistente}. Nenhuma alteração.</p>}
       </div>}
-      {loteParaConverter && <button type="button" onClick={() => setAba('legado')}>Disponibilizar lote Legado para DOF/DTC</button>}
+      {loteParaConverter && destino === 'nucleo' && mapear && <PromocaoLegado key={loteParaConverter}
+        csrf={csrf} loteInicial={loteParaConverter} tipoInicial={tipo} fixarLote onErro={onErro}
+        onAplicado={() => { setVersao((v) => v + 1); onMensagem('Lote aplicado ao Núcleo; referências e edições manuais preservadas.'); }}
+        renderRelatorio={(dados) => <Relatorio relatorio={dados} />} />}
+      {loteParaConverter && destino === 'legado' && <button type="button" onClick={() => setAba('legado')}>Disponibilizar lote Legado para DOF/DTC</button>}
       </> },
         { id: 'legado', titulo: 'Disponibilizar Legado', conteudo: <PromocaoLegado key={`conversao-${loteParaConverter ?? 'selecionar'}`} csrf={csrf} loteInicial={loteParaConverter}
         onErro={onErro} onAplicado={() => {

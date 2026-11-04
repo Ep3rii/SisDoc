@@ -61,12 +61,23 @@ Se porta/nome TLS mudarem, use os valores efetivos da configuração aceita.
 
 ## Desligar e reiniciar
 
-Para desligar a aplicação iniciada no seu terminal, pressione `Ctrl+C`.
-Para ligar novamente, repita o passo 1.
-A aplicação ainda **não inicia automaticamente após reiniciar o Windows**.
-Há modelos de serviço WinSW preparados em `ops/windows`, mas a operação atual
-segue por processos diretos iniciados manualmente. Use o início manual acima
-até a ativação formal dos serviços.
+Nesta VM, SisDoc e SisDocCaddy estão registrados como serviços Windows.
+Não execute `npm start` enquanto o serviço SisDoc estiver ativo.
+Para reiniciar, use PowerShell elevado; o Caddy depende da API:
+
+```powershell
+Stop-Service -Name 'SisDocCaddy'
+try {
+  Restart-Service -Name 'SisDoc' -ErrorAction Stop
+} finally {
+  Start-Service -Name 'SisDocCaddy'
+}
+Get-Service -Name 'SisDoc', 'SisDocCaddy'
+```
+
+Confira HTTPS/health após reiniciar. O procedimento manual do passo 1 é
+alternativo para instalações sem esses serviços, não para iniciar outra cópia.
+O reinício automático após reboot não foi testado nesta operação.
 
 Na operação diária, não execute `npm run setup`, testes ou importações para
 ligar o sistema. Build e migrações só são necessários após atualização do

@@ -11,9 +11,10 @@ type Props = {
   onPendente: (valor: boolean) => void;
   onErro: (erro: unknown) => void;
   onLimpar: () => void;
+  onEdicao?: (processo: string | null) => void;
 };
 
-export function ProcessoDof({ rascunho, csrf, bloqueado, somenteLeitura = false, onAtualizar, onPendente, onErro, onLimpar }: Props) {
+export function ProcessoDof({ rascunho, csrf, bloqueado, somenteLeitura = false, onAtualizar, onPendente, onErro, onLimpar, onEdicao }: Props) {
   const [processo, setProcesso] = useState(rascunho.processo ?? '');
   const [motivo, setMotivo] = useState('');
   const [remover, setRemover] = useState(false);
@@ -30,6 +31,7 @@ export function ProcessoDof({ rascunho, csrf, bloqueado, somenteLeitura = false,
     setMotivo(justificativa);
     setRemover(confirmarRemocao);
     setMensagem('');
+    onEdicao?.(confirmarRemocao ? null : numero);
     onPendente(confirmarRemocao || numero.trim().toUpperCase() !== (rascunho.processo ?? '') || justificativa.length > 0);
   }
 

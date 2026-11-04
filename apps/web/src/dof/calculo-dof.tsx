@@ -6,10 +6,16 @@ import { EncaminhamentoDof } from './encaminhamento-dof';
 import { VerificacaoConferenciaDof } from './preconferencia-dof';
 import { ProcessoDof } from './processo-dof';
 import { useEditorDof } from './use-editor-dof';
+import { AjustesDeclaracao } from '../compartilhado/ajustes-declaracao';
+import { useState } from 'react';
+import { PreviaDocumento } from '../compartilhado/previa-documento';
+import { renderizarPreviaDof } from '@sisdoc/templates';
+import { CorrecaoNoDocumento } from '../cadastro/correcao-no-documento';
 
 /** Apresenta editor e prévia DOF sem desmontar painéis ocultos ou perder edições pendentes. */
 export function CalculoDof(props: Props) {
-  const { id, rascunho, nome, matricula, admissaoAtual, somenteLeitura, podeSalvar, onErro, onLimpar, resultado, aba, setAba, dadosServidor, csrf, calculoPendente, blocosPendentes, encaminhamentoPendente, operacaoEncaminhamento, operacaoConferencia, ocupado, edicaoIndisponivel, setRascunho, onPendente, marcarProcesso, bloqueioCalculo, inicio, setInicio, setTabela, invalidar, fim, setFim, preparar, calcular, tabela, inicioEfetivo, anteriorTs, setAnteriorTs, anteriorPf, setAnteriorPf, origemAnterior, setOrigemAnterior, pagina, anosPagina, abrangencias, valores, atualizar, setPagina, confirmado, setConfirmado, marcarCalculo, resultadoSalvo, mensagem, pedidoCalculado, salvar, bloqueioSalvar, anosExcluidos, confirmouRemocao, setConfirmouRemocao, motivo, setMotivo, destinoPrevia, setFontePrevia, processoPendente, marcarBlocos, setProvaPrevia, setOcupado, provaPrevia, marcarConferencia, onFechar, marcarEncaminhamento, setOperacaoEncaminhamento, setDestinoPrevia, confirmarSaida, rascunhoInicial } = useEditorDof(props);
+  const [processoEdicao, setProcessoEdicao] = useState<string | null | undefined>(undefined);
+  const { setReferencia, ajustesCadastro, alterarCadastro, fonteEdicao, fonteReferencia, fonteCompleta, referencia, previaLocal, id, rascunho, nome, matricula, admissaoAtual, somenteLeitura, podeSalvar, onErro, onLimpar, resultado, aba, setAba, dadosServidor, csrf, calculoPendente, blocosPendentes, encaminhamentoPendente, operacaoEncaminhamento, operacaoConferencia, ocupado, edicaoIndisponivel, setRascunho, onPendente, marcarProcesso, bloqueioCalculo, inicio, setInicio, setTabela, invalidar, fim, setFim, preparar, calcular, tabela, inicioEfetivo, anteriorTs, setAnteriorTs, anteriorPf, setAnteriorPf, origemAnterior, setOrigemAnterior, pagina, anosPagina, abrangencias, valores, atualizar, setPagina, confirmado, setConfirmado, marcarCalculo, resultadoSalvo, mensagem, pedidoCalculado, salvar, bloqueioSalvar, anosExcluidos, confirmouRemocao, setConfirmouRemocao, motivo, setMotivo, destinoPrevia, setFontePrevia, processoPendente, marcarBlocos, setProvaPrevia, setOcupado, provaPrevia, marcarConferencia, onFechar, marcarEncaminhamento, setOperacaoEncaminhamento, setDestinoPrevia, confirmarSaida, rascunhoInicial } = useEditorDof(props);
   return (
     <section className="estudio-dof" aria-labelledby="calculo-dof-titulo">
       <div className="area-dof">
@@ -51,16 +57,19 @@ export function CalculoDof(props: Props) {
         ))}
       </nav>
       <div role="tabpanel" id={`${id}-painel-dados`} aria-labelledby={`${id}-aba-dados`} hidden={aba !== 'dados'}>
-        <dl className="dados-servidor">{dadosServidor.map(([rotulo, valor]) => (
-          <div key={rotulo}><dt>{rotulo}</dt><dd>{valor}</dd></div>
-        ))}</dl>
-        <p>Os campos da fonte são somente leitura. A prévia auditada é carregada após salvar. Ajustes cadastrais exclusivos da declaração ainda não estão implementados.</p>
+        <AjustesDeclaracao fonte={fonteReferencia} ajustes={ajustesCadastro} onAlterar={alterarCadastro}
+          bloqueado={bloqueioSalvar} />
+        {!referencia && <p role="status">Carregando referência cadastral completa...</p>}
+        {!edicaoIndisponivel && <CorrecaoNoDocumento pessoaId={props.pessoaId} vinculoId={props.vinculoId} csrf={csrf}
+          bloqueado={bloqueioSalvar || calculoPendente || blocosPendentes || processoPendente}
+          onErro={onErro} onPendente={marcarCalculo}
+          onAtualizado={setReferencia} />}
         {rascunho && (podeSalvar || somenteLeitura) && (
           <ProcessoDof rascunho={rascunho} csrf={csrf}
             bloqueado={calculoPendente || blocosPendentes || encaminhamentoPendente
               || operacaoEncaminhamento || operacaoConferencia || ocupado}
             somenteLeitura={edicaoIndisponivel}
-            onAtualizar={setRascunho} onPendente={marcarProcesso} onErro={onErro} onLimpar={onLimpar} />
+            onAtualizar={setRascunho} onPendente={marcarProcesso} onEdicao={setProcessoEdicao} onErro={onErro} onLimpar={onLimpar} />
         )}
       </div>
       <div role="tabpanel" id={`${id}-painel-periodo`} aria-labelledby={`${id}-aba-periodo`} hidden={aba !== 'periodo'}>
@@ -164,6 +173,7 @@ export function CalculoDof(props: Props) {
         {!rascunho && <p>Salve o rascunho para adicionar os blocos de texto.</p>}
       {rascunho && (podeSalvar || somenteLeitura) && (
         <BlocosDof rascunho={rascunho} csrf={csrf} destinoPrevia={destinoPrevia} onFonte={setFontePrevia}
+          previaLocal={previaLocal} ajustesCadastro={ajustesCadastro} fonteEdicao={fonteCompleta ?? undefined} processoEdicao={processoEdicao}
           bloqueado={calculoPendente || processoPendente || encaminhamentoPendente
             || operacaoEncaminhamento || operacaoConferencia || ocupado}
           previaBloqueada={operacaoConferencia}
@@ -208,7 +218,13 @@ export function CalculoDof(props: Props) {
       </div>
       <aside className="painel-previa" aria-label="Prévia do documento">
         <p className="identificador-documento">Prévia do documento · sem validade oficial</p>
-        {!rascunho && <p>Salve o rascunho para abrir a prévia auditada.</p>}
+        {!rascunho && <p>Prévia de edição não salva. Salvar é uma ação separada.</p>}
+        {!rascunho && ('erro' in previaLocal ? <p className="aviso" role="status">{previaLocal.erro}</p> :
+          <PreviaDocumento titulo="Prévia provisória da DOF" html={renderizarPreviaDof({
+            nome: fonteEdicao.nome, matricula: fonteEdicao.matricula, revisao: 1,
+            resultado: previaLocal.resultado, blocos: [], processo: null,
+            ...(fonteCompleta ? { fonte: fonteCompleta } : {}),
+          })} />)}
         <div ref={setDestinoPrevia} />
       </aside>
       </div>

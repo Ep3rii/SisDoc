@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { dataFuncionalSchema } from './dominio';
+import { ajustesCadastroSchema } from './ajustes-cadastro';
 
 const quantidade = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
 
@@ -30,6 +31,7 @@ export const solicitarCalculoDofSchema = z.strictObject({
   anos: z.array(anoCalculoSchema).min(1).max(9999),
   acumuladoAnterior: acumuladoAnteriorSchema.optional(),
   confirmacaoDados: z.literal(true),
+  ajustesCadastro: ajustesCadastroSchema.optional(),
 }).refine((dados) => dados.fim >= dados.inicio, {
   path: ['fim'],
   message: 'A data final não pode ser anterior à inicial.',

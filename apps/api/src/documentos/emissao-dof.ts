@@ -257,11 +257,12 @@ export class EmissaoDofService {
         await auditarConsultaFuncional(cliente, sessao, 'copia_emissao_fonte_ocupada', 'documento', documentoId, linha.pessoa_id, ip);
         return { falha: { tipo: 'conflito', mensagem: 'A fonte está sendo atualizada. Aguarde e tente copiar novamente.' } };
       }
-      if (!linha.admissao) {
+      const entrada = entradaOrdenada(snapshot.entrada);
+      const admissao = entrada.ajustesCadastro?.admissao ?? linha.admissao;
+      if (!admissao) {
         return { falha: { tipo: 'conflito', mensagem: 'A admissão do vínculo não está informada na fonte. Solicite a correção antes de copiar.' } };
       }
-      const entrada = entradaOrdenada(snapshot.entrada);
-      const calculo = await calcularDofNaTransacao(cliente, sessao, ip, entrada, linha.admissao);
+      const calculo = await calcularDofNaTransacao(cliente, sessao, ip, entrada, admissao);
       if ('erro' in calculo) return { falha: { tipo: 'invalido', mensagem: calculo.erro } };
       if ('conflito' in calculo) return { falha: { tipo: 'conflito', mensagem: calculo.conflito } };
       const versoes = await cliente.query<{ template_id: string; regra_id: string }>(`

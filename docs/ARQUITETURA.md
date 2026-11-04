@@ -17,6 +17,14 @@ uma auditoria de vulnerabilidades ou nova certificação de concorrência.
 
 ## Diagnóstico inicial
 
+Evolução de 04/11/2026: contratos de ajustes cadastrais e histórico ficam em
+`packages/contratos`; adaptadores puros DOF/DTC em `packages/calculo` são
+compartilhados por API/web. Interações de documentos (contadores, retornos e
+sugestões) pertencem ao módulo Documentos; histórico/importação por vínculo
+pertencem ao módulo Servidores. XML e seleção de abas permanecem no importador.
+Não há novo serviço/banco. A migração 025 e a publicação estão pendentes na
+instalação operacional; situação/evidências em [Progresso](PROGRESSO.md).
+
 Inventário após a extração dos módulos: 178 arquivos, incluindo 30 arquivos
 de testes. Não foram encontrados ciclos nos imports locais resolvidos pela
 análise estática. Imports dinâmicos, dependências de pacotes e relações

@@ -53,6 +53,15 @@ export async function verificarPreconferenciaDof(
   `, [rascunho.pessoaId, rascunho.vinculoId]);
   const fonte = consulta.rows[0];
   if (!fonte) throw new Error('Pessoa ou vínculo do rascunho deixou de existir.');
+  const ajustes = rascunho.entrada.ajustesCadastro;
+  fonte.admissao = ajustes?.admissao ?? fonte.admissao;
+  for (const [campo, valor] of Object.entries(ajustes ?? {})) {
+    if (campo === 'nascimento') fonte.nascimento = valor;
+    if (campo === 'cargo') fonte.cargo = valor;
+    if (campo === 'regimeJuridico') fonte.regime_juridico = valor;
+    if (campo === 'referencia') fonte.referencia = valor;
+    if (campo === 'orgao') fonte.orgao_nome = valor;
+  }
   const bloqueios: PreconferenciaDof['bloqueios'] = [];
   const avisos: PreconferenciaDof['avisos'] = [
     { codigo: 'aprovacao_modelo_nao_verificada', mensagem: 'O modelo e os campos obrigatórios não foram aprovados. A conferência não autoriza emissão.' },
@@ -68,7 +77,9 @@ export async function verificarPreconferenciaDof(
     } as const;
     bloqueios.push({ codigo: cpf.erro, mensagem: mensagens[cpf.erro] });
   }
-  const nomeMae = lerNomeMaeDof(protetor, rascunho.pessoaId, fonte.nome_mae_cifrado);
+  const nomeMaeFonte = lerNomeMaeDof(protetor, rascunho.pessoaId, fonte.nome_mae_cifrado);
+  const nomeMae = 'erro' in nomeMaeFonte ? nomeMaeFonte
+    : { valor: ajustes && 'nomeMae' in ajustes ? ajustes.nomeMae ?? null : nomeMaeFonte.valor };
   if ('erro' in nomeMae) {
     bloqueios.push({
       codigo: nomeMae.erro,
@@ -82,7 +93,7 @@ export async function verificarPreconferenciaDof(
     avisos.push({ codigo: 'nivel_referencia', mensagem: nivel.avisos.join(' ') });
   }
 
-  if (!rascunho.matricula.trim() || normalizarMatricula(rascunho.matricula) !== fonte.matricula_norm) {
+  if (!rascunho.matricula.trim() || (!ajustes?.matricula && normalizarMatricula(rascunho.matricula) !== fonte.matricula_norm)) {
     bloqueios.push({
       codigo: 'matricula_inconsistente',
       mensagem: 'A matrícula e sua forma normalizada divergem. Solicite a correção na fonte.',
@@ -182,7 +193,7 @@ export async function verificarPreconferenciaDof(
     fonte: {
       nome: rascunho.nome,
       matricula: rascunho.matricula,
-      cpf: 'valor' in cpf ? cpf.valor : null,
+      cpf: 'valor' in cpf ? ajustes?.cpf ?? cpf.valor : null,
       nascimento: fonte.nascimento,
       nomeMae: 'valor' in nomeMae ? nomeMae.valor : null,
       regimeJuridico: fonte.regime_juridico,

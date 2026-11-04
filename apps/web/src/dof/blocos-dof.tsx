@@ -7,11 +7,13 @@ import {
   type DadosFontePreviaDof,
   type ProvaFontePreviaDof,
   type RascunhoDof,
+  aplicarAjustesCadastro, type AjustesCadastro, type ResultadoCalculoDof,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { api, ErroApi } from '../infraestrutura/api';
+import { PreviaDocumento } from '../compartilhado/previa-documento';
 
 type Props = {
   rascunho: RascunhoDof;
@@ -26,11 +28,15 @@ type Props = {
   onLimpar: () => void;
   destinoPrevia: HTMLDivElement | null;
   onFonte: (fonte: DadosFontePreviaDof | null) => void;
+  previaLocal?: { resultado: ResultadoCalculoDof; erro?: undefined } | { erro: string; resultado?: undefined };
+  ajustesCadastro?: AjustesCadastro;
+  processoEdicao?: string | null;
+  fonteEdicao?: Omit<DadosFontePreviaDof, 'documentoId' | 'revisao' | 'provaFonte'>;
 };
 
 export function BlocosDof({
   rascunho, csrf, bloqueado, previaBloqueada = false, somenteLeitura = false, onAtualizar, onPendente, onPrevia, onErro, onLimpar,
-  destinoPrevia, onFonte,
+  destinoPrevia, onFonte, previaLocal, ajustesCadastro, processoEdicao, fonteEdicao,
 }: Props) {
   const [blocos, setBlocos] = useState(rascunho.blocos);
   const [tipo, setTipo] = useState<CodigoBlocoDof>('contratacao');
@@ -180,7 +186,7 @@ export function BlocosDof({
         <div className="previa-documento">
           <details className="orientacoes-dof">
             <summary>Dados consultados ao abrir · proteja a prévia</summary>
-            <p>Usa o cálculo e processo salvos e reflete os blocos locais, inclusive alterações ainda não salvas. Carrega automaticamente após salvar e reabrir o rascunho. Use Atualizar prévia para consultar novamente a fonte. Contém dados pessoais integrais; proteja a tela. Não possui validade oficial.</p>
+            <p>Prévia de edição, sem validade oficial. Reflete os dados locais; não comprova gravação. Conferência usa exclusivamente revisão e fonte salvas. Contém dados pessoais integrais; proteja a tela.</p>
           </details>
           <button type="button" className="secundario" disabled={carregandoPrevia || previaBloqueada}
             onClick={() => { onLimpar(); setAtualizacaoPrevia((valor) => valor + 1); }}>
@@ -190,11 +196,12 @@ export function BlocosDof({
           {falhaPrevia && <p className="aviso erro">A prévia não pôde ser carregada. Tente novamente antes de conferir.</p>}
           {fonte && fonte.documentoId === rascunho.id && fonte.revisao === rascunho.revisao ? (
             <>
-              <iframe
-                title="Prévia provisória da DOF"
-                sandbox=""
-                srcDoc={renderizarPreviaDof({ ...rascunho, blocos, fonte })}
-              />
+              {previaLocal?.erro ? <p className="aviso erro" role="status">{previaLocal.erro}</p> :
+                <PreviaDocumento titulo="Prévia provisória da DOF" html={renderizarPreviaDof({
+                  ...rascunho, blocos, resultado: previaLocal?.resultado ?? rascunho.resultado,
+                  processo: processoEdicao === undefined ? rascunho.processo : processoEdicao,
+                  fonte: fonteEdicao ?? aplicarAjustesCadastro(fonte, ajustesCadastro),
+                })} />}
             </>
           ) : null}
         </div>

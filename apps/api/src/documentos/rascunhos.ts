@@ -595,7 +595,7 @@ export class RascunhosService {
         [entrada.inicio, entrada.fim, id]);
       await this.escrita.registrarAjustes(cliente, id, sessao.usuario.id, dados.motivo, alteracoes);
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_editado', 'documento', id, entrada.pessoaId, ip);
-      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
+      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!atualizado) throw new Error('Rascunho atualizado não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, atualizado) };
     });
@@ -684,7 +684,7 @@ export class RascunhosService {
       `, [sessao.usuario.id, id]);
       await this.escrita.registrarAjustes(cliente, id, sessao.usuario.id, dados.motivo, alteracoes);
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_blocos_editados', 'documento', id, linha.pessoa_id, ip);
-      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
+      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!atualizado) throw new Error('Rascunho com blocos atualizados não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, atualizado) };
     });
@@ -733,7 +733,7 @@ export class RascunhosService {
         { campo: 'processo', anterior: anterior.processo, novo: dados.processo },
       ]);
       await auditarConsultaFuncional(cliente, sessao, 'rascunho_processo_editado', 'documento', id, linha.pessoa_id, ip);
-      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
+      const atualizado = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!atualizado) throw new Error('Rascunho com processo atualizado não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, atualizado) };
     });
@@ -787,7 +787,7 @@ export class RascunhosService {
           atualizado_em = now(), revisao = revisao + 1 WHERE id = $3
       `, [this.escrita.cifrar('documento', id, 'confirmacao_inicio_cifrada', confirmacao), sessao.usuario.id, id]);
       await auditarConsultaFuncional(cliente, sessao, 'inicio_ajustado_confirmado', 'documento', id, atual.pessoa_id, ip);
-      const confirmado = await this.consulta.linha(cliente, id, sessao.usuario.id, undefined, false, 'rascunho', true);
+      const confirmado = await this.consulta.linha(cliente, id, sessao.usuario.id, 'alteracao', false, 'rascunho', true);
       if (!confirmado) throw new Error('Rascunho com início confirmado não pôde ser recuperado.');
       return { valor: await this.consulta.apresentar(cliente, confirmado) };
     });

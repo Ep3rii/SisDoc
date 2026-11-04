@@ -11,10 +11,10 @@
   sem aprovação automática; não substitui ACLs e aceite da restauração.
 
 Os modelos WinSW e Caddy em `ops/windows` continuam sendo referência de
-implantação, mas o estado atual já possui API e Caddy ativos como processos
-diretos (sem registro WinSW). A execução observada usa `LocalService`, API em
+implantação. Na última verificação, API e Caddy já estavam registrados e
+ativos como serviços Windows. A execução observada usa `LocalService`, API em
 `127.0.0.1:3443` e proxy Caddy em `192.168.70.26:443`, com regra de firewall
-LAN em escopo restrito. Antes de converter para serviços, valide caminhos,
+LAN em escopo restrito. Ao atualizar, valide caminhos,
 certificados, ACLs e ordem de dependência (PostgreSQL -> SisDoc -> Caddy).
 
 ## Novos modelos de saída — versão 2
@@ -24,7 +24,8 @@ Os formulários seguem as referências locais em
 fora do Git. DOF tem seções de frequência e ocorrências; IPAM/Comissionado
 usam formulário; INSS usa duas seções paginadas. Demonstrativos DTC ficam
 em anexo. Conteúdo extenso pode gerar páginas adicionais sem corte.
-Prévias seguem sem validade oficial e utilizam somente revisão salva.
+Prévias seguem sem validade oficial. O editor tem prévia local do formulário;
+conferência/emissão continuam vinculadas à revisão e à fonte salvas.
 
 A migração `023-modelos-oficiais` registra quatro versões novas sem alterar
 documentos, PDFs ou aprovações anteriores. **A liberação histórica das
@@ -40,10 +41,14 @@ Após salvar ou reabrir uma DOF, a prévia auditada carrega automaticamente
 e permanece disponível entre abas. Cada nova revisão salva recarrega a
 prévia; use **Atualizar prévia** para consultar novamente a fonte. Falha de
 carregamento oferece retentativa e não libera conferência sem prova válida.
-Blocos locais aparecem na prévia, mas cálculo/processo usam valores salvos.
+Durante edição, identificação, cálculo, processo e blocos locais aparecem
+na prévia sem gravação a cada tecla. Campos inválidos mostram pendências e
+retiram totais antigos. A prova auditada continua sendo da revisão salva;
+salve/revalide antes de conferir. Zoom, página inteira, proporção e ampliação
+afetam só a exibição, não o PDF emitido.
 
-Na DTC, a prévia da revisão salva permanece ao editar. Valores alterados no
-formulário só aparecem depois de salvar, como informado no painel.
+Na DTC, a prévia de edição usa o mesmo motor puro da API e referências locais,
+incluindo períodos IPAM ativos. Não substitui a prova de conferência.
 As tabelas são compactas sem ocultar dados completos; em telas pequenas,
 controles mantêm alvos maiores e a rolagem fica dentro da tabela.
 Veja [avaliação de UI/UX](AVALIACAO_UI_UX.md) para recomendações por tela.
@@ -58,7 +63,19 @@ Importação e exportação têm abas **Importar**, **Disponibilizar Legado**,
 **Exportar** e **Histórico**, acessíveis por clique ou teclado (setas,
 Home/End). Trocar aba preserva arquivo, mapeamento e validação; alterar a
 entrada continua invalidando a confirmação. Nenhum dado é gravado ao trocar
-abas. Depois de gravar no Legado, use o botão de disponibilização do lote.
+abas. No Núcleo, o assistente com mapeamento reúne recepção protegida e
+promoção na mesma aba. Lotes legados anteriores conservam o fluxo próprio.
+CSV/XLSX e XML SisDoc v1 são documentados em [Dados e importação](DADOS_E_IMPORTACAO.md).
+
+Em DOF/DTC, **Ajustar nesta declaração** não modifica o cadastro; ao salvar,
+gera sugestões comparáveis no Cadastro. **Corrigir cadastro local** é ação
+administrativa separada, com motivo e confirmação. No Cadastro também há
+histórico funcional/financeiro por vínculo, com revisões e importação.
+Não há cálculo de folha ou direitos.
+
+Os círculos de **Encaminhados** e **Retornos** contam pendências, não leituras.
+Abrir não zera; uma nova gravação atende o retorno. Atualização após escritas,
+foco e a cada 30 segundos. Falhas de atualização são indicadas no menu.
 
 As listas de servidores, rascunhos, conferidas, DTCs, histórico, usuários,
 auditoria e lotes compartilham **Filtrar lista carregada**, **Limpar filtro**
@@ -186,8 +203,11 @@ lista local seja configurada. A conta que executa o serviço precisa conseguir
 lê-la. Depois de uma falha de comunicação no comando, consulte os usuários
 antes de repetir a criação.
 
-O setup aplica até `024-perfil-secretario-adjunto` ao banco novo. O bootstrap
-exige essa migração; o diagnóstico confere a sequência completa do release.
+No código candidato da evolução do Núcleo, o setup aplica a sequência
+compartilhada até `025-historico-servidor` ao banco novo. O bootstrap exige
+essa migração; o diagnóstico confere a sequência completa do release.
+A instalação operacional ainda está em 024: não execute o novo backend
+antes de concluir o procedimento autorizado abaixo.
 Para atualizar uma instalação existente sob autorização, pare a aplicação,
 preserve uma cópia consistente conforme o guia de migração e execute na raiz
 do repositório:

@@ -8,15 +8,17 @@ import { api, ErroApi } from '../infraestrutura/api';
 import type { Props, ProtecaoEdicao } from './contexto';
 
 /** Edita apenas o cadastro local, preservando origem e snapshots dos documentos. */
-export function EditorCadastro({ dados, csrf, onErro, onPendente, confirmarSaida, onAtualizado }: {
+export function EditorCadastro({ dados, csrf, onErro, onPendente, confirmarSaida, onAtualizado, onCancelar, cadastroInicial }: {
   dados: ReferenciaServidor;
   csrf: string;
   onErro: Props['onErro'];
   onPendente: ProtecaoEdicao['onPendente'];
   confirmarSaida: ProtecaoEdicao['confirmarSaida'];
   onAtualizado: () => void;
+  onCancelar?: () => void;
+  cadastroInicial?: CadastroServidor;
 }) {
-  const [cadastro, setCadastro] = useState<CadastroServidor>(dados.cadastro);
+  const [cadastro, setCadastro] = useState<CadastroServidor>(cadastroInicial ?? dados.cadastro);
   const [motivo, setMotivo] = useState('');
   const [ocupado, setOcupado] = useState(false);
   /** Atualiza campo e marca pendência; vazio opcional é representado por null. */
@@ -30,7 +32,7 @@ export function EditorCadastro({ dados, csrf, onErro, onPendente, confirmarSaida
     onPendente(false);
     setCadastro(dados.cadastro);
     setMotivo('');
-    onAtualizado();
+    (onCancelar ?? onAtualizado)();
   };
   /** Valida CPF, datas, motivo e revisões antes de enviar a alteração concorrente ao núcleo. */
   async function salvar(evento: FormEvent<HTMLFormElement>) {

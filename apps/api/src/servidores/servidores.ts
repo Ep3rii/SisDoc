@@ -65,7 +65,7 @@ export class ServidoresService {
         rg_orgao: string | null; rg_expedicao: string | null; matricula: string; regime_juridico: string | null;
         cargo: string | null; classe: string | null; nivel: string | null; referencia: string | null;
         setor: string | null; orgao_codigo: string | null; orgao_nome: string | null;
-        admissao: string | null; desligamento: string | null;
+        admissao: string | null; desligamento: string | null; removido: boolean;
         cpf_cifrado: Buffer; nome_mae_cifrado: Buffer | null; nome_pai_cifrado: Buffer | null;
         pis_pasep_cifrado: Buffer | null; rg_numero_cifrado: Buffer | null;
         titulo_eleitor_cifrado: Buffer | null; endereco_cifrado: Buffer | null;
@@ -76,7 +76,7 @@ export class ServidoresService {
         p.rg_numero_cifrado, p.titulo_eleitor_cifrado, p.endereco_cifrado,
         v.matricula, v.regime_juridico, v.cargo, v.classe, v.nivel, v.referencia, v.setor,
         v.orgao_codigo, v.orgao_nome, to_char(v.admissao, 'YYYY-MM-DD') AS admissao,
-        to_char(v.desligamento, 'YYYY-MM-DD') AS desligamento
+        to_char(v.desligamento, 'YYYY-MM-DD') AS desligamento, v.removido_na_fonte_em IS NOT NULL AS removido
         FROM nucleo.pessoa p JOIN nucleo.vinculo v ON v.pessoa_id = p.id WHERE p.id = $1 AND v.id = $2`,
       [pessoaId, consulta.vinculoId]);
       const p = pessoal.rows[0];
@@ -155,6 +155,7 @@ export class ServidoresService {
         vinculoId: consulta.vinculoId,
         revisaoPessoa: p.revisao_pessoa,
         revisaoVinculo: p.revisao_vinculo,
+        removidoNaFonte: p.removido,
         cadastro,
         pessoa,
         registros,

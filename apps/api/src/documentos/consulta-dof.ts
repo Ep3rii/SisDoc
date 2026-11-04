@@ -10,6 +10,7 @@ import {
   type DadosFontePreviaDof,
   type RascunhoDof
 } from '@sisdoc/contratos';
+import { aplicarAjustesCadastro } from '@sisdoc/contratos';
 import { timingSafeEqual } from 'node:crypto';
 import { type PoolClient } from 'pg';
 import { ProtetorDados } from '../seguranca/protecao-dados';
@@ -182,6 +183,12 @@ export class ConsultasDof {
       permitirEncaminhado, estado, permitirEdicaoCompartilhada,
     ]);
     const linha = consulta.rows[0];
+    if (linha) {
+      const entrada = solicitarCalculoDofSchema.parse(this.ler('documento', linha.id, 'entrada_cifrada', linha.entrada_cifrada));
+      linha.nome = entrada.ajustesCadastro?.nome ?? linha.nome;
+      linha.matricula = entrada.ajustesCadastro?.matricula ?? linha.matricula;
+      linha.admissao = entrada.ajustesCadastro?.admissao ?? linha.admissao;
+    }
     if (!linha || linha.criado_por === autorId) return linha;
     if (estado === 'rascunho' && permitirEdicaoCompartilhada) {
       const elegivel = await cliente.query(`
@@ -229,8 +236,10 @@ export class ConsultasDof {
     const cpf = lerCpfDof(this.protetor, atual.pessoa_id, origem.cpf_cifrado, origem.cpf_hash);
     const nomeMae = lerNomeMaeDof(this.protetor, atual.pessoa_id, origem.nome_mae_cifrado);
     if ('erro' in cpf || 'erro' in nomeMae) return { erro: 'identidade' };
-    const nivel = nivelDof(origem.referencia ?? '');
-    const fonte = dadosFontePreviaDofSchema.safeParse({
+    const entrada = solicitarCalculoDofSchema.parse(this.ler('documento', atual.id, 'entrada_cifrada', atual.entrada_cifrada));
+    const referencia = entrada.ajustesCadastro && 'referencia' in entrada.ajustesCadastro ? entrada.ajustesCadastro.referencia : origem.referencia;
+    const nivel = nivelDof(referencia ?? '');
+    const fonte = dadosFontePreviaDofSchema.safeParse(aplicarAjustesCadastro({
       documentoId: id,
       revisao: atual.revisao,
       provaFonte: this.assinarFonte(atual, origem).toString('hex'),
@@ -248,7 +257,7 @@ export class ConsultasDof {
       orgao: origem.orgao_nome,
       admissao: atual.admissao,
       removidoNaFonte: origem.removido,
-    });
+    }, entrada.ajustesCadastro));
     if (!fonte.success) return { erro: 'fonte' };
     return { fonte: fonte.data, fonteSelecionadaAlterada: origem.fonte_selecionada_alterada };
   }

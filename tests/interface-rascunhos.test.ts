@@ -143,6 +143,12 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === '/api/v1/admin/usuarios') {
         return responder(rota, 200, { itens: [], proximoCursor: null });
       }
+      if (caminho === '/api/v1/notificacoes/declaracoes') {
+        return responder(rota, 200, { encaminhados: estado.rascunho?.encaminhamento && !estado.conferido ? 1 : 0, retornos: estado.devolucao ? 1 : 0 });
+      }
+      if (caminho === `/api/v1/servidores/${pessoaId}/sugestoes` || caminho === `/api/v1/servidores/${pessoaId}/historico`) {
+        return responder(rota, 200, { itens: [], proximoCursor: null });
+      }
       if (caminho === '/api/v1/sincronizacao/situacao') {
         return responder(rota, 200, {
           configurada: false, ultimaSincronizacaoEm: null, horasDesdeUltima: null, limiteHoras: 24,
@@ -169,12 +175,12 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       }
       if (caminho === `/api/v1/servidores/${pessoaId}/referencias` && metodo === 'GET') {
         return responder(rota, 200, {
-          pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1',
+          pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1', removidoNaFonte: false,
           cadastro: {
-            nome, cpf: cpfSintetico(), nascimento: null, nomeMae: null, nomePai: null,
+            nome, cpf: cpfSintetico(), nascimento: '1960-05-04', nomeMae: 'Mãe fictícia <img src=x>', nomePai: null,
             pisPasep: null, rgNumero: null, rgOrgao: null, rgExpedicao: null, tituloEleitor: null, endereco: null,
-            matricula, regimeJuridico: null, cargo: null, classe: null, nivel: null, referencia: null,
-            setor: null, orgaoCodigo: null, orgao: null, admissao: estado.admissao, desligamento: null,
+            matricula, regimeJuridico: 'ESTATUTARIO', cargo: 'Cargo fictício', classe: null, nivel: null, referencia: 'UNICA',
+            setor: null, orgaoCodigo: null, orgao: 'Órgão fictício', admissao: estado.admissao, desligamento: null,
           },
           pessoa: { Nome: nome }, registros: [], proximoCursor: null,
         });
@@ -532,6 +538,7 @@ describe('interface de rascunhos com API sintética', () => {
   beforeEach(async () => {
     pagina = await navegador.newPage({ viewport: { width: 1366, height: 768 } });
     estado = await simularApi(pagina);
+    pagina.on('pageerror', (erro) => estado.erros.push(erro.message));
   });
 
   afterEach(async () => {
@@ -555,7 +562,8 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     expect(await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').locator('body')
       .evaluate((elemento) => getComputedStyle(elemento).color)).toBe('rgb(0, 0, 0)');
-    await pagina.locator('.dados-servidor').getByText('Mãe fictícia <img src=x>', { exact: true }).waitFor();
+    expect(await pagina.getByLabel('Nome da mãe', { exact: true }).inputValue()).toBe('Mãe fictícia <img src=x>');
+    expect(await pagina.locator('.dados-servidor img').count()).toBe(0);
     expect(await pagina.getByRole('tabpanel').count()).toBe(1);
     const editor = await pagina.locator('.editor-dof').boundingBox();
     const previa = await pagina.locator('.painel-previa').boundingBox();
@@ -585,9 +593,11 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.keyboard.press('ArrowRight');
     await pagina.getByLabel('Faltas em 1980').fill('1');
     await selecionarAba(pagina, 'Dados do servidor');
-    expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').isVisible()).toBe(true);
+    await pagina.getByText('Há dias não informados.', { exact: false }).waitFor();
+    expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').count()).toBe(0);
     await selecionarAba(pagina, 'Tabela ano a ano');
     expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('1');
+    await pagina.getByLabel('Confirmei todos os anos e intervalos parciais; campos vazios representam zero.').check();
     const celula = await pagina.getByLabel('Faltas em 1980').boundingBox();
     if (!celula) throw new Error('Campo anual indisponível.');
     expect(celula.width).toBeLessThanOrEqual(80);
@@ -599,7 +609,7 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.getByText('Há alterações não salvas.', { exact: true }).isVisible()).toBe(true);
     await selecionarAba(pagina, 'Dados do servidor');
     expect(await pagina.locator('iframe[title="Prévia provisória da DOF"]').isVisible()).toBe(true);
-    expect(await pagina.locator('.dados-servidor').getByText('Mãe fictícia <img src=x>', { exact: true }).isVisible()).toBe(true);
+    expect(await pagina.getByLabel('Nome da mãe', { exact: true }).inputValue()).toBe('Mãe fictícia <img src=x>');
     await pagina.setViewportSize({ width: 375, height: 812 });
     await pagina.getByRole('button', { name: 'Menu', exact: true }).click();
     expect(await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).isVisible()).toBe(true);
@@ -762,7 +772,7 @@ describe('interface de rascunhos com API sintética', () => {
       duracoes.push(await pagina.evaluate(() => performance.now()) - inicio);
     }
     const maiorDuracao = Math.max(...duracoes);
-    expect(maiorDuracao).toBeLessThan(1000);
+    expect(maiorDuracao).toBeLessThan(200);
     process.stdout.write(`Prévia sintética de 45 anos: maior tempo edição-exibição ${maiorDuracao.toFixed(1)} ms.\n`);
 
     await pagina.getByLabel('Tipo de bloco').selectOption('progressao');
@@ -877,7 +887,56 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).waitFor();
   });
 
-  it('mantém a prévia abaixo de um segundo no limite técnico de blocos', async () => {
+  it('edita identificação somente na declaração, reabre ajustes e adapta a prévia às telas', async () => {
+    await pagina.goto(endereco);
+    await iniciarCalculo(pagina);
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Identificação sintética inicial');
+    await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
+    await abrirRascunho(pagina);
+    await selecionarAba(pagina, 'Dados do servidor');
+    const escritas = estado.escritas;
+    await pagina.getByLabel('Nome completo', { exact: true }).fill('Nome ajustado na declaração');
+    const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
+    await quadro.getByText('Nome ajustado na declaração', { exact: true }).waitFor();
+    expect(estado.escritas).toBe(escritas);
+    expect(await pagina.getByText(`Referência: ${nome}`, { exact: false }).isVisible()).toBe(true);
+    for (const [width, height] of [[1366, 768], [1920, 1080], [390, 844]]) {
+      await pagina.setViewportSize({ width, height });
+      expect(await pagina.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      if (width > 800) {
+        await pagina.getByRole('button', { name: 'Página inteira', exact: true }).click();
+        await expect.poll(async () => {
+          const caixa = await pagina.locator('.janela-previa').boundingBox();
+          const rodape = await pagina.locator('.barra-totais').boundingBox();
+          if (!caixa || !rodape) throw new Error('Prévia e rodapé devem estar disponíveis.');
+          return caixa.y + caixa.height - rodape.y;
+        }).toBeLessThanOrEqual(0);
+      }
+      if (process.env.SISDOC_TEST_CAPTURAS) await pagina.screenshot({
+        path: path.join(process.env.SISDOC_TEST_CAPTURAS, `sisdoc-previa-${width}.png`), fullPage: false,
+      });
+    }
+    await pagina.setViewportSize({ width: 1366, height: 900 });
+    await pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).click();
+    expect(await pagina.locator('.visualizador-previa.ampliado').count()).toBe(1);
+    await pagina.getByRole('button', { name: 'Recolher prévia', exact: true }).click();
+    await selecionarAba(pagina, 'Tabela ano a ano');
+    await calcularTabela(pagina);
+    await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Nome ajustado somente na declaração fictícia');
+    await pagina.getByRole('button', { name: 'Salvar alterações' }).click();
+    await pagina.getByText('Rascunho salvo na revisão 2.', { exact: false }).waitFor();
+    expect(estado.rascunho?.entrada.ajustesCadastro?.nome).toBe('Nome ajustado na declaração');
+    await abrirRascunho(pagina);
+    await selecionarAba(pagina, 'Dados do servidor');
+    expect(await pagina.getByLabel('Nome completo', { exact: true }).inputValue()).toBe('Nome ajustado na declaração');
+    await pagina.getByRole('button', { name: 'Usar referência para Nome completo' }).click();
+    expect(await pagina.getByLabel('Nome completo', { exact: true }).inputValue()).toBe(nome);
+    expect(estado.erros).toEqual([]);
+  });
+
+  it('atualiza a prévia válida em até 200 ms no limite técnico de blocos', async () => {
     await pagina.goto(endereco);
     await iniciarCalculo(pagina);
     await calcularTabela(pagina);
@@ -906,7 +965,7 @@ describe('interface de rascunhos com API sintética', () => {
       duracoes.push(await pagina.evaluate(() => performance.now()) - inicio);
     }
     const maiorDuracao = Math.max(...duracoes);
-    expect(maiorDuracao).toBeLessThan(1000);
+    expect(maiorDuracao).toBeLessThan(200);
     process.stdout.write(
       `Prévia sintética no limite (45 anos, 200 blocos, 20.000 caracteres): ${maiorDuracao.toFixed(1)} ms.\n`,
     );
@@ -1039,6 +1098,7 @@ describe('interface de rascunhos com API sintética', () => {
 
     estado.papel = 'coordenador';
     await pagina.reload();
+    await pagina.getByLabel('1 declarações encaminhadas pendentes', { exact: true }).waitFor();
     await pagina.getByRole('button', { name: 'Encaminhados a mim' }).click();
     await pagina.getByText('Analista Ficticio', { exact: true }).waitFor();
     await pagina.getByRole('button', { name: /Abrir rascunho de Pessoa Ficticia/ }).click();
@@ -1112,6 +1172,7 @@ describe('interface de rascunhos com API sintética', () => {
     estado.papel = 'analista';
     await pagina.reload();
     estado.falhaConsultaDevolucao = true;
+    await pagina.getByLabel('1 declarações devolvidas pendentes', { exact: true }).waitFor();
     await abrirRascunho(pagina);
     await pagina.getByRole('alert').getByText('Falha sintética de devolução.').waitFor();
     estado.falhaConsultaDevolucao = false;

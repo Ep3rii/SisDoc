@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { anoCalculoSchema, linhaAnualSchema, totaisCalculoSchema } from './calculo';
 import { cpfSchema, dataFuncionalSchema } from './dominio';
 import { numeroProcessoSchema } from './processo';
+import { ajustesCadastroSchema } from './ajustes-cadastro';
 
 const revisaoSchema = z.number().int().min(1).max(2147483647);
 export const provaFonteDtcSchema = z.string().regex(/^[0-9a-f]{64}$/);
@@ -72,6 +73,7 @@ export const conteudoDtcSchema = z.strictObject({
   inss: dadosInssSchema.nullable(),
   processo: numeroProcessoSchema.nullable(),
   confirmarInicioAjustado: z.boolean(),
+  ajustesCadastro: ajustesCadastroSchema.optional(),
 });
 
 export type PeriodoDtc = z.infer<typeof periodoDtcSchema>;

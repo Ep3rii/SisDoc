@@ -79,6 +79,7 @@ export function mudancas(anterior: SolicitarCalculoDof | null, novo: SolicitarCa
   adicionar('periodo.inicio', anterior?.inicio ?? null, novo.inicio);
   adicionar('periodo.fim', anterior?.fim ?? null, novo.fim);
   adicionar('acumulado_anterior', anterior?.acumuladoAnterior ?? null, novo.acumuladoAnterior ?? null);
+  adicionar('cadastro.ajustes', anterior?.ajustesCadastro ?? null, novo.ajustesCadastro ?? null);
   const anteriores = new Map((anterior?.anos ?? []).map((ano) => [ano.ano, ano]));
   const novos = new Map(novo.anos.map((ano) => [ano.ano, ano]));
   const anos = new Set([...anteriores.keys(), ...novos.keys()]);

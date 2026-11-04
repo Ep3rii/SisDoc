@@ -18,6 +18,7 @@ import {
   resultadoExclusaoDocumentoSchema,
   situacaoEmissaoSchema,
   snapshotEmissaoDofSchema,
+  type AjustesCadastro,
   type Configuracao,
   type SituacaoEmissao,
 } from '@sisdoc/contratos';
@@ -39,6 +40,7 @@ import { consultarModeloVigente, registrarAprovacaoModelo } from '../apps/api/di
 import { instalar, type OpcoesInstalacao } from '../apps/api/dist/setup/instalador.js';
 import { migrar } from '../apps/api/dist/setup/migrar.js';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { sidServicoTeste } from './ambiente-windows';
 
 const senhaMigrador = 'MigracaoEmissaoFicticia!12345';
 const senhaAplicativo = 'AplicativoEmissaoFicticio!12345';
@@ -213,11 +215,12 @@ describe('emissão da DOF em recursos descartáveis', () => {
   }
 
   // Cria, completa e encaminha a DOF ao coordenador, que a confere; devolve a prova atual para emitir.
-  async function prepararConferida(nome = 'Pessoa Emissão Fictícia', autor = 'analista', coordenador = 'coordenador'): Promise<{
+  async function prepararConferida(nome = 'Pessoa Emissão Fictícia', autor = 'analista', coordenador = 'coordenador', ajustesCadastro?: AjustesCadastro): Promise<{
     documentoId: string; revisao: number; provaFonte: string;
   }> {
     const { pessoaId, vinculoId } = await criarFonte(nome);
     const calculo = {
+      ...(ajustesCadastro ? { ajustesCadastro } : {}),
       pessoaId, vinculoId, inicio: coordenador === 'admin' ? '1979-01-01' : '1980-01-01', fim: '2024-12-31', confirmacaoDados: true,
       anos: Array.from({ length: 45 }, (_, indice) => ({
         ano: 1980 + indice, abrangencia: 'intervalo_declarado',
@@ -226,7 +229,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     };
     const criado = await requisitar({
       metodo: 'POST', rota: 'documentos', sessao: sessao(autor),
-      corpo: { calculo, admissaoEsperada: '1980-01-01', motivo: 'Cálculo sintético de 45 anos' },
+      corpo: { calculo, admissaoEsperada: ajustesCadastro?.admissao ?? '1980-01-01', motivo: 'Cálculo sintético de 45 anos' },
     });
     expect(criado.status, criado.corpo).toBe(201);
     let rascunho = rascunhoDofSchema.parse(JSON.parse(criado.corpo));
@@ -344,7 +347,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
         usuario: 'sisdoc_aplicativo', senha: senhaAplicativo,
       },
       tls: { certificado, chave, ca, nome: nomeTls },
-      sidServico: 'S-1-5-19',
+      sidServico: sidServicoTeste,
       listaSenhas,
       processos: { mascaras: ['####/####'] },
       administrador: { matricula: 'ADMIN-EMISSAO-FICTICIO', nome: 'Operador Fictício', senha: senhaAdmin },
@@ -547,7 +550,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
     }
     expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf` })).status).toBe(401);
     expect((await requisitar({ metodo: 'GET', rota: `emissoes/${emitida.emissaoId}/pdf`, sessao: sessao('admin') })).status).toBe(200);
-    expect(await auditorias('pdf_baixado', emitida.emissaoId)).toBe(4);
+    expect(await auditorias('pdf_baixado', emitida.emissaoId)).toBe(3);
     expect(await auditorias('pdf_nao_encontrado', emitida.emissaoId)).toBe(1);
     emissoes.push(concluida);
   });
@@ -769,7 +772,7 @@ describe('emissão da DOF em recursos descartáveis', () => {
       aplicativo: { usuario: 'sisdoc_aplicativo', senha: senhaAplicativo },
     };
     const atualizado = await migrar(provisionamento);
-    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '024-perfil-secretario-adjunto' });
+    expect(atualizado).toEqual({ aplicadas: [], versaoAtual: '025-historico-servidor' });
     expect((await banco().query('SELECT count(*)::int AS total FROM seguranca.migracao')).rows[0].total)
       .toBe(SEQUENCIA_MIGRACOES.length + 1);
 
@@ -814,11 +817,12 @@ describe('emissão da DOF em recursos descartáveis', () => {
           '022-destinatario-coordenador',
           '023-modelos-oficiais',
           '024-perfil-secretario-adjunto',
+          '025-historico-servidor',
         ],
-        versaoAtual: '024-perfil-secretario-adjunto',
+        versaoAtual: '025-historico-servidor',
       });
       const segundaExecucao = await migrar({ ...provisionamento, nome: 'sisdoc_migrar' });
-      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '024-perfil-secretario-adjunto' });
+      expect(segundaExecucao).toEqual({ aplicadas: [], versaoAtual: '025-historico-servidor' });
       const privilegios = await anterior.query<{ inserir: boolean; aprovar: boolean }>(`
         SELECT has_column_privilege('sisdoc_aplicativo', 'documentos.emissao', 'snapshot_cifrado', 'INSERT') AS inserir,
           has_table_privilege('sisdoc_aplicativo', 'documentos.aprovacao_modelo', 'INSERT') AS aprovar
@@ -993,5 +997,31 @@ describe('emissão da DOF em recursos descartáveis', () => {
     )).rows[0]?.numero_formatado;
     expect(anterior).toBe(emitida.numero);
     expect(Number(numero)).toBeGreaterThan(Number(artefato.rows[0].numero));
+  });
+
+  it('conserva ajustes de identidade e admissão no snapshot e na cópia sem alterar o cadastro', async () => {
+    const ajustesCadastro = { nome: 'Nome ajustado para DOF fictícia', cpf: cpfSintetico(920000099), admissao: '1980-02-01' };
+    const alvo = await prepararConferida('Nome canônico DOF fictício', 'analista', 'admin', ajustesCadastro);
+    const resposta = await emitir(alvo, randomUUID(), 'admin');
+    expect(resposta.status, resposta.corpo).toBe(200);
+    const emitida = situacaoEmissaoSchema.parse(JSON.parse(resposta.corpo));
+    const linha = await banco().query<{ snapshot_cifrado: Buffer }>(
+      'SELECT snapshot_cifrado FROM documentos.emissao WHERE id = $1', [emitida.emissaoId]);
+    const snapshot = snapshotEmissaoDofSchema.parse(JSON.parse(protetor.decifrar(linha.rows[0].snapshot_cifrado, {
+      schema: 'documentos', tabela: 'emissao', registroId: emitida.emissaoId, campo: 'snapshot_cifrado',
+    }).toString('utf8')));
+    expect(snapshot.nome).toBe(ajustesCadastro.nome);
+    expect(snapshot.fonte).toMatchObject(ajustesCadastro);
+    expect(snapshot.resultado.admissaoConsiderada).toBe(ajustesCadastro.admissao);
+    const cadastro = await requisitar({ metodo: 'GET', rota: `servidores/${snapshot.entrada.pessoaId}/referencias?vinculoId=${snapshot.entrada.vinculoId}`, sessao: sessao('analista') });
+    expect(cadastro.status, cadastro.corpo).toBe(200);
+    expect(JSON.parse(cadastro.corpo).cadastro).toMatchObject({ nome: 'Nome canônico DOF fictício', admissao: '1980-01-01' });
+    const copia = await requisitar({ metodo: 'POST', rota: `documentos/${alvo.documentoId}/copia`, sessao: sessao('analista'), corpo: { confirmar: true } });
+    expect(copia.status, copia.corpo).toBe(201);
+    const id = resultadoCopiaEmitidoSchema.parse(JSON.parse(copia.corpo)).documentoId;
+    const reaberto = await requisitar({ metodo: 'GET', rota: `documentos/${id}`, sessao: sessao('analista') });
+    const rascunho = rascunhoDofSchema.parse(JSON.parse(reaberto.corpo));
+    expect(rascunho.entrada.ajustesCadastro).toEqual(ajustesCadastro);
+    expect(rascunho.resultado.admissaoConsiderada).toBe(ajustesCadastro.admissao);
   });
 });

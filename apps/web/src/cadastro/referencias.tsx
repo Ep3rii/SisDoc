@@ -3,10 +3,13 @@ import {
   type ReferenciaServidor,
   type ReferenciaServidorQuery
 } from '@sisdoc/contratos';
+import type { CadastroServidor } from '@sisdoc/contratos';
 import { useEffect, useState } from 'react';
 import { requisitar, validar } from '../infraestrutura/api';
 import type { Props, ProtecaoEdicao } from './contexto';
 import { EditorCadastro } from './editor-cadastro';
+import { SugestoesCadastro } from './sugestoes-cadastro';
+import { HistoricoServidor } from './historico-servidor';
 
 /** Consulta referências completas auditadas do vínculo e permite edição local autorizada. */
 export function Referencias({ pessoaId, vinculoId, csrf, podeEditarCadastro, onErro, onPendente, confirmarSaida, onAtualizado }: {
@@ -25,6 +28,7 @@ export function Referencias({ pessoaId, vinculoId, csrf, podeEditarCadastro, onE
   const [falhou, setFalhou] = useState(false);
   const [versao, setVersao] = useState(0);
   const [editando, setEditando] = useState(false);
+  const [sugestao, setSugestao] = useState<CadastroServidor | undefined>();
   useEffect(() => {
     let ativa = true;
     setDados(null);
@@ -52,11 +56,17 @@ export function Referencias({ pessoaId, vinculoId, csrf, podeEditarCadastro, onE
     </select></label>
     {falhou ? <button type="button" onClick={() => setVersao((v) => v + 1)}>Tentar carregar referências novamente</button>
       : !dados ? <p role="status">Carregando referências...</p> : <>
+        <SugestoesCadastro pessoaId={pessoaId} vinculoId={vinculoId} cadastro={dados.cadastro} onErro={onErro}
+          onAplicar={podeEditarCadastro ? (cadastro) => {
+            if (!confirmarSaida()) return;
+            setSugestao(cadastro); setEditando(true); onPendente(true);
+          } : undefined} />
         {podeEditarCadastro && !editando && <button type="button" className="secundario"
           onClick={() => setEditando(true)}>Editar cadastro local</button>}
-        {podeEditarCadastro && editando && <EditorCadastro key={`${dados.revisaoPessoa}-${dados.revisaoVinculo}`}
+        {podeEditarCadastro && editando && <EditorCadastro key={`${dados.revisaoPessoa}-${dados.revisaoVinculo}-${JSON.stringify(sugestao)}`}
+          cadastroInicial={sugestao}
           dados={dados} csrf={csrf} onErro={onErro} onPendente={onPendente} confirmarSaida={confirmarSaida}
-          onAtualizado={() => { setEditando(false); onAtualizado(); setVersao((v) => v + 1); }} />}
+          onAtualizado={() => { setEditando(false); setSugestao(undefined); onAtualizado(); setVersao((v) => v + 1); }} />}
         <details className="grupo-formulario" open><summary>Cadastro completo</summary>
         <dl className="dados-servidor">{Object.entries(dados.pessoa).map(([nome, valor]) => <div key={nome}><dt>{nome.replace(/_/g, ' ')}</dt><dd>{valor ?? 'Não informado'}</dd></div>)}</dl>
         </details>
@@ -70,6 +80,8 @@ export function Referencias({ pessoaId, vinculoId, csrf, podeEditarCadastro, onE
           <button type="button" disabled={!dados.proximoCursor} onClick={() => setCursor(dados.proximoCursor ?? undefined)}>Próxima página de referências</button>
         </div>
         </details>
+        <HistoricoServidor pessoaId={pessoaId} vinculoId={vinculoId} csrf={csrf} podeEditar={podeEditarCadastro}
+          onErro={onErro} onPendente={onPendente} confirmarSaida={confirmarSaida} />
       </>}
   </section>;
 }

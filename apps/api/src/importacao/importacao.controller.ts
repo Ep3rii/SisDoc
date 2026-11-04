@@ -1,34 +1,20 @@
-import { BadRequestException, Body, Controller, Get, HttpCode, Post, PayloadTooLargeException, Query, Req, Res, UnsupportedMediaTypeException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Post, Query, Req, Res } from '@nestjs/common';
 import { consultaPreviaLegadoSchema, promoverLegadoSchema, enviarImportacaoQuerySchema, exportarDadosSchema, paginaLotesImportacaoQuerySchema } from '@sisdoc/contratos';
 import type { ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } from '../seguranca/guarda';
 import { ImportacaoService } from './importacao';
-import { LIMITE_ARQUIVO_BYTES } from './planilhas';
-
-async function lerCorpoBruto(req: RequisicaoAutenticada): Promise<Buffer> {
-  const tipo = String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase();
-  if (tipo !== 'application/octet-stream') {
-    throw new UnsupportedMediaTypeException('Envie o arquivo como application/octet-stream.');
-  }
-  const declarado = Number(req.headers['content-length'] ?? '0');
-  if (declarado > LIMITE_ARQUIVO_BYTES) throw new PayloadTooLargeException('O arquivo excede o limite de 64 MB.');
-  const partes: Buffer[] = [];
-  let total = 0;
-  for await (const parte of req as AsyncIterable<Buffer>) {
-    total += parte.length;
-    if (total > LIMITE_ARQUIVO_BYTES) {
-      req.destroy();
-      throw new PayloadTooLargeException('O arquivo excede o limite de 64 MB.');
-    }
-    partes.push(parte);
-  }
-  return Buffer.concat(partes, total);
-}
+import { lerCorpoBruto } from './corpo-arquivo';
 
 @Controller('admin/importacoes')
 export class ImportacaoController {
   constructor(private readonly importacao: ImportacaoService) {}
+  @ExigirAcao('administrar_importacao')
+  @Post('abas')
+  @HttpCode(200)
+  async abas(@Req() req: RequisicaoAutenticada) {
+    return this.importacao.abas(exigirSessao(req), await lerCorpoBruto(req));
+  }
 
   @ExigirAcao('administrar_importacao')
   @Get('legado')

@@ -1,7 +1,7 @@
 # Pontos de memória do projeto
 
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
-Atualizada em **03/11/2026**, após preparar a infraestrutura da instalação limpa.
+Atualizada em **04/11/2026**, após validar a evolução do Núcleo em recursos descartáveis.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
 
 ## 1. Objetivo e permissões
@@ -41,6 +41,36 @@ Detalhes e invariantes de extração: [Arquitetura](../ARQUITETURA.md).
 
 ## 3. Último estado validado
 
+### Evolução funcional autorizada — implementada e testada, publicação pendente
+
+O responsável aprovou o [plano](../PLANO_EVOLUCAO_NUCLEO.md), incluindo sugestões
+no cadastro e contadores de pendências. Código da [decisão 033](../decisoes/033-edicao-contextual-e-historico-local.md)
+implementado: ajustes exclusivos DOF/DTC, correção canônica administrativa
+separada, sugestões derivadas dos ajustes salvos, prévia instantânea compartilhada,
+zoom/proporção/ampliação, encaminhados/retornos, Núcleo mapeado CSV/XLSX/XML
+SisDoc v1 e histórico funcional/financeiro cifrado com revisões/importação/exportação.
+Não calcula folha/direitos; filtros/subtotais históricos são da página carregada.
+
+Validados: typecheck/build; **43/43** testes de interface DOF/DTC, contratos,
+permissões/tokens; **45 aprovados e um excluído** em emissão, DTC e importação,
+sob LocalService com PostgreSQL descartável. Inclui instalação com 025,
+atualização, PDFs, ajustes no snapshot/cópia, sugestões, retornos e histórico.
+Excluído teste de carga preexistente que cria 48 sessões e exige 64.
+Fundação completa não validada: CLI tenta recompilar código sem ACL de escrita
+sob LocalService. Não ampliar ACL do código nem usar produção para contornar.
+Prévia válida de 45 anos/200 blocos/20 mil caracteres: máximo 135,3 ms nesta VM.
+
+**Instalação continua em 024. Não reiniciar usando build candidato sem migrar.**
+Autorização específica de backup/migração/publicação não foi obtida.
+Os builds de validação haviam substituído artefatos locais; para não misturar
+web nova e API antiga, os cinco `dist` foram repostos a partir de uma compilação
+isolada de `f788a6d`, sem reverter fontes. SHA-256 conferido; página HTTPS
+serve o bundle anterior, health 200 e privado 401. Serviços continuam Running,
+sem reinício ou migração nesta etapa. Fontes novas permanecem não commitadas.
+Novo `npm run build` nesta pasta volta a substituir artefatos servidos:
+validar/publicar em janela controlada, com backup e migração 025.
+Avaliação e prioridades visuais: [UI/UX](../AVALIACAO_UI_UX.md).
+
 ### Perfis, rascunhos e serviços Windows — 03/11/2026
 
 Implementada a migração obrigatória `024-perfil-secretario-adjunto`, a
@@ -58,8 +88,11 @@ Estado observado em 03/11/2026 20:42 (somente leitura): diagnóstico
 `024-perfil-secretario-adjunto`; API ativa em `127.0.0.1:3443` e Caddy ativo
 em `192.168.70.26:443`, ambos sob `NT AUTHORITY\LOCAL SERVICE`.
 A rota de health responde 200 e rota privada sem sessão responde 401 no
-caminho direto da API e via proxy. Caddy está em processo manual (sem serviço
-WinSW registrado). Aprovação formal dos templates v2 continua pendente.
+caminho direto da API e via proxy. Em 03/11/2026 22:54, SisDoc e SisDocCaddy
+foram confirmados como serviços Windows sob LocalService e reiniciados na
+ordem de dependência, sem reiniciar PostgreSQL. Health via proxy 200 e privado
+sem sessão 401; certificado/nome validados, sem verificar revogação.
+Aprovação formal dos templates v2 continua pendente.
 
 - Fatias funcionais 5–7 implementadas; fatias 8–9 e recursos externos
   adicionais continuam extras, sujeitos a autorização.

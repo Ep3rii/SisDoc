@@ -25,6 +25,7 @@ import { ProtetorDados } from '../apps/api/dist/seguranca/protecao-dados.js';
 import { gerarHashSenha } from '../apps/api/dist/seguranca/senhas.js';
 import { instalar } from '../apps/api/dist/setup/instalador.js';
 import { cpfSintetico } from './dados-sinteticos.js';
+import { sidServicoTeste } from './ambiente-windows';
 
 // Compartilha o loader CommonJS entre operações e erros, sem duplicar suas classes no transformador de testes.
 const carregar = createRequire(import.meta.url);
@@ -241,7 +242,7 @@ describe('Importação de planilhas e base legada', () => {
         usuario: 'sisdoc_aplicativo', senha: senhaAplicativo,
       },
       tls: { certificado, chave, ca, nome: nomeTls },
-      sidServico: 'S-1-5-19',
+      sidServico: sidServicoTeste,
       listaSenhas,
       processos: { mascaras: ['####/####'] },
       administrador: { matricula: 'ADMIN-IMPORT-FICTICIO', nome: 'Operador Fictício', senha: 'AdministradorImportFicticio!12345' },

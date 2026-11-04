@@ -1,7 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
+import { calcularPreviaDof } from '@sisdoc/calculo';
 import {
-  resultadoCalculoDofSchema,
   type ResultadoCalculoDof,
   type SolicitarCalculoDof,
 } from '@sisdoc/contratos';
@@ -28,45 +27,12 @@ export async function calcularDofNaTransacao(
   const vinculo = consulta.rows[0];
   if (!vinculo) throw new NotFoundException('Vínculo não encontrado para esta pessoa.');
   await auditarConsultaFuncional(cliente, sessao, 'calculo_solicitado', 'vinculo', dados.vinculoId, dados.pessoaId, ip);
-  if (!vinculo.admissao) return { erro: 'A data de admissão do vínculo não está informada na fonte.' };
-  if (admissaoEsperada && vinculo.admissao !== admissaoEsperada) {
+  const admissao = dados.ajustesCadastro?.admissao ?? vinculo.admissao;
+  if (!admissao) return { erro: 'Informe a data de admissão do vínculo ou um ajuste nesta declaração.' };
+  if (admissaoEsperada && admissao !== admissaoEsperada) {
     return { conflito: 'A admissão do vínculo mudou. Recalcule e confira os lançamentos antes de salvar.' };
   }
-  const calculo = calcular({
-    tipo: 'DOF',
-    posse: vinculo.admissao,
-    dataReferencia: dataEmSaoPaulo(new Date()),
-    periodos: [{
-      inicio: dados.inicio,
-      fim: dados.fim,
-      anos: dados.anos,
-      ...(dados.acumuladoAnterior ? { acumuladoAnterior: dados.acumuladoAnterior } : {}),
-    }],
-    regras: REGRAS_PLANILHA,
-  });
-  if (!calculo.sucesso) {
-    return { erro: [...new Set(calculo.erros.map((erro) => erro.mensagem))].join(' ') };
-  }
-  const periodo = calculo.periodos[0];
-  return {
-    resultado: resultadoCalculoDofSchema.parse({
-      admissaoConsiderada: vinculo.admissao,
-      regra: {
-        codigo: calculo.regras.codigo,
-        versao: calculo.regras.versao,
-        classificacao: calculo.regras.classificacao,
-      },
-      periodo: {
-        inicioInformado: periodo.inicioInformado,
-        inicioEfetivo: periodo.inicioEfetivo,
-        fim: periodo.fim,
-        linhas: periodo.linhas,
-      },
-      totais: calculo.totais,
-      declaracao: linhasDeclaracaoDof(calculo.totais, calculo.regras),
-      avisos: calculo.avisos,
-    }),
-  };
+  return calcularPreviaDof(dados, admissao, dataEmSaoPaulo(new Date()));
 }
 
 export class CalculosService {

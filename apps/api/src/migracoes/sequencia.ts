@@ -23,6 +23,7 @@ import { aplicarRevisaoPeriodosIpam } from './revisao-periodos-ipam';
 import { aplicarDestinatarioCoordenador } from './destinatario-coordenador';
 import { aplicarModelosOficiais, VERSAO_MODELOS_OFICIAIS } from './modelos-oficiais';
 import { aplicarRetiradaPerfilSecretarioAdjunto, VERSAO_PERFIL_SECRETARIO_ADJUNTO } from './perfil-secretario-adjunto';
+import { aplicarHistoricoServidor, VERSAO_HISTORICO_SERVIDOR } from './historico-servidor';
 
 type Migracao = { versao: string; aplicar: (cliente: Client, usuarioAplicacao: string) => Promise<boolean> };
 
@@ -51,6 +52,7 @@ export const SEQUENCIA_MIGRACOES: readonly Migracao[] = [
   { versao: '022-destinatario-coordenador', aplicar: aplicarDestinatarioCoordenador },
   { versao: VERSAO_MODELOS_OFICIAIS, aplicar: aplicarModelosOficiais },
   { versao: VERSAO_PERFIL_SECRETARIO_ADJUNTO, aplicar: aplicarRetiradaPerfilSecretarioAdjunto },
+  { versao: VERSAO_HISTORICO_SERVIDOR, aplicar: aplicarHistoricoServidor },
 ];
 
 // Deve ser chamada dentro de uma transação aberta pelo papel de migração; devolve as versões aplicadas agora.
