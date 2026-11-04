@@ -1,5 +1,9 @@
 # Decisão 031 — Serviços Windows e proxy Caddy local
 
+> Atualização: o escopo de publicação foi revisado pela
+> [decisão 032](032-proxy-lan-restrito.md), que mantém API em loopback e
+> permite proxy Caddy com endpoint LAN restrito.
+
 ## Escolha
 
 A aplicação continua sendo um monólito local. A API NestJS permanece em HTTPS

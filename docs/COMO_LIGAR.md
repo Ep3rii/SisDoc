@@ -26,10 +26,12 @@ encerra a aplicação iniciada nele.
 
 ## 2. Acesse a aplicação
 
-Abra **https://localhost:3443/** no navegador e entre com sua conta.
-Esse endereço funciona somente na máquina em que a aplicação está ligada,
-inclusive quando for um Windows Server. Não é um endereço de acesso LAN.
-Se configurar outra porta/nome TLS, use os valores da configuração aceita.
+Use o endpoint correspondente ao cenário:
+- acesso local direto à API: **https://localhost:3443/**;
+- acesso pela rede interna (quando o proxy Caddy LAN estiver ativo):
+  **https://192.168.70.26/**.
+
+Se porta/nome TLS mudarem, use os valores efetivos da configuração aceita.
 
 ## 3. Se não abrir
 
@@ -62,9 +64,9 @@ Se configurar outra porta/nome TLS, use os valores da configuração aceita.
 Para desligar a aplicação iniciada no seu terminal, pressione `Ctrl+C`.
 Para ligar novamente, repita o passo 1.
 A aplicação ainda **não inicia automaticamente após reiniciar o Windows**.
-Há modelos de serviço WinSW e proxy Caddy preparados em `ops/windows`, mas
-eles ainda não foram instalados nem validados operacionalmente. Use o início
-manual acima até a ativação autorizada e documentada.
+Há modelos de serviço WinSW preparados em `ops/windows`, mas a operação atual
+segue por processos diretos iniciados manualmente. Use o início manual acima
+até a ativação formal dos serviços.
 
 Na operação diária, não execute `npm run setup`, testes ou importações para
 ligar o sistema. Build e migrações só são necessários após atualização do

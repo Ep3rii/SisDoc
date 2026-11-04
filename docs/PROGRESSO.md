@@ -9,24 +9,25 @@ Analista, coordenador e administrador podem consultar/editar rascunhos DOF/DTC
 de terceiros; a edição compartilhada permanece limitada a rascunhos, e DOF
 com encaminhamento ativo continua bloqueada até recolhimento/devolução.
 
-Validação desta etapa: typecheck aprovado; testes de interface 16/16 e testes
-de permissões/tokens 5/5 aprovados. A suíte de fundação/migração não iniciou:
-o PostgreSQL descartável inicializa, mas recusa iniciar sob a conta Windows
-administrativa desta sessão. Nenhum teste acessou o banco operacional.
+Validação de código desta etapa: typecheck aprovado; interface 16/16 e
+permissões/tokens 5/5 aprovados. A suíte fundação/migração continua bloqueada
+em recursos descartáveis porque o PostgreSQL embutido recusa iniciar sob conta
+Windows administrativa nesta sessão. Nenhum teste foi apontado para base
+operacional.
 
-Preparados modelos WinSW/Caddy. Ambos definem `LocalService`; Caddy depende
-do serviço SisDoc. XML passou pelo parser do Windows, mas Caddy não está
-instalado, então o Caddyfile e os serviços não foram validados em execução.
-Não foram instalados serviços nem alterados certificados, configuração,
-banco, firewall ou exposição de rede.
+Estado operacional observado em 03/11/2026 20:42 (somente leitura):
+- `npm run verificar-instalacao` aprovado com histórico até 024.
+- API ativa em `127.0.0.1:3443` e Caddy ativo em `192.168.70.26:443`.
+- Health 200 e rota privada 401 sem sessão, no acesso direto e via proxy.
+- API e Caddy executando sob `NT AUTHORITY\LOCAL SERVICE`, mas sem serviços
+  WinSW registrados (processos diretos).
+- Regra de firewall `SisDoc LAN TCP 443` ativa em perfis Domain/Private, com
+  escopo de rede restrito.
 
-Verificação observacional adicional: serviço PostgreSQL Windows em execução;
-serviços SisDoc/SisDocCaddy não encontrados; listener em `127.0.0.1:3443`.
-O caminho de configuração documentado não foi encontrado e `SISDOC_CONFIG`
-não está definido no terminal desta sessão. Health/TLS não foram retestados;
-essa observação não comprova instalação/aceite operacional. A migração 024
-segue pendente na instalação existente, conforme o último histórico conhecido
-até 023; confirmar novamente antes de aplicar.
+Pendências mantidas: aprovação formal dos quatro templates v2, validação do
+fluxo operacional completo (login/troca inicial/aceite) e definição final de
+partida automática via serviço Windows.
+Escopo de rede atualizado em [decisão 032](decisoes/032-proxy-lan-restrito.md).
 
 ## Estado da instalação limpa na retomada da tarde — 03/11/2026
 

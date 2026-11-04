@@ -51,17 +51,15 @@ não foram ampliadas.
 
 Validados: typecheck; 16 testes de interface; cinco testes de permissões e
 tokens. A suíte de fundação/migração não iniciou porque o PostgreSQL embutido
-recusa execução sob a conta Windows administrativa da sessão. Os manifests
-WinSW foram analisados como XML; Caddy não está instalado, portanto serviços
-e Caddyfile permanecem sem validação operacional. Não houve alteração da
-instalação externa.
+recusa execução sob a conta Windows administrativa da sessão.
 
-Última observação local: PostgreSQL Windows em execução, serviços SisDoc e
-SisDocCaddy não registrados, listener `127.0.0.1:3443`; caminho de configuração
-documentado não encontrado e `SISDOC_CONFIG` ausente no terminal desta sessão.
-Health/TLS não foram retestados. Histórico do banco segue pendente de
-confirmação; último registro anterior indicava versão 023. Não tratar os
-templates como serviços instalados nem executar a migração sem backup aprovado.
+Estado observado em 03/11/2026 20:42 (somente leitura): diagnóstico
+`npm run verificar-instalacao` aprovado e histórico confirmado até
+`024-perfil-secretario-adjunto`; API ativa em `127.0.0.1:3443` e Caddy ativo
+em `192.168.70.26:443`, ambos sob `NT AUTHORITY\LOCAL SERVICE`.
+A rota de health responde 200 e rota privada sem sessão responde 401 no
+caminho direto da API e via proxy. Caddy está em processo manual (sem serviço
+WinSW registrado). Aprovação formal dos templates v2 continua pendente.
 
 - Fatias funcionais 5–7 implementadas; fatias 8–9 e recursos externos
   adicionais continuam extras, sujeitos a autorização.
@@ -128,7 +126,12 @@ Mapeamento parcial da sincronização preserva campos canônicos sem alias.
 
 ## 6. Operação e materiais locais
 
-A instalação é HTTPS em loopback: `https://localhost:3443/`.
+A instalação aceita dois pontos de acesso HTTPS:
+- direto na API em loopback: `https://localhost:3443/`;
+- proxy Caddy na LAN (escopo restrito por firewall): `https://192.168.70.26/`.
+Base de decisão: [031](../decisoes/031-servicos-locais-caddy.md) e
+[032](../decisoes/032-proxy-lan-restrito.md).
+
 Início manual e atualização: [Como ligar](../COMO_LIGAR.md) e
 [Operação](../OPERACAO.md). Não iniciar segunda cópia com a porta ocupada;
 verificar PID/comando antes de parar somente o processo correto.
@@ -139,7 +142,7 @@ Migração completa para Windows Server é preparada em
 cifra/HMAC, PDFs e arquivos externos da mesma captura; reaplicar ACLs por
 conta do destino e instalar Chromium no contexto correto. Não executar
 setup sobre restauração. `npm run verificar-instalacao` usa `SISDOC_CONFIG`
-e diagnóstico somente leitura; bootstrap exige 023. Captura/restauração
+e diagnóstico somente leitura; bootstrap exige 024. Captura/restauração
 operacional e aceite no Windows Server ainda não foram executados.
 
 No destino, em 03/11/2026, o responsável confirmou VM exclusiva e escolheu
@@ -151,10 +154,11 @@ licença e Chromium compartilhado preparados. Conta executora não
 administrativa validada: acesso a código/TLS/lista, provisionamento negado,
 HTTPS e PDF em memória aprovados. Fluxo local interativo de conclusão
 disponível fora do Git; detalhes em [Instalação](../INSTALACAO_LOCAL.md).
-Na retomada da tarde, configuração/provisionamento já existem e o diagnóstico
-somente leitura passou: banco/login restrito e histórico completo até 023,
-arquivos/TLS/PDF/Chromium acessíveis. Página/health HTTPS 200 e privados 401.
-API ligada em loopback, mas não sob a conta dedicada; não repetir setup.
+Na validação mais recente, configuração/provisionamento já existem e o
+diagnóstico somente leitura passou: banco/login restrito e histórico completo
+até 024, arquivos/TLS/PDF/Chromium acessíveis. Página/health HTTPS 200 e
+privados 401. API e Caddy ativos sob a conta dedicada (`LocalService`), porém
+como processos diretos (sem serviços WinSW registrados); não repetir setup.
 Pendente validar execução sob conta dedicada, primeiro login/troca e aceite
 funcional, conferir um formato de processo configurado e aprovar formalmente
 os quatro templates v2. `SISDOC_CONFIG` não persistida: definir por sessão.
