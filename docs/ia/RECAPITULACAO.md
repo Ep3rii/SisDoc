@@ -1,10 +1,75 @@
 # Pontos de memória do projeto
 
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
-Atualizada em **04/11/2026**, com rascunho de conclusão funcional para retomada.
+Atualizada em **05/11/2026**, com separação documental de Produção e
+Homologação.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
 
-## Foco da próxima retomada — conclusão funcional
+## Foco atual da retomada — prévia, motivos e lote
+
+### Produção e Homologação — estado em 05/11/2026
+
+O usuário solicitou publicar as alterações, separar versões e iniciar
+Homologação em porta dedicada. A [decisão 035](../decisoes/035-versoes-e-ambientes.md)
+e o [guia de ambientes](../VERSOES_E_AMBIENTES.md) definem releases imutáveis
+por tag/commit, diretório/build separado, Homologação isolada e acesso
+recomendado `https://127.0.0.1:3444/` (TLS SAN IP, banco/configuração/chaves/PDF
+próprios; sem firewall/Caddy LAN).
+
+**Ainda não publicado nem disponibilizado:** o worktree contém alterações
+não commitadas; o serviço Windows ativo aponta para `C:\SisDoc`, logo build
+nesse caminho pode trocar arquivos servidos. `apps/web/dist/index.html` tinha
+timestamp 05/11/2026 11:26; a página compartilhada de Produção estava apenas
+no login e não foi autenticada. Assim, a interface interna pode refletir o
+build local, mas não foi possível verificar. O primeiro release não foi
+tagueado e não há Homologação provisionada/validada. Evitar novo build em
+`C:\SisDoc`; antes de trocar a API, inspecionar em janela autorizada, testar
+candidato separado, realizar backup verificado e seguir o health check.
+
+### Revisão visual em 05/11/2026
+
+A importação administrativa foi revisada no preview local, com API/sessão
+sintéticas, nas larguras desktop, tablet e celular. Abaixo de 900 px o menu
+recolhe para liberar largura. A etapa Importar separa arquivo/destino de aba
+XLSX, mostra progresso como etapas (não botões), explica o mapeamento e ajusta
+etapa final/ação ao destino. XML e requisitos ficam recolhidos; a tabela
+histórica foi observada com valores sintéticos. Build web passou. Nenhuma
+autenticação ou escrita na instalação operacional.
+
+### Continuação em 05/11/2026 — importação de histórico
+
+No importador de histórico por pessoa/vínculo, a tela agora oferece apenas o
+grupo ativo (Histórico Funcional ou Histórico Financeiro); contrato e API
+exigem o grupo, rejeitam linhas de outro grupo e incluem o grupo na prova da
+validação. Divergências seguem sem sobrescrita. Typecheck e 18 testes focados
+de evolução do Núcleo passaram.
+
+Isso **não consolidou ainda o importador administrativo geral em três
+categorias**: nele continuam Dados Funcionais, Afastamentos, Incorporações,
+Períodos IPAM e Eventos Funcionais. A consolidação precisa dos exemplos das
+tabelas históricas para definir layout, chaves de vínculo, mapeamento e
+reconciliação; não remover esses fluxos nem inventar compatibilidades antes
+disso. Estado e limites em [Dados e importação](../DADOS_E_IMPORTACAO.md) e
+[Progresso](../PROGRESSO.md).
+
+A etapa mais recente está implementada no worktree, mas **não foi publicada**.
+Ver [decisão 034](../decisoes/034-emissao-em-lote-e-motivos-condicionais.md)
+e [evidências](../PROGRESSO.md): emissão sequencial por item nas DOFs
+conferidas/DTCs carregadas, revisão individual da prévia e prova atual de
+fonte, idempotência preservada no retry, motivos condicionais e viewer/layout
+unificados. Blocos da página 2: extração dos campos de eventos para sugestão
+inativa, com destino escolhido manualmente e revisão obrigatória; sem
+classificação ou cálculo automático. Typecheck, build web, 24 testes focados
+DOF/DTC e teste direcionado de blocos passaram; `git diff --check` passou.
+Sem mudança de banco/serviços ou publicação.
+
+**Pendente desta etapa:** classificação automática dos eventos e cálculos dos
+blocos da página 2. Tipos dos eventos importados são texto livre; não há
+mapeamento aprovado para as quatro categorias dos blocos nem fórmulas
+homologadas. Não inferir texto oficial ou cálculo. Retomar após validação
+institucional do mapeamento, precedência, conflitos e cálculos.
+
+## Pendências estruturais — conclusão funcional
 
 O responsável retirou migração de máquina do foco ativo; manter seus registros
 apenas como referência, sem apagar evidências ou proteções operacionais.
@@ -12,9 +77,9 @@ Novo [plano em rascunho](../PLANO_CONCLUSAO_APLICACAO_RASCUNHO.md):
 tabelas das fichas financeiras; histórico funcional ainda a apurar;
 dossiês antigos ainda a tratar; revisão das regras/campos; tipos e layout
 da importação do Núcleo. Histórico genérico existente não fecha esses domínios.
-Somente planejamento foi solicitado, sem autorização de implementação.
-Próxima ação: confirmar prioridade e levantar estruturas/fontes de financeiro
-e funcional, sem presumir modelos finais ou usar dados reais em testes.
+Essas frentes continuam apenas planejadas; não presumir modelos finais nem
+usar dados reais em testes. Retomá-las após resolver a pendência de mapeamento
+dos blocos ou por nova priorização do responsável.
 
 ## 1. Objetivo e permissões
 
@@ -52,6 +117,17 @@ recursos CLI ficam na pasta `importacao`.
 Detalhes e invariantes de extração: [Arquitetura](../ARQUITETURA.md).
 
 ## 3. Último estado validado
+
+### Estado corrente do worktree — lote e interface
+
+A [decisão 034](../decisoes/034-emissao-em-lote-e-motivos-condicionais.md)
+documenta os limites do lote, a elegibilidade explícita da fonte DTC, o retry
+com a mesma chave e os motivos condicionais. Implementação e testes estão no
+worktree, **sem publicação/commit**. A automação textual e de cálculos da
+página 2 está limitada à extração dos campos disponíveis para sugestão
+inativa e revisável, com seleção manual do destino. Classificação automática
+e cálculos continuam pendentes de regras institucionais aprovadas; não foram
+misturados ao cálculo da página 1.
 
 ### Evolução funcional e UI/UX — implementadas, testadas e publicadas
 

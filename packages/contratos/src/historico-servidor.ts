@@ -108,7 +108,7 @@ export const revisoesHistoricoSchema = z.strictObject({
   proximoCursor: z.uuid().nullable(),
 });
 export const importarHistoricoQuerySchema = z.strictObject({
-  vinculoId: z.uuid(), origem: origemImportacaoSchema, modo: z.enum(['validar','gravar']),
+  vinculoId: z.uuid(), grupo: z.enum(['funcional', 'financeiro']), origem: origemImportacaoSchema, modo: z.enum(['validar','gravar']),
   aba: z.string().min(1).max(200).optional(),
   validacao: z.string().regex(/^[0-9a-f]{64}$/).optional(),
 }).refine((dados) => dados.modo !== 'gravar' || !!dados.validacao, 'Valide o arquivo antes de gravar.');

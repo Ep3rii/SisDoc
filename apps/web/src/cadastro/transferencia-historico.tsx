@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { relatorioImportacaoHistoricoSchema, type RegistroHistorico } from '@sisdoc/contratos';
 import { ErroApi, validar } from '../infraestrutura/api';
 
-export function TransferenciaHistorico({ pessoaId, vinculoId, csrf, onErro, onImportado }: {
-  pessoaId: string; vinculoId: string; csrf: string; onErro: (erro: unknown) => void; onImportado: () => void;
+export function TransferenciaHistorico({ pessoaId, vinculoId, grupo, csrf, onErro, onImportado }: {
+  pessoaId: string; vinculoId: string; grupo: RegistroHistorico['grupo']; csrf: string; onErro: (erro: unknown) => void; onImportado: () => void;
 }) {
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [origem, setOrigem] = useState('historico-planilha');
@@ -15,7 +15,7 @@ export function TransferenciaHistorico({ pessoaId, vinculoId, csrf, onErro, onIm
     if (modo === 'gravar' && (!relatorio || !window.confirm(`Aplicar ${relatorio.inseridos} registros aceitos? ${relatorio.rejeitados} rejeitados e ${relatorio.divergentes} divergentes não serão aplicados. Edições manuais serão preservadas.`))) return;
     setOcupado(true);
     try {
-      const query = new URLSearchParams({ vinculoId, origem, modo, ...(aba ? { aba } : {}),
+      const query = new URLSearchParams({ vinculoId, grupo, origem, modo, ...(aba ? { aba } : {}),
         ...(modo === 'gravar' && relatorio ? { validacao: relatorio.validacao } : {}) });
       const resposta = await fetch(`/api/v1/servidores/${pessoaId}/historico/importar?${query}`, {
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
@@ -28,22 +28,22 @@ export function TransferenciaHistorico({ pessoaId, vinculoId, csrf, onErro, onIm
     } catch (erro: unknown) { setRelatorio(null); onErro(erro); }
     finally { setOcupado(false); }
   }
-  function baixarModelo(grupo: RegistroHistorico['grupo']) {
+  function baixarModelo() {
     const cabecalho = grupo === 'financeiro'
       ? 'GRUPO;TIPO;SITUACAO;DESCRICAO;COMPETENCIA;RUBRICA;NATUREZA;VALOR;FOLHA;PAGAMENTO;COMPETENCIAORIGEM;IDORIGEM'
       : 'GRUPO;TIPO;SITUACAO;DESCRICAO;INICIO;FIM;AQUISITIVOINICIO;AQUISITIVOFIM;DIASINFORMADOS;ESPECIELICENCA;ATO;IDORIGEM';
     const url = URL.createObjectURL(new Blob([`\uFEFF${cabecalho}\r\n`], { type: 'text/csv;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url; link.download = `modelo-historico-${grupo}.csv`; link.click(); URL.revokeObjectURL(url);
   }
-  return <details className="grupo-formulario"><summary>Importar histórico deste vínculo — CSV, XLSX ou XML</summary>
+  const titulo = grupo === 'funcional' ? 'Histórico Funcional' : 'Histórico Financeiro';
+  return <details className="grupo-formulario"><summary>Importar {titulo.toLocaleLowerCase('pt-BR')} deste vínculo — CSV, XLSX ou XML</summary>
     <p>Use o modelo canônico. A origem e o identificador de cada linha evitam duplicidades. XML usa a raiz SisDoc versão 1. Nenhuma linha é aplicada antes de validar e confirmar.</p>
-    <div className="acoes"><button type="button" className="secundario" onClick={() => baixarModelo('funcional')}>Baixar cabeçalhos funcionais</button>
-      <button type="button" className="secundario" onClick={() => baixarModelo('financeiro')}>Baixar cabeçalhos financeiros</button></div>
+    <button type="button" className="secundario" onClick={baixarModelo}>Baixar modelo — {titulo}</button>
     <fieldset disabled={ocupado}><div className="grade">
       <label>Origem técnica<input value={origem} onChange={(e) => { setOrigem(e.target.value); setRelatorio(null); }} /></label>
       <label>Nome exato da aba XLSX (vazio = primeira aba)<input value={aba} onChange={(e) => { setAba(e.target.value); setRelatorio(null); }} /></label>
       <label>Arquivo<input type="file" accept=".csv,.xlsx,.xml" onChange={(e) => { setArquivo(e.target.files?.[0] ?? null); setRelatorio(null); }} /></label>
-    </div><div className="acoes"><button type="button" disabled={!arquivo} onClick={() => void processar('validar')}>Validar histórico</button>
+    </div><div className="acoes"><button type="button" disabled={!arquivo} onClick={() => void processar('validar')}>Validar {titulo}</button>
       <button type="button" disabled={!relatorio || relatorio.modo !== 'validar'} onClick={() => void processar('gravar')}>Confirmar importação</button></div></fieldset>
     {relatorio && <div role="status"><p>{relatorio.modo === 'validar' ? 'Validação sem gravação' : 'Importação concluída'}: {relatorio.inseridos} {relatorio.modo === 'validar' ? 'a inserir' : 'inseridos'}, {relatorio.inalterados} inalterados, {relatorio.divergentes} divergentes, {relatorio.rejeitados} rejeitados.</p>
       {relatorio.ocorrencias.map((item, i) => <p key={i}>Linha {item.linha}: {item.motivo}</p>)}

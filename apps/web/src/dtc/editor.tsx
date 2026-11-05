@@ -72,6 +72,7 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
     return () => { corrente = false; };
   }, [servidor.pessoaId, servidor.vinculoId, onErro]);
   const problemas = validarConteudoDtc(tipo, conteudo);
+  const alterado = JSON.stringify(inicial) !== JSON.stringify(conteudo);
   const validado = conteudoDtcSchema.safeParse(conteudo);
   const fonteEdicao = fonte ? aplicarAjustesCadastro(fonte, conteudo.ajustesCadastro) : null;
   const calculoLocal = validado.success && fonteEdicao?.admissao && problemas.length === 0
@@ -81,7 +82,9 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
   /** Atualiza conteúdo local e ativa a proteção global contra perda de edição. */
   function alterar(novo: ConteudoDtc) {
     setConteudo(novo);
-    onPendente(true);
+    const mudou = JSON.stringify(inicial) !== JSON.stringify(novo);
+    if (!mudou) setMotivo('');
+    onPendente(mudou);
   }
   /** Recalcula a grade anual após mudar datas, preservando lançamentos dos anos mantidos. */
   function alterarPeriodo(indice: number, mudanca: Partial<PeriodoDtc>) {
@@ -278,9 +281,10 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
         <label className="marcador"><input type="checkbox" checked={conteudo.confirmarInicioAjustado}
           onChange={(evento) => alterar({ ...conteudo, confirmarInicioAjustado: evento.target.checked })} />
           Confirmo o ajuste do início à data de posse, se o cálculo o indicar</label>
-        {documento ? (
+        {documento && alterado && (
           <label>Motivo da alteração<textarea required maxLength={2000} value={motivo} onChange={(evento) => { setMotivo(evento.target.value); onPendente(true); }} /></label>
-        ) : (
+        )}
+        {!documento && (
           <label className="marcador"><input type="checkbox" checked={confirmacao} onChange={(evento) => setConfirmacao(evento.target.checked)} />
             Confirmo que conferi os dados do servidor e os períodos informados</label>
         )}
@@ -290,7 +294,8 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
       {problemas.length > 0 && <ul className="aviso erro">{problemas.map((problema) => <li key={problema.caminho + problema.mensagem}>{problema.mensagem}</li>)}</ul>}
       <div className="acoes">
         {aba !== 'conferencia' && <button type="button" onClick={() => setAba('conferencia')}>Revisar e salvar</button>}
-        <button type="submit" hidden={aba !== 'conferencia'} disabled={ocupado || problemas.length > 0 || (documento ? !motivo.trim() : !confirmacao)}>
+        <button type="submit" hidden={aba !== 'conferencia'} disabled={ocupado || problemas.length > 0
+          || (documento ? !alterado || !motivo.trim() : !confirmacao)}>
           {ocupado ? 'Salvando...' : 'Salvar rascunho'}</button>
         <button type="button" className="secundario" disabled={ocupado} onClick={onCancelar}>Cancelar</button>
       </div>

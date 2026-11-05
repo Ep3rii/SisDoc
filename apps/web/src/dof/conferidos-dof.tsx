@@ -2,7 +2,9 @@ import type { PaginaConferidosDof, PreviaConferidaDof, SituacaoEmissao } from '@
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
+import { PreviaDocumento } from '../compartilhado/previa-documento';
 import { PainelEmissao } from '../documentos/emissao';
+import { EmissaoEmLote, type DocumentoElegivelLote } from '../documentos/emissao-em-lote';
 import { ExclusaoDocumento } from '../documentos/exclusao-documento';
 import { api, ErroApi } from '../infraestrutura/api';
 
@@ -164,8 +166,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
             onLimpar(); setVersaoPrevia((atual) => atual + 1);
           }}>Tentar carregar prévia novamente</button>
         ) : previa && previa.documentoId === selecionado.id && previa.revisao === selecionado.revisao ? (
-          <iframe className="previa-conferida" title="Prévia atual da DOF conferida" sandbox=""
-            srcDoc={renderizarPreviaDof(previa)} />
+          <PreviaDocumento titulo="Prévia atual da DOF conferida" html={renderizarPreviaDof(previa)} />
         ) : <p role="status">Carregando prévia da DOF conferida...</p>}
         {podeEmitir && (
           <div className="separado">
@@ -208,6 +209,23 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
       <p>{administrador ? 'Todas as DOFs conferidas são exibidas. O administrador pode emitir ou devolver documentos de qualquer autoria.'
         : 'Somente suas DOFs e as encaminhadas a você são exibidas. A emissão é feita pelo coordenador.'} A emissão depende da aprovação formal da regra e do modelo.</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
+      {podeEmitir && <EmissaoEmLote
+        documentos={filtro.itens.filter((item) => !item.fonteSelecionadaAlterada)
+          .map(({ id, nome, matricula, revisao }) => ({ id, nome, matricula, revisao } satisfies DocumentoElegivelLote))}
+        carregar={async (documento) => {
+          const dados = await api.obterPreviaConferidaDof(documento.id);
+          return {
+            documentoId: dados.documentoId,
+            revisao: dados.revisao,
+            provaFonte: dados.fonte.provaFonte,
+            fonteElegivel: !dados.fonteSelecionadaAlterada,
+            html: renderizarPreviaDof(dados),
+          };
+        }}
+        emitir={(documento, chave, provaFonte) => api.emitirDof(csrf, documento.id, chave, {
+          revisao: documento.revisao, provaFonte,
+        })}
+        onConcluido={() => setVersao((atual) => atual + 1)} onErro={onErro} onLimpar={onLimpar} onPendente={onPendente} />}
       {falhou ? (
         <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>
           Tentar carregar DOFs conferidas novamente

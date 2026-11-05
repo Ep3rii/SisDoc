@@ -248,6 +248,8 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
 
   const assinatura = arquivo ? `${destino}|${mapear}|${abaArquivo}|${tipo}|${origem}|${arquivo.name}|${arquivo.size}|${arquivo.lastModified}` : null;
   const xlsx = arquivo?.name.toLowerCase().endsWith('.xlsx') ?? false;
+  const etapaAtual = !arquivo ? 0 : xlsx && !abaArquivo ? 1 : assinatura !== null && validadoPara === assinatura ? 3 : 2;
+  const etapaFinal = destino === 'legado' ? 'Guardar no Legado' : mapear ? 'Guardar para mapear' : 'Aplicar ao Núcleo';
   async function consultarAbas() {
     if (!arquivo) return;
     setEnviando(true);
@@ -296,52 +298,77 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   return (
     <section aria-labelledby="importacao-titulo">
       <h2 id="importacao-titulo">Importação e exportação de dados</h2>
-      <p>Legado: guarde o XLSX/CSV/XML original e use o assistente abaixo para disponibilizar os dados para DOF/DTC.
-        Núcleo: importação direta no formato canônico. Valide e confira o relatório antes de confirmar qualquer gravação.</p>
-      <p className="aviso">Dados existentes e edições manuais são preservados. Campos vazios podem ser completados;
-        divergências ficam indicadas para revisão, sem substituição automática.</p>
+      <p>Receba arquivos, confira diferenças e só então aplique os dados. Use as abas para escolher o fluxo desejado.</p>
+      <p className="aviso">O arquivo não substitui a base: linhas ausentes não são apagadas e divergências são preservadas para revisão.</p>
       <Abas atual={aba} onSelecionar={setAba} rotulo="Transferência de dados" itens={[
         { id: 'importar', titulo: 'Importar', conteudo: <>
-      <ol className="etapas-importacao" aria-label="Etapas da recepção">
-        {['Arquivo', 'Aba/perfil', 'Validação e diferenças', 'Confirmação da recepção'].map((titulo, indice) => {
-          const atual = !arquivo ? 0 : xlsx && !abaArquivo ? 1 : validadoPara === assinatura ? 3 : 2;
-          return <li key={titulo} aria-current={atual === indice ? 'step' : undefined}>{indice + 1}. {titulo}</li>;
-        })}
+      <ol className="etapas-importacao" aria-label="Etapas da importação">
+        {['Arquivo e destino', 'Aba XLSX (se necessário)', 'Validar e revisar', etapaFinal].map((titulo, indice) => (
+          <li key={titulo} data-concluida={indice < etapaAtual || undefined}
+            aria-current={etapaAtual === indice ? 'step' : undefined}>
+            <span className="numero-etapa" aria-hidden="true">{indice < etapaAtual ? 'OK' : indice + 1}</span>{titulo}
+          </li>
+        ))}
       </ol>
-      {destino === 'nucleo' && mapear && <p>Após receber o arquivo: Mapeamento → Diferenças → Confirmação no Núcleo.
-        A recepção guarda o original, ainda não altera os cadastros.</p>}
-      <div className="painel">
+      <div className="painel fluxo-importacao">
         <form className="formulario-importacao" onSubmit={(evento) => { evento.preventDefault(); void processar('validar'); }}>
-          <label>Schema de destino<select value={destino} onChange={(e) => {
-            setDestino(e.target.value === 'legado' ? 'legado' : 'nucleo'); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null);
-          }}>
-            <option value="nucleo">Núcleo — pessoas e referências</option><option value="legado">Legado — preservar cabeçalhos da planilha</option>
-          </select></label>
-          {destino === 'nucleo' && <label>Tipo de dado
-            <select value={tipo} onChange={(evento) => { setTipo(evento.target.value as TipoImportacao); setRelatorio(null); }}>
-              {(Object.keys(nomesTipo) as TipoImportacao[]).map((chave) => <option key={chave} value={chave}>{nomesTipo[chave]}</option>)}
-            </select>
-          </label>}
-          {destino === 'nucleo' && <label className="marcador"><input type="checkbox" checked={mapear} onChange={(e) => {
-            setMapear(e.target.checked); setValidadoPara(null); setRelatorio(null); setRelatorioLegado(null); setLoteParaConverter(null);
-          }} />Mapear colunas antes de aplicar ao Núcleo (recomendado)</label>}
-          <label>Origem
-            <input value={origem} maxLength={63} pattern="[a-z0-9][a-z0-9_.\-]*" required
-              onChange={(evento) => { setOrigem(evento.target.value.toLowerCase()); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
-          </label>
-          <label>Arquivo
-            <input ref={campoArquivo} type="file" accept=".csv,.xlsx,.xml,text/csv,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
-              onChange={(evento) => { setArquivo(evento.target.files?.[0] ?? null); setAbas(null); setAbaArquivo(''); setLoteParaConverter(null); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
-          </label>
-          {xlsx && <><button type="button" disabled={enviando || !arquivo} onClick={() => void consultarAbas()}>Consultar abas do XLSX</button>
-            <label>Aba a importar<select disabled={enviando || !abas} value={abaArquivo} onChange={(e) => { setAbaArquivo(e.target.value); setValidadoPara(null); setLoteParaConverter(null); }}>
-              <option value="">Consulte as abas para selecionar</option>{abas?.map((nome) => <option key={nome} value={nome}>{nome}</option>)}
-            </select></label></>}
-          <p>XML: estrutura SisDoc versão 1, com registros e campos simples. Arquivos de outros sistemas precisam ser adaptados a esse modelo.</p>
-          <div className="acoes">
-            <button type="submit" disabled={enviando || !arquivo}>{enviando ? 'Processando...' : 'Validar arquivo'}</button>
-            <button type="button" disabled={enviando || !arquivo || validadoPara !== assinatura} onClick={() => void processar('gravar')}>
-              {destino === 'nucleo' && mapear ? 'Guardar recepção para mapear' : 'Gravar importação'}</button>
+          <fieldset className="etapa-formulario">
+            <legend>1. Arquivo e destino</legend>
+            <div className="grade-formulario campos-importacao">
+              <label>Destino<select value={destino} onChange={(e) => {
+                setDestino(e.target.value === 'legado' ? 'legado' : 'nucleo'); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null);
+              }}>
+                <option value="nucleo">Núcleo — revisar e aplicar</option><option value="legado">Legado — guardar arquivo original</option>
+              </select></label>
+              {destino === 'nucleo' && <label>Tipo de dado
+                <select value={tipo} onChange={(evento) => { setTipo(evento.target.value as TipoImportacao); setRelatorio(null); setValidadoPara(null); }}>
+                  {(Object.keys(nomesTipo) as TipoImportacao[]).map((chave) => <option key={chave} value={chave}>{nomesTipo[chave]}</option>)}
+                </select>
+              </label>}
+              <label>Origem dos dados
+                <input value={origem} maxLength={63} pattern="[a-z0-9][a-z0-9_.\-]*" required
+                  onChange={(evento) => { setOrigem(evento.target.value.toLowerCase()); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
+              </label>
+              <label>Arquivo CSV, XLSX ou XML
+                <input ref={campoArquivo} type="file" accept=".csv,.xlsx,.xml,text/csv,application/xml,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required
+                  onChange={(evento) => { setArquivo(evento.target.files?.[0] ?? null); setAbas(null); setAbaArquivo(''); setLoteParaConverter(null); setRelatorio(null); setRelatorioLegado(null); setValidadoPara(null); }} />
+              </label>
+            </div>
+            {destino === 'nucleo' && <div className="opcao-mapeamento">
+              <label className="marcador"><input type="checkbox" checked={mapear} onChange={(e) => {
+                setMapear(e.target.checked); setValidadoPara(null); setRelatorio(null); setRelatorioLegado(null); setLoteParaConverter(null);
+              }} />Revisar o mapeamento antes de aplicar</label>
+              <p>{mapear
+                ? 'O arquivo será guardado cifrado como lote; depois você confere as colunas e confirma a aplicação no Núcleo.'
+                : 'A importação será validada e aplicada diretamente ao Núcleo após sua confirmação.'}</p>
+            </div>}
+          </fieldset>
+          {xlsx && <fieldset className="etapa-formulario">
+            <legend>2. Selecionar aba</legend>
+            <div className="grade-formulario campos-importacao">
+              <button type="button" className="secundario" disabled={enviando || !arquivo} onClick={() => void consultarAbas()}>
+                Consultar abas do arquivo
+              </button>
+              <label>Aba a importar<select disabled={enviando || !abas} value={abaArquivo} onChange={(e) => {
+                setAbaArquivo(e.target.value); setValidadoPara(null); setLoteParaConverter(null);
+              }}>
+                <option value="">Consulte as abas para selecionar</option>{abas?.map((nome) => <option key={nome} value={nome}>{nome}</option>)}
+              </select></label>
+            </div>
+          </fieldset>}
+          <details className="grupo-formulario orientacao-formato">
+            <summary>Requisitos de formato</summary>
+            <p>XML aceita somente a estrutura SisDoc versão 1, com registros e campos simples; arquivos de outros sistemas precisam ser adaptados. XLSX permite escolher a aba a importar. Limite de 64 MB.</p>
+          </details>
+          {assinatura !== null && validadoPara === assinatura && <p className="estado-validacao" role="status">
+            Arquivo validado sem gravação. Confira o relatório antes de confirmar a próxima etapa.
+          </p>}
+          <div className="acoes importacao-acoes">
+            <button type="submit" disabled={enviando || !arquivo}>{enviando ? 'Validando...' : 'Validar arquivo'}</button>
+            <button type="button" className="secundario" disabled={enviando || !arquivo || validadoPara !== assinatura} onClick={() => void processar('gravar')}>
+              {destino === 'nucleo' && mapear ? 'Guardar lote e revisar mapeamento'
+                : destino === 'legado' ? 'Guardar lote no Legado' : 'Confirmar importação no Núcleo'}
+            </button>
           </div>
         </form>
       </div>

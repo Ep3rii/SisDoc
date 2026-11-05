@@ -163,9 +163,15 @@ describe('Editor DTC', () => {
         })).toEqual({ fonte: 'Arial, sans-serif', executou: null });
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
         await pagina.getByRole('heading', { name: new RegExp(`${ROTULOS_DTC[tipo]} —`) }).waitFor();
+        await pagina.getByRole('tab', { name: 'Conferência', exact: true }).click();
+        expect(await pagina.getByLabel('Motivo da alteração').isVisible()).toBe(false);
+        await pagina.getByRole('tab', { name: 'Identificação', exact: true }).click();
         await quadro.locator('body').waitFor();
         await pagina.getByLabel('Nome completo', { exact: true }).fill('Nome ajustado na DTC fictícia');
         await quadro.getByText('Nome ajustado na DTC fictícia', { exact: true }).waitFor();
+        await pagina.getByRole('tab', { name: 'Conferência', exact: true }).click();
+        expect(await pagina.getByLabel('Motivo da alteração').isVisible()).toBe(true);
+        await pagina.getByRole('tab', { name: 'Identificação', exact: true }).click();
         expect(enviado).toBeNull();
         await pagina.getByRole('tab', { name: 'Períodos', exact: true }).click();
         await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();
@@ -193,7 +199,15 @@ describe('Editor DTC', () => {
         ] }] });
         expect(documento.resultado.totais).toMatchObject({ pb: 50, pv: 70, licencaPremio: 90 });
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
-        expect(await pagina.getByLabel('Nome completo', { exact: true }).inputValue()).toBe('Nome ajustado na DTC fictícia');
+        const nomeSalvo = await pagina.getByLabel('Nome completo', { exact: true }).inputValue();
+        expect(nomeSalvo).toBe('Nome ajustado na DTC fictícia');
+        await pagina.getByLabel('Nome completo', { exact: true }).fill('Nome temporário na DTC fictícia');
+        await pagina.getByRole('tab', { name: 'Conferência', exact: true }).click();
+        expect(await pagina.getByLabel('Motivo da alteração').isVisible()).toBe(true);
+        await pagina.getByRole('tab', { name: 'Identificação', exact: true }).click();
+        await pagina.getByLabel('Nome completo', { exact: true }).fill(nomeSalvo);
+        await pagina.getByRole('tab', { name: 'Conferência', exact: true }).click();
+        expect(await pagina.getByLabel('Motivo da alteração').isVisible()).toBe(false);
         await pagina.getByRole('tab', { name: 'Períodos', exact: true }).click();
         expect(await pagina.getByLabel('PB em 2020', { exact: true }).inputValue()).toBe('40');
         expect(erros).toEqual([]);
@@ -202,4 +216,129 @@ describe('Editor DTC', () => {
       }
     },
   );
+
+  it('emite DTCs em lote somente com fonte validada e revisão individual, preservando a chave no retry', async () => {
+    const pagina = await navegador.newPage();
+    const ids = [
+      documentoId,
+      '77777777-7777-4777-8777-777777777777',
+      '88888888-8888-4888-8888-888888888888',
+    ];
+    const documentos = ids.map((id, indice) => ({
+      ...documentoSintetico('DTC_IPAM', conteudoSintetico('DTC_IPAM')),
+      id,
+      nome: `Pessoa DTC fictícia ${indice + 1}`,
+      matricula: `DTC-FICTICIA-${indice + 1}`,
+      status: 'conferido' as const,
+      conferidoPorNome: 'Coordenador fictício',
+      conferidoEm: '2026-10-31T12:00:00.000Z',
+    }));
+    const fontePorDocumento = new Map(ids.map((id, indice) => [id, indice === 2 ? null : false]));
+    const tentativas = new Map<string, number>();
+    const chamadas: Array<{ id: string; chave: string; corpo: Record<string, unknown> }> = [];
+    const erros: string[] = [];
+    pagina.on('pageerror', (erro) => erros.push(erro.message));
+    pagina.on('dialog', (dialogo) => dialogo.accept());
+    await pagina.route('**/api/v1/**', async (rota) => {
+      const requisicao = rota.request();
+      const url = new URL(requisicao.url());
+      let resposta: unknown;
+      if (url.pathname === '/api/v1/auth/me') {
+        resposta = { usuario: { id: usuarioId, matricula: 'COORD-FICTICIO', nome: 'Coordenador fictício',
+          papel: 'coordenador', trocaSenhaObrigatoria: false }, csrf };
+      } else if (url.pathname === '/api/v1/notificacoes/declaracoes') {
+        resposta = { encaminhados: 0, retornos: 0 };
+      } else if (url.pathname === '/api/v1/sincronizacao/situacao') {
+        resposta = { configurada: false, ultimaSincronizacaoEm: null, horasDesdeUltima: null,
+          limiteHoras: 24, avisoAtraso: false, disjuntorAberto: false };
+      } else if (url.pathname === '/api/v1/servidores') {
+        resposta = { itens: [], proximoCursor: null };
+      } else if (url.pathname === '/api/v1/dtc') {
+        resposta = { itens: documentos.map(({ id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome }) =>
+          ({ id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome })) };
+      } else {
+        const previa = /^\/api\/v1\/dtc\/([^/]+)\/previa$/.exec(url.pathname);
+        const emissao = /^\/api\/v1\/dtc\/([^/]+)\/emitir$/.exec(url.pathname);
+        if (previa) {
+          const documento = documentos.find((item) => item.id === previa[1]);
+          if (!documento) return rota.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Documento não encontrado"}' });
+          resposta = {
+            documento,
+            fonte: {
+              documentoId: documento.id, revisao: documento.revisao, provaFonte: 'b'.repeat(64),
+              consultadoEm: '2026-10-31T12:00:00.000Z', nome: documento.nome, matricula: documento.matricula,
+              cpf: cpfSintetico(920000011), nascimento: null, nomeMae: null, nomePai: null, rg: null,
+              rgOrgao: null, rgExpedicao: null, pisPasep: null, tituloEleitor: null, endereco: null,
+              regimeJuridico: null, cargo: null, referencia: null, orgao: null, admissao: '2020-01-01',
+              periodosIpam: [], removidoNaFonte: false,
+            },
+            fonteSelecionadaAlterada: fontePorDocumento.get(documento.id),
+          };
+        } else if (emissao) {
+          const documento = documentos.find((item) => item.id === emissao[1]);
+          if (!documento) return rota.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Documento não encontrado"}' });
+          const numeroTentativa = (tentativas.get(documento.id) ?? 0) + 1;
+          tentativas.set(documento.id, numeroTentativa);
+          chamadas.push({
+            id: documento.id,
+            chave: requisicao.headers()['idempotency-key'] ?? '',
+            corpo: requisicao.postDataJSON() as Record<string, unknown>,
+          });
+          if (documento.id === ids[1] && numeroTentativa === 1) {
+            return rota.fulfill({ status: 409, contentType: 'application/json', body: '{"detail":"Falha temporária simulada"}' });
+          }
+          resposta = {
+            emissaoId: '99999999-9999-4999-8999-999999999999',
+            documentoId: documento.id, tipo: documento.tipo, numero: `N° ${numeroTentativa}/2026`,
+            emitidoEm: '2026-10-31T12:00:00.000Z', emitidoPorNome: 'Coordenador fictício',
+            status: 'emitido', canceladoEm: null,
+            pdf: { status: 'pendente', tentativas: 0, erro: null, disponivel: false },
+          };
+        } else {
+          erros.push(`${requisicao.method()} ${url.pathname}`);
+          return rota.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Rota inesperada"}' });
+        }
+      }
+      return rota.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(resposta) });
+    });
+
+    try {
+      await pagina.goto(endereco);
+      await pagina.getByRole('button', { name: /^DTC IPAM/ }).click();
+      await pagina.getByLabel('Situação').selectOption('conferido');
+      await pagina.locator('.emissao-lote > summary').click();
+      await pagina.getByRole('checkbox', { name: /Pessoa DTC fictícia 1/ }).check();
+      await pagina.getByRole('checkbox', { name: /Pessoa DTC fictícia 2/ }).check();
+      await pagina.getByRole('checkbox', { name: /Pessoa DTC fictícia 3/ }).check();
+      await pagina.getByRole('alert').getByText(/não pôde ser validada/).waitFor();
+
+      const grupos = pagina.locator('.emissao-lote .grupo-formulario');
+      await grupos.nth(0).getByText('Revisar prévia individual').click();
+      await grupos.nth(1).getByText('Revisar prévia individual').click();
+      await grupos.nth(0).getByRole('checkbox', { name: /Revisei esta prévia/ }).check();
+      await grupos.nth(1).getByRole('checkbox', { name: /Revisei esta prévia/ }).check();
+      expect(await grupos.nth(2).getByRole('checkbox', { name: /Revisei esta prévia/ }).count()).toBe(0);
+      const emitirTres = pagina.getByRole('button', { name: /Emitir 3 documento/ });
+      expect(await emitirTres.isDisabled()).toBe(true);
+      await pagina.getByRole('checkbox', { name: /Pessoa DTC fictícia 3/ }).uncheck();
+
+      await pagina.getByRole('button', { name: /Emitir 2 documento/ }).click();
+      await pagina.getByRole('alert').getByText('Falha temporária simulada').waitFor();
+      expect(chamadas).toHaveLength(2);
+      expect(chamadas.map((chamada) => chamada.corpo)).toEqual([
+        { revisao: 1, provaFonte: 'b'.repeat(64) },
+        { revisao: 1, provaFonte: 'b'.repeat(64) },
+      ]);
+      expect(chamadas.every((chamada) => /^[A-Za-z0-9._:-]{16,200}$/.test(chamada.chave))).toBe(true);
+
+      await pagina.getByRole('button', { name: /Emitir 1 documento/ }).click();
+      await pagina.getByText('N° 2/2026', { exact: false }).waitFor();
+      expect(chamadas).toHaveLength(3);
+      expect(chamadas[1].id).toBe(chamadas[2].id);
+      expect(chamadas[1].chave).toBe(chamadas[2].chave);
+      expect(erros).toEqual([]);
+    } finally {
+      await pagina.close({ runBeforeUnload: false });
+    }
+  });
 });

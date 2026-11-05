@@ -11,7 +11,7 @@ import type { SessaoAutenticada } from '../seguranca/autenticacao';
 import { HistoricoServidorService, type LinhaHistoricoServidor } from './historico-servidor';
 
 const normalizar = (campo: string) => campo.normalize('NFD').replace(/[\u0300-\u036f_\s]/g, '').toLowerCase();
-export function analisarHistorico(linhas: string[][], origem: string) {
+export function analisarHistorico(linhas: string[][], origem: string, grupo: 'funcional' | 'financeiro') {
   const colunas = Object.keys(registroHistoricoSchema.shape);
   const cabecalho = linhas[0];
   if (!cabecalho?.length || new Set(cabecalho.map(normalizar)).size !== cabecalho.length) throw new UnprocessableEntityException('Cabeçalhos ausentes ou duplicados.');
@@ -38,6 +38,10 @@ export function analisarHistorico(linhas: string[][], origem: string) {
     if (!validado.success || validado.data.origem !== origem || !validado.data.idOrigem) {
       ocorrencias.push({ linha, motivo: !validado.success ? validado.error.issues.map((erro) => `${erro.path.join('.')}: ${erro.message}`).join(' ') : 'Informe identificador e mesma origem técnica.' }); continue;
     }
+    if (validado.data.grupo !== grupo) {
+      ocorrencias.push({ linha, motivo: `Registro de ${validado.data.grupo === 'funcional' ? 'Histórico Funcional' : 'Histórico Financeiro'} incompatível com o tipo selecionado.` });
+      continue;
+    }
     if (ids.has(validado.data.idOrigem)) { ocorrencias.push({ linha, motivo: 'Identificador de origem repetido no arquivo.' }); continue; }
     ids.add(validado.data.idOrigem); registros.push({ linha, registro: validado.data });
   }
@@ -52,13 +56,13 @@ export async function importarHistorico(historico: HistoricoServidorService, ses
     if (erro instanceof ErroPlanilha || erro instanceof ErroXmlImportacao) throw new UnprocessableEntityException(erro.message);
     throw erro;
   }
-  const analise = analisarHistorico(linhas, consulta.origem);
+  const analise = analisarHistorico(linhas, consulta.origem, consulta.grupo);
   return transacao(historico.banco, async (cliente) => {
     await confirmarSessao(cliente, sessao, papeisPermitidos('editar_servidor'));
     await historico.vinculo(cliente, pessoaId, consulta.vinculoId, true);
     const existentes = await cliente.query<LinhaHistoricoServidor>('SELECT * FROM nucleo.historico_servidor WHERE vinculo_id = $1 ORDER BY id FOR UPDATE', [consulta.vinculoId]);
     const validacao = historico.protetor.hashConteudo('importacao', 'historico_servidor_v1', {
-      pessoaId, vinculoId: consulta.vinculoId, origem: consulta.origem, linhas, sessao: sessao.hash.toString('hex'),
+      pessoaId, vinculoId: consulta.vinculoId, grupo: consulta.grupo, origem: consulta.origem, linhas, sessao: sessao.hash.toString('hex'),
       revisoes: existentes.rows.map((linha) => [linha.id, linha.revisao]),
     }).toString('hex');
     if (consulta.modo === 'gravar') {

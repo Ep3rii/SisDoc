@@ -2,9 +2,11 @@ import {
   ROTULOS_DTC,
   type PaginaDtc
 } from '@sisdoc/contratos';
+import { renderizarPreviaDtc } from '@sisdoc/templates';
 import { useCallback, useEffect, useState } from 'react';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { ExclusaoDocumento } from '../documentos/exclusao-documento';
+import { EmissaoEmLote, type DocumentoElegivelLote } from '../documentos/emissao-em-lote';
 import { api } from '../infraestrutura/api';
 import { BuscaServidor } from './busca-servidor';
 import { conteudoInicial, DESCRICOES, Modo, Props } from './contexto';
@@ -67,7 +69,24 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
         </select></label>
       </FiltrosLista>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
+      {estado === 'conferido' && (papel === 'coordenador' || papel === 'admin') && <EmissaoEmLote
+        documentos={filtro.itens.map(({ id, nome, matricula, revisao }) => ({ id, nome, matricula, revisao } satisfies DocumentoElegivelLote))}
+        carregar={async (documento) => {
+          const dados = await api.previaDtc(documento.id);
+          return {
+            documentoId: dados.documento.id,
+            revisao: dados.documento.revisao,
+            provaFonte: dados.fonte.provaFonte,
+            fonteElegivel: dados.fonteSelecionadaAlterada === false,
+            html: renderizarPreviaDtc({ documento: dados.documento, fonte: dados.fonte }),
+          };
+        }}
+        emitir={(documento, chave, provaFonte) => api.emitirDtc(csrf, documento.id, chave, {
+          revisao: documento.revisao, provaFonte,
+        })}
+        onConcluido={() => setVersao((atual) => atual + 1)} onErro={onErro} onLimpar={onLimpar} onPendente={onPendente} />}
       {!pagina ? <p role="status">Carregando...</p> : pagina.itens.length === 0 ? <p>Nenhum documento nesta situação.</p> : (
+        <>
         <div className="tabela"><table>
           <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Revisão</th>
             <th scope="col">Atualizado em</th><th scope="col">Autor</th><th scope="col">Ações</th></tr></thead>
@@ -88,6 +107,7 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
               </div></td></tr>
           ))}</tbody>
         </table></div>
+        </>
       )}
     </section>
   );

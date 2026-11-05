@@ -229,8 +229,11 @@ export function useEditorDof({
         invalidar();
         onErro(new ErroApi(409, 'A admissão mudou na fonte. Prepare a tabela novamente e confira todos os valores.'));
       } else if (ativa.current) {
+        const alterado = !rascunho || JSON.stringify(validacao.data) !== JSON.stringify(rascunho.entrada);
         setResultado(calculado);
         setPedidoCalculado(validacao.data);
+        setResultadoSalvo(!alterado);
+        marcarCalculo(alterado);
       }
     } catch (erro) {
       if (ativa.current) onErro(erro);

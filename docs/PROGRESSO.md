@@ -1,5 +1,110 @@
 # Progresso da construção
 
+## Separação por versões e ambientes — 05/11/2026
+
+Criadas a [decisão 035](decisoes/035-versoes-e-ambientes.md) e a
+[documentação de releases e ambientes](VERSOES_E_AMBIENTES.md), distinguindo
+início de Produção e Homologação. O procedimento define tags/commits fixos,
+diretórios/builds separados, isolamento total do banco e artefatos de
+Homologação e endpoint recomendado `https://127.0.0.1:3444/` sem exposição LAN.
+
+**Implementado:** orientação documental e registro do estado/limites.
+**Não testado/instalado:** não foi criado banco/configuração/certificado para
+Homologação nem serviço/processo na porta 3444. **Não publicado:** nenhum
+release/tag/commit foi criado e os serviços ativos não foram reiniciados nem
+substituídos. No estado observado, `SisDoc` e `SisDocCaddy` estavam ativos; o
+XML de `SisDoc` usa `C:\SisDoc` como diretório de trabalho. O build web em
+`C:\SisDoc\apps\web\dist` tinha timestamp 05/11/2026 11:26, portanto os
+arquivos estáticos podem já refletir mudanças locais, embora a página
+compartilhada de Produção mostrasse apenas o login. Não foi feita autenticação
+para conferir telas internas. Tratar a versão da interface publicada como
+incerta até inspeção autorizada; não executar novo build nesse caminho. O
+worktree ainda contém alterações sem commit.
+
+**Pendências antes do deploy:** fechar o escopo do release; rodar validação
+final das mudanças candidatas; criar release imutável em diretório separado;
+confirmar backup consistente/verificado; provisionar e validar Homologação
+com banco e credenciais próprios; executar aceite e health check em janela.
+Não compartilhar base/configuração de produção e não tratar esta documentação
+como confirmação de publicação.
+
+## Revisão visual da importação — 05/11/2026
+
+Observação realizada em preview local do build, com sessão e respostas
+inteiramente sintéticas; a página compartilhada em produção permaneceu no
+login, sem autenticação ou gravação. Em 1366 px, 764 px e 390 px:
+
+- A navegação lateral passava a comprimir o conteúdo em larguras de tablet.
+  O menu agora recolhe abaixo de 900 px, preservando a área útil.
+- A importação foi organizada em seções de arquivo/destino e aba XLSX, com
+  etapas visuais não confundíveis com botões. A última etapa e a ação mudam
+  conforme o fluxo: guardar no Legado, guardar para mapear ou aplicar no Núcleo.
+- A opção de mapeamento explica o que acontece, XML/requisitos ficam em seção
+  recolhida e a confirmação permanece indisponível até validar o arquivo.
+  A mensagem de validação não aparece antes de selecionar/validar arquivo.
+- Conferência e lotes foram inspecionados com linhas sintéticas; tabelas
+  preservam rolagem horizontal e cabeçalhos, sem remover campos operacionais.
+
+**Validação:** build web e `npm run typecheck` aprovados; `git diff --check`
+limpo. Preview verificado visualmente e por acessibilidade em desktop, tablet
+e celular, incluindo os três destinos/modos, sem transbordamento horizontal
+da página. Nenhuma interação com produção, dado real, banco, publicação ou
+commit.
+
+## Separação da importação de históricos — 05/11/2026
+
+Implementada no histórico por pessoa/vínculo a seleção exclusiva entre
+**Histórico Funcional** e **Histórico Financeiro**. O grupo é exigido no
+contrato e na API; linhas de outro grupo são rejeitadas, o grupo integra a
+prova de validação, e os modelos/ações exibidos correspondem à aba ativa.
+Divergências existentes seguem preservadas; não há sobrescrita automática.
+
+**Limite ainda pendente:** o importador administrativo do Núcleo continua com
+os tipos de origem atuais (Dados Funcionais, Afastamentos, Incorporações,
+Períodos IPAM e Eventos Funcionais). Não os removi nem agrupei sem amostras
+das tabelas de Histórico Funcional/Financeiro: falta definir identificação
+do vínculo, mapeamento e reconciliação. Os modelos genéricos atuais são
+provisórios e não substituem o layout real a ser apresentado.
+
+Ver [Dados e importação](DADOS_E_IMPORTACAO.md) e
+[decisão 033](decisoes/033-edicao-contextual-e-historico-local.md).
+Typecheck e teste direcionado de evolução do Núcleo aprovados; nenhuma
+alteração de banco, publicação ou commit.
+
+## Prévia, motivos e emissão em lote — 04/11/2026
+
+Implementação atual no worktree, ainda **não publicada**. A [decisão 034](decisoes/034-emissao-em-lote-e-motivos-condicionais.md)
+registra o escopo e seus limites:
+
+- DOF conferidas (página atual) e DTCs conferidas (itens carregados do tipo)
+  podem ser selecionadas para emissão sequencial. Cada documento exige prévia
+  aberta e revisada, prova da fonte atual explicitamente válida e chave
+  idempotente própria. Falhas são individuais; emissões concluídas não são
+  revertidas. Aprovações, permissões e validações do servidor permanecem
+  obrigatórias.
+- A DTC com estado de fonte `null` não é considerada íntegra nem habilitada
+  para emissão em lote. Resultado incerto preserva a chave no retry enquanto
+  a interface permanece aberta; após recarga, consultar o Histórico antes de
+  tentar outra emissão.
+- Motivos de cálculo/processo/blocos DOF e conteúdo DTC aparecem quando há
+  mudança real contra o documento salvo; restaurar os valores limpa motivo e
+  pendência. Motivos de devolução/transição permanecem inalterados.
+- Visualizadores DOF/DTC foram uniformizados e o layout ficou fluido e
+  responsivo; prévias de edição continuam instantâneas e locais.
+
+**Blocos da página 2 — extração parcial implementada:** a tela carrega eventos
+funcionais e permite copiar os campos disponíveis para um bloco inativo,
+escolhido manualmente. A sugestão não classifica eventos, não calcula
+períodos/direitos e exige revisão/edição antes de ativação. Classificação
+automática dos eventos e fórmulas homologadas continuam pendentes de validação
+institucional; nenhum texto oficial ou cálculo é inferido.
+
+**Validação:** `npm run typecheck`, build web e 24 testes focados de interface
+DOF/DTC aprovados, com API sintética e dados fictícios. O teste direcionado de
+blocos também passou, cobrindo extração revisável, bloco inativo, prévia e
+preservação de alterações/conflitos. `git diff --check` aprovado. Sem
+alteração de banco/serviços, publicação, aprovação de modelos ou commit/push.
+
 ## Rascunho de conclusão funcional — 04/11/2026
 
 Por orientação do responsável, migração de máquina deixa o foco ativo;

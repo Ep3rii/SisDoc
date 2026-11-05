@@ -172,7 +172,7 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
     </form>
     <label>Filtrar registros carregados (descrição, competência, rubrica, origem)<input value={filtro} onChange={(e) => setFiltro(e.target.value)} /></label>
     {podeEditar && !registro && <button type="button" onClick={() => { setRegistro(historicoVazio(grupo)); setEdicao(null); setMensagem(''); }}>Adicionar registro {grupo}</button>}
-    {podeEditar && !registro && <TransferenciaHistorico pessoaId={pessoaId} vinculoId={vinculoId} csrf={csrf}
+    {podeEditar && !registro && <TransferenciaHistorico key={grupo} pessoaId={pessoaId} vinculoId={vinculoId} grupo={grupo} csrf={csrf}
       onErro={onErro} onImportado={() => setVersao((v) => v + 1)} />}
     {mensagem && <p role="status" className="aviso">{mensagem}</p>}
     {registro && podeEditar && <form onSubmit={salvar}><fieldset disabled={ocupado}>

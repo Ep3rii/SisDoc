@@ -3,6 +3,8 @@
 ## Escolha o procedimento
 
 - Ligar diariamente: [Como ligar](COMO_LIGAR.md).
+- Iniciar/verificar uma versão e separar Produção de Homologação:
+  [Versões, Produção e Homologação](VERSOES_E_AMBIENTES.md).
 - Instalar vazio: [Instalação e requisitos atuais](INSTALACAO_LOCAL.md).
 - Transferir dados/usuários/documentos para outra máquina:
   [Migração completa Windows Server](MIGRACAO_WINDOWS_SERVER.md).
@@ -16,6 +18,10 @@ ativos como serviços Windows. A execução observada usa `LocalService`, API em
 `127.0.0.1:3443` e proxy Caddy em `192.168.70.26:443`, com regra de firewall
 LAN em escopo restrito. Ao atualizar, valide caminhos,
 certificados, ACLs e ordem de dependência (PostgreSQL -> SisDoc -> Caddy).
+O serviço `SisDoc` observado usa `C:\SisDoc` como diretório de trabalho;
+não compile nesse checkout durante operação. Releases e Homologação precisam
+de diretórios/builds próprios. O passo a passo está na decisão
+[035 — versões e ambientes](decisoes/035-versoes-e-ambientes.md).
 Em 04/11/2026, publicação autorizada aplicou `025-historico-servidor`,
 após backup local cifrado/verificado. Serviços automáticos Running e HTTPS
 validado; detalhes e limites do backup em [Progresso](PROGRESSO.md).

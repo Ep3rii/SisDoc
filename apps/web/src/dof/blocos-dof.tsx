@@ -6,13 +6,15 @@ import {
   type CodigoBlocoDof,
   type DadosFontePreviaDof,
   type ProvaFontePreviaDof,
+  referenciaServidorSchema,
+  type ReferenciaServidor,
   type RascunhoDof,
   aplicarAjustesCadastro, type AjustesCadastro, type ResultadoCalculoDof,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { api, ErroApi } from '../infraestrutura/api';
+import { api, ErroApi, requisitar, validar } from '../infraestrutura/api';
 import { PreviaDocumento } from '../compartilhado/previa-documento';
 
 type Props = {
@@ -47,6 +49,14 @@ export function BlocosDof({
   const [carregandoPrevia, setCarregandoPrevia] = useState(false);
   const [falhaPrevia, setFalhaPrevia] = useState(false);
   const [atualizacaoPrevia, setAtualizacaoPrevia] = useState(0);
+  const [eventos, setEventos] = useState<ReferenciaServidor['registros'] | null>(null);
+  const [cursorEventos, setCursorEventos] = useState<string | undefined>();
+  const [proximoCursorEventos, setProximoCursorEventos] = useState<string | null>(null);
+  const [cursorFalhaEventos, setCursorFalhaEventos] = useState<string | undefined>();
+  const [codigoSugestao, setCodigoSugestao] = useState<CodigoBlocoDof | ''>('');
+  const [carregandoEventos, setCarregandoEventos] = useState(false);
+  const [falhaEventos, setFalhaEventos] = useState(false);
+  const requisicaoEventos = useRef(0);
   const ativa = useRef(true);
   const revisaoAtual = useRef({ id: rascunho.id, revisao: rascunho.revisao });
   revisaoAtual.current = { id: rascunho.id, revisao: rascunho.revisao };
@@ -79,9 +89,10 @@ export function BlocosDof({
 
   function alterar(novos: BlocoRascunhoDof[], novoMotivo = motivo) {
     setBlocos(novos);
-    setMotivo(novoMotivo);
     setMensagem('');
-    onPendente(JSON.stringify(novos) !== JSON.stringify(rascunho.blocos) || novoMotivo.length > 0);
+    const mudou = JSON.stringify(novos) !== JSON.stringify(rascunho.blocos);
+    setMotivo(mudou ? novoMotivo : '');
+    onPendente(mudou);
   }
 
   function adicionar() {
@@ -94,6 +105,68 @@ export function BlocosDof({
       return;
     }
     alterar([...blocos, { id: globalThis.crypto.randomUUID(), codigo: tipo, ativo: true, texto: '' }]);
+  }
+
+  async function carregarEventos(cursor?: string) {
+    const requisicao = ++requisicaoEventos.current;
+    setCarregandoEventos(true);
+    setFalhaEventos(false);
+    try {
+      const consulta = new URLSearchParams({
+        vinculoId: rascunho.vinculoId, tipo: 'eventos_funcionais', limite: '50',
+        ...(cursor ? { cursor } : {}),
+      });
+      const dados = validar(referenciaServidorSchema, await requisitar(
+        `servidores/${rascunho.pessoaId}/referencias?${consulta.toString()}`,
+      ));
+      if (dados.pessoaId !== rascunho.pessoaId || dados.vinculoId !== rascunho.vinculoId) {
+        throw new ErroApi(409, 'Os eventos consultados não correspondem ao vínculo deste rascunho.');
+      }
+      if (!ativa.current || requisicao !== requisicaoEventos.current) return;
+      setEventos(dados.registros.filter((evento) => evento.campos.removido_na_fonte_em === null));
+      setCursorEventos(cursor);
+      setProximoCursorEventos(dados.proximoCursor);
+      setCursorFalhaEventos(undefined);
+    } catch (erro: unknown) {
+      if (ativa.current && requisicao === requisicaoEventos.current) {
+        setFalhaEventos(true);
+        setCursorFalhaEventos(cursor);
+        onErro(erro);
+      }
+    } finally {
+      if (ativa.current && requisicao === requisicaoEventos.current) setCarregandoEventos(false);
+    }
+  }
+
+  function adicionarSugestao(evento: ReferenciaServidor['registros'][number]) {
+    if (!codigoSugestao) return;
+    if (blocos.length >= 200) {
+      onErro(new ErroApi(400, 'O limite técnico é de 200 blocos por rascunho.'));
+      return;
+    }
+    if (!globalThis.crypto?.randomUUID) {
+      onErro(new ErroApi(0, 'Não foi possível gerar um identificador seguro para o bloco.'));
+      return;
+    }
+    const campo = (nome: string) => evento.campos[nome]?.replace(/\s+/g, ' ').trim() || null;
+    const ato = [campo('ato_tipo'), campo('ato_numero')].filter((valor): valor is string => valor !== null).join(' ');
+    const linhas = [
+      campo('tipo') ? `Tipo registrado: ${campo('tipo')}` : null,
+      campo('data_evento') ? `Data do evento: ${campo('data_evento')}` : null,
+      ato ? `Ato: ${ato}` : null,
+      campo('data_publicacao') ? `Data de publicação: ${campo('data_publicacao')}` : null,
+      campo('descricao_origem') ? `Descrição de origem: ${campo('descricao_origem')}` : null,
+      campo('fonte') ? `Fonte: ${campo('fonte')}` : null,
+    ].filter((linha): linha is string => linha !== null);
+    const texto = linhas.join('\n');
+    if (texto.length === 0 || texto.length > 8000) {
+      onErro(new ErroApi(400, 'O evento não tem campos utilizáveis ou excede o limite de texto do bloco.'));
+      return;
+    }
+    alterar([...blocos, {
+      id: globalThis.crypto.randomUUID(), codigo: codigoSugestao, ativo: false, texto,
+    }]);
+    setMensagem('Sugestão copiada para um bloco inativo. Revise e edite o texto antes de ativá-lo.');
   }
 
   function mover(indice: number, destino: number) {
@@ -143,6 +216,54 @@ export function BlocosDof({
       <p>Variáveis disponíveis: {'{{nome}}'}, {'{{matricula}}'}, {'{{cpf}}'}, {'{{nascimento}}'}, {'{{nome_mae}}'}, {'{{regime_juridico}}'}, {'{{cargo}}'}, {'{{nivel}}'}, {'{{referencia}}'}, {'{{orgao}}'}, {'{{processo}}'}, {'{{admissao}}'}, {'{{inicio}}'}, {'{{fim}}'}, {'{{dias_periodo}}'}, {'{{tempo_contribuicao}}'} e {'{{efetivo_exercicio}}'}. Variáveis indisponíveis e expressões malformadas são destacadas.</p>
       </details>
       {bloqueado && <p className="aviso erro">Salve ou descarte as alterações do cálculo e do processo antes de editar os blocos.</p>}
+      <section className="separado" aria-labelledby="sugestoes-eventos-titulo">
+        <h4 id="sugestoes-eventos-titulo">Sugestões revisáveis do histórico funcional</h4>
+        <p>Extraia dados dos eventos para um bloco provisório. Escolha o tipo manualmente; a sugestão fica inativa e não calcula períodos ou direitos. Revise e edite antes de ativar. As regras de classificação e cálculo da página 2 ainda não foram homologadas.</p>
+        <fieldset disabled={ocupado || bloqueado || somenteLeitura || carregandoEventos}>
+          <label>Destino da sugestão
+            <select value={codigoSugestao} onChange={(evento) => {
+              const codigo = codigoBlocoDofSchema.safeParse(evento.target.value);
+              if (codigo.success) setCodigoSugestao(codigo.data);
+              else setCodigoSugestao('');
+            }}>
+              <option value="">Escolha o tipo de bloco</option>
+              {Object.entries(TITULOS_BLOCOS_DOF).map(([codigo, titulo]) =>
+                <option key={codigo} value={codigo}>{titulo}</option>)}
+            </select>
+          </label>
+          {eventos === null && !falhaEventos && (
+            <button type="button" className="secundario" onClick={() => { onLimpar(); void carregarEventos(); }}>
+              {carregandoEventos ? 'Carregando eventos...' : 'Carregar eventos funcionais'}
+            </button>
+          )}
+          {eventos !== null && <>
+            <p role="status">{eventos.length} evento(s) ativo(s) nesta página do histórico funcional.</p>
+            {eventos.length === 0 && <p>Nenhum evento ativo nesta página.</p>}
+            {eventos.map((evento) => <section className="grupo-formulario" key={evento.id}>
+              <h5>{evento.campos.tipo || 'Evento sem tipo informado'}</h5>
+              <p>{[
+                evento.campos.data_evento,
+                [evento.campos.ato_tipo, evento.campos.ato_numero].filter(Boolean).join(' '),
+                evento.campos.data_publicacao ? `Publicação ${evento.campos.data_publicacao}` : null,
+              ].filter(Boolean).join(' · ') || 'Sem data ou ato informado'}</p>
+              <button type="button" className="secundario" disabled={!codigoSugestao}
+                onClick={() => adicionarSugestao(evento)}>Adicionar ao rascunho como bloco inativo</button>
+            </section>)}
+            <div className="acoes">
+              <button type="button" className="secundario" disabled={!cursorEventos}
+                onClick={() => { onLimpar(); void carregarEventos(); }}>Primeira página de eventos</button>
+              <button type="button" className="secundario" disabled={!proximoCursorEventos}
+                onClick={() => { onLimpar(); void carregarEventos(proximoCursorEventos ?? undefined); }}>Próxima página de eventos</button>
+            </div>
+          </>}
+          {falhaEventos && <>
+            <p className="aviso erro" role="alert">Não foi possível carregar esta página do histórico funcional.</p>
+            <button type="button" className="secundario" onClick={() => { onLimpar(); void carregarEventos(cursorFalhaEventos); }}>
+              Tentar carregar eventos novamente
+            </button>
+          </>}
+        </fieldset>
+      </section>
         <form onSubmit={salvar}>
           <fieldset disabled={ocupado || bloqueado || somenteLeitura}>
             <label>Tipo de bloco
@@ -176,10 +297,10 @@ export function BlocosDof({
                 </div>
               </section>
             ))}
-            <label>Motivo da alteração dos blocos
+            {alterados && <label>Motivo da alteração dos blocos
               <textarea value={motivo} maxLength={2000} required onChange={(evento) => alterar(blocos, evento.target.value)} />
-            </label>
-            <button type="submit" disabled={!alterados}>{ocupado ? 'Salvando...' : 'Salvar blocos'}</button>
+            </label>}
+            <button type="submit" disabled={!alterados || !motivo.trim()}>{ocupado ? 'Salvando...' : 'Salvar blocos'}</button>
           </fieldset>
         </form>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}

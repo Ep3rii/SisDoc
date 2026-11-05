@@ -16,6 +16,8 @@ import { CorrecaoNoDocumento } from '../cadastro/correcao-no-documento';
 export function CalculoDof(props: Props) {
   const [processoEdicao, setProcessoEdicao] = useState<string | null | undefined>(undefined);
   const { setReferencia, ajustesCadastro, alterarCadastro, fonteEdicao, fonteReferencia, fonteCompleta, referencia, previaLocal, id, rascunho, nome, matricula, admissaoAtual, somenteLeitura, podeSalvar, onErro, onLimpar, resultado, aba, setAba, dadosServidor, csrf, calculoPendente, blocosPendentes, encaminhamentoPendente, operacaoEncaminhamento, operacaoConferencia, ocupado, edicaoIndisponivel, setRascunho, onPendente, marcarProcesso, bloqueioCalculo, inicio, setInicio, setTabela, invalidar, fim, setFim, preparar, calcular, tabela, inicioEfetivo, anteriorTs, setAnteriorTs, anteriorPf, setAnteriorPf, origemAnterior, setOrigemAnterior, pagina, anosPagina, abrangencias, valores, atualizar, setPagina, confirmado, setConfirmado, marcarCalculo, resultadoSalvo, mensagem, pedidoCalculado, salvar, bloqueioSalvar, anosExcluidos, confirmouRemocao, setConfirmouRemocao, motivo, setMotivo, destinoPrevia, setFontePrevia, processoPendente, marcarBlocos, setProvaPrevia, setOcupado, provaPrevia, marcarConferencia, onFechar, marcarEncaminhamento, setOperacaoEncaminhamento, setDestinoPrevia, confirmarSaida, rascunhoInicial } = useEditorDof(props);
+  const calculoAlterado = Boolean(pedidoCalculado && resultado
+    && (!rascunho || JSON.stringify(pedidoCalculado) !== JSON.stringify(rascunho.entrada)));
   return (
     <section className="estudio-dof" aria-labelledby="calculo-dof-titulo">
       <div className="area-dof">
@@ -162,9 +164,9 @@ export function CalculoDof(props: Props) {
                 </label>
               </>
             )}
-            <label>Motivo dos lançamentos ou da alteração
+            {calculoAlterado && <label>Motivo dos lançamentos ou da alteração
               <textarea value={motivo} onChange={(evento) => { setMotivo(evento.target.value); marcarCalculo(true); }} maxLength={2000} required />
-            </label>
+            </label>}
           </fieldset>
         </form>
       )}
@@ -237,7 +239,7 @@ export function CalculoDof(props: Props) {
         </dl>
         <div className="acoes">
           {podeSalvar && resultado && pedidoCalculado && <button type="submit" form={`${id}-salvar`} className="secundario"
-            disabled={bloqueioSalvar}>{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>}
+            disabled={bloqueioSalvar || !calculoAlterado || !motivo.trim()}>{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>}
           <button type="button" disabled title="Após conferir, abra DOFs conferidas para revisão e emissão pelo coordenador">Emitir PDF · após conferir</button>
         </div>
       </footer>

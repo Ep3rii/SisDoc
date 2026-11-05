@@ -51,6 +51,11 @@ a cada 30 segundos. Falha de consulta é visível, não substituída por zero.
 - Histórico por pessoa/vínculo separa fatos funcionais (férias, licenças,
   abono pecuniário, abono de permanência e outros) de lançamentos financeiros.
   Não calcula direitos, tributos, saldos legais ou folha.
+- A importação do histórico é do vínculo selecionado e deve declarar um único
+  grupo: funcional ou financeiro. O servidor rejeita as linhas de outro grupo
+  e mantém divergências existentes para revisão, sem sobrescrita automática.
+  Modelos/campos finais para tabelas funcionais e financeiras ainda dependem
+  dos exemplos de origem e não devem ser inferidos a partir do modelo genérico.
 - Valores são strings decimais exatas; somas usam centavos inteiros.
   Previsto/informado/pago/estornado são estados distintos. Estorno exige
   pagamento do mesmo vínculo, mesmo valor/natureza e não pode ser duplicado;

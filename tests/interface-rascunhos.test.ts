@@ -612,9 +612,11 @@ describe('interface de rascunhos com API sintética', () => {
   it('mantém o layout em duas colunas, navega por teclado e protege a edição na busca global', async () => {
     await pagina.goto(endereco);
     await iniciarCalculo(pagina);
+    expect(await pagina.getByLabel('Motivo dos lançamentos ou da alteração').isVisible()).toBe(false);
     await pagina.getByLabel('Faltas em 1980').fill('2');
     await pagina.getByLabel('PB em 1980').fill('10');
     await calcularTabela(pagina);
+    expect(await pagina.getByLabel('Motivo dos lançamentos ou da alteração').isVisible()).toBe(true);
     expect(await pagina.locator('.barra-totais dd').allTextContents()).toEqual(['16.437', '2', '16.435', '16.445']);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Conferência fictícia do layout');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
@@ -689,7 +691,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Conferência fictícia');
     await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
-    expect(await pagina.getByLabel('Motivo dos lançamentos ou da alteração').inputValue()).toBe('');
+    expect(await pagina.getByLabel('Motivo dos lançamentos ou da alteração').isVisible()).toBe(false);
     expect(estado.escritas).toBe(1);
 
     await abrirRascunho(pagina);
@@ -799,6 +801,32 @@ describe('interface de rascunhos com API sintética', () => {
 
   it('edita blocos com prévia isolada e atualizada, preservando alterações e conflitos', async () => {
     await pagina.goto(endereco);
+    await pagina.route('**/api/v1/**', async (rota) => {
+      const url = new URL(rota.request().url());
+      if (url.pathname !== `/api/v1/servidores/${pessoaId}/referencias` || url.searchParams.get('limite') !== '50') {
+        await rota.fallback();
+        return;
+      }
+      await responder(rota, 200, {
+        pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1', removidoNaFonte: false,
+        cadastro: {
+          nome, cpf: cpfSintetico(), nascimento: '1960-05-04', nomeMae: 'Mãe fictícia', nomePai: null,
+          pisPasep: null, rgNumero: null, rgOrgao: null, rgExpedicao: null, tituloEleitor: null, endereco: null,
+          matricula, regimeJuridico: 'ESTATUTARIO', cargo: 'Cargo fictício', classe: null, nivel: null, referencia: 'UNICA',
+          setor: null, orgaoCodigo: null, orgao: 'Órgão fictício', admissao: estado.admissao, desligamento: null,
+        },
+        pessoa: { Nome: nome },
+        registros: [{
+          id: '66666666-6666-4666-8666-666666666666',
+          campos: {
+            tipo: 'progressao', data_evento: '2024-06-10', data_publicacao: '2024-06-15',
+            ato_tipo: 'Portaria', ato_numero: '123/2024', fonte: 'fixture',
+            removido_na_fonte_em: null, descricao_origem: 'Progressão fictícia registrada',
+          },
+        }],
+        proximoCursor: null,
+      });
+    });
     await iniciarCalculo(pagina);
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Cálculo fictício');
@@ -806,9 +834,20 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByText('Rascunho salvo na revisão 1.', { exact: false }).waitFor();
 
     await selecionarAba(pagina, 'Blocos de texto');
+    expect(await pagina.getByLabel('Motivo da alteração dos blocos').isVisible()).toBe(false);
+    await pagina.getByRole('button', { name: 'Carregar eventos funcionais' }).click();
+    await pagina.getByRole('heading', { name: 'progressao', exact: true }).waitFor();
+    await pagina.getByLabel('Destino da sugestão').selectOption('progressao');
+    await pagina.getByRole('button', { name: 'Adicionar ao rascunho como bloco inativo' }).click();
+    expect(await pagina.getByLabel('Texto do bloco 1').inputValue()).toContain('Tipo registrado: progressao');
+    expect(await pagina.getByLabel('Texto do bloco 1').inputValue()).toContain('Ato: Portaria 123/2024');
+    expect(await pagina.getByRole('checkbox', { name: 'Ativar bloco 1' }).isChecked()).toBe(false);
+    await pagina.getByRole('button', { name: 'Remover bloco novo 1' }).click();
+    expect(await pagina.getByLabel('Motivo da alteração dos blocos').isVisible()).toBe(false);
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
     const textoInicial = '<script>window.top.intrusao=1</script> {{nome}} {{cargo}} {{desconhecida}}';
     await pagina.getByLabel('Texto do bloco 1').fill(textoInicial);
+    expect(await pagina.getByLabel('Motivo da alteração dos blocos').isVisible()).toBe(true);
     expect(await pagina.getByLabel('Fim do período').isDisabled()).toBe(true);
     expect(await pagina.getByText('Há alterações não salvas.').isVisible()).toBe(true);
     await expect.poll(() => estado.previas).toBe(1);
@@ -836,7 +875,7 @@ describe('interface de rascunhos com API sintética', () => {
     expect(maiorDuracao).toBeLessThan(200);
     process.stdout.write(`Prévia sintética de 45 anos: maior tempo edição-exibição ${maiorDuracao.toFixed(1)} ms.\n`);
 
-    await pagina.getByLabel('Tipo de bloco').selectOption('progressao');
+    await pagina.locator('form select').last().selectOption('progressao');
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
     await pagina.getByLabel('Texto do bloco 2').fill('Segundo bloco fictício');
     await pagina.getByRole('button', { name: 'Subir bloco 2' }).click();
@@ -900,7 +939,9 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
     await expect.poll(() => estado.liberarPrevia !== null).toBe(true);
     await selecionarAba(pagina, 'Dados do servidor');
+    expect(await pagina.getByLabel('Motivo da alteração do processo').isVisible()).toBe(false);
     await pagina.getByLabel('Número do processo').fill('1234/5678');
+    expect(await pagina.getByLabel('Motivo da alteração do processo').isVisible()).toBe(true);
     await pagina.getByLabel('Motivo da alteração do processo').fill('Processo fictício');
     await pagina.getByRole('button', { name: 'Salvar processo' }).click();
     await pagina.getByText('Processo salvo na revisão 2.', { exact: false }).waitFor();

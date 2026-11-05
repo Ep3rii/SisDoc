@@ -146,6 +146,24 @@ Na aplicação, o relatório mostra referências completas (matrícula, nome e C
 quando disponíveis) para a conferência operacional autenticada. Relatórios
 da CLI continuam mascarados. Nenhum dado pessoal vai para logs.
 
+## Importação do histórico do servidor
+
+O histórico é importado no contexto de uma pessoa e vínculo, separado da
+importação administrativa de dados funcionais. A tela disponibiliza somente
+o grupo selecionado: **Histórico Funcional** ou **Histórico Financeiro**.
+O contrato exige esse grupo e o servidor rejeita linhas de outro grupo mesmo
+que o arquivo tenha sido enviado manualmente. Os modelos atuais são
+provisórios e representam o esquema genérico já implementado; os layouts
+definitivos dependem dos exemplos das tabelas de origem que ainda serão
+fornecidos.
+
+Na validação, registros novos são listados como candidatos; registros
+idênticos são inalterados e divergências são preservadas para revisão.
+Somente os candidatos aceitos são aplicados após confirmação. Linhas rejeitadas
+e divergentes não substituem dados cadastrados. A gravação é transacional e o
+arquivo recebido é guardado cifrado como lote; não há criação, exclusão ou
+recriação do banco ou do schema Legado.
+
 ## Execução
 
 ### Linha de comando

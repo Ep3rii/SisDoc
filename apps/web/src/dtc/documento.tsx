@@ -10,6 +10,7 @@ import { PainelEmissao } from '../documentos/emissao';
 import { api, ErroApi } from '../infraestrutura/api';
 import { dataBr, Papel } from './contexto';
 import { Editor } from './editor';
+import { PreviaDocumento } from '../compartilhado/previa-documento';
 
 /** Exibe revisão salva e coordena edição, conferência, devolução e emissão autorizadas. */
 export function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, onPendente }: {
@@ -123,7 +124,7 @@ export function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, o
       </div>
       <div className="painel-previa previa-documento">
         <p>Prévia sem validade oficial. {tipo === 'DTC_INSS' ? 'Modelo do INSS provisório.' : ''}</p>
-        <iframe title={`Prévia da ${ROTULOS_DTC[tipo]}`} sandbox="" srcDoc={renderizarPreviaDtc({ documento, fonte })} />
+        <PreviaDocumento titulo={`Prévia da ${ROTULOS_DTC[tipo]}`} html={renderizarPreviaDtc({ documento, fonte })} />
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import { ajustesCadastroSchema, aplicarAjustesCadastro, registroHistoricoSchema, somarValoresMonetarios,
-  consultaHistoricoServidorSchema, filtrarHistorico, type RegistroHistorico } from '@sisdoc/contratos';
+  consultaHistoricoServidorSchema, importarHistoricoQuerySchema, filtrarHistorico, type RegistroHistorico } from '@sisdoc/contratos';
 import { calcularPreviaDof } from '@sisdoc/calculo';
 import { cpfSintetico } from './dados-sinteticos';
 
@@ -104,13 +104,26 @@ describe('evolução local do Núcleo', () => {
     expect(() => lerPlanilha(danificado, 'Cadastro')).toThrow();
   });
   it('valida importação histórica canônica, rejeita duplicatas e preserva valores decimais', () => {
+    expect(importarHistoricoQuerySchema.safeParse({
+      vinculoId: '00000000-0000-4000-8000-000000000001', origem: 'fixture', modo: 'validar',
+    }).success).toBe(false);
+    expect(importarHistoricoQuerySchema.safeParse({
+      vinculoId: '00000000-0000-4000-8000-000000000001', grupo: 'financeiro', origem: 'fixture', modo: 'validar',
+    }).success).toBe(true);
     const campos = ['GRUPO', 'TIPO', 'SITUACAO', 'DESCRICAO', 'COMPETENCIA', 'RUBRICA', 'NATUREZA', 'VALOR', 'FOLHA', 'IDORIGEM'];
     const linha = ['financeiro', 'lancamento', 'informado', 'Sintético', '2024-01', 'FICTICIA', 'provento', '0.10', 'normal', 'ID-1'];
-    const analise = analisarHistorico([campos, linha, linha, [...linha.slice(0, 7), '0,10', 'normal', 'ID-2']], 'fixture');
+    const analise = analisarHistorico([campos, linha, linha, [...linha.slice(0, 7), '0,10', 'normal', 'ID-2']], 'fixture', 'financeiro');
     expect(analise.registros).toHaveLength(1);
     expect(analise.registros[0].registro.valor).toBe('0.10');
     expect(analise.ocorrencias).toHaveLength(2);
-    expect(() => analisarHistorico([['TIPO', 'tipo']], 'fixture')).toThrow();
-    expect(() => analisarHistorico([['desconhecido']], 'fixture')).toThrow();
+    const registroFuncional = ['funcional', 'outro', 'informado', 'Fato sintético', '', '', '', '', '', 'ID-FUNCIONAL'];
+    const separacao = analisarHistorico([campos, linha, registroFuncional], 'fixture', 'financeiro');
+    expect(separacao.registros).toHaveLength(1);
+    expect(separacao.ocorrencias).toContainEqual({
+      linha: 3,
+      motivo: 'Registro de Histórico Funcional incompatível com o tipo selecionado.',
+    });
+    expect(() => analisarHistorico([['TIPO', 'tipo']], 'fixture', 'financeiro')).toThrow();
+    expect(() => analisarHistorico([['desconhecido']], 'fixture', 'financeiro')).toThrow();
   });
 });

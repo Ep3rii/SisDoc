@@ -28,11 +28,12 @@ export function ProcessoDof({ rascunho, csrf, bloqueado, somenteLeitura = false,
 
   function alterar(numero: string, justificativa: string, confirmarRemocao = remover) {
     setProcesso(numero);
-    setMotivo(justificativa);
     setRemover(confirmarRemocao);
     setMensagem('');
     onEdicao?.(confirmarRemocao ? null : numero);
-    onPendente(confirmarRemocao || numero.trim().toUpperCase() !== (rascunho.processo ?? '') || justificativa.length > 0);
+    const mudou = confirmarRemocao || numero.trim().toUpperCase() !== (rascunho.processo ?? '');
+    setMotivo(mudou ? justificativa : '');
+    onPendente(mudou);
   }
 
   async function salvar(evento: FormEvent<HTMLFormElement>) {
@@ -88,10 +89,10 @@ export function ProcessoDof({ rascunho, csrf, bloqueado, somenteLeitura = false,
             <input type="checkbox" checked={remover} onChange={(evento) => alterar(processo, motivo, evento.target.checked)} />
             Confirmo a remoção do número de processo.
           </label>}
-          <label>Motivo da alteração do processo
+          {alterado && <label>Motivo da alteração do processo
             <textarea value={motivo} maxLength={2000} required onChange={(evento) => alterar(processo, evento.target.value)} />
-          </label>
-          <button type="submit" disabled={!alterado}>{ocupado ? 'Salvando...' : 'Salvar processo'}</button>
+          </label>}
+          <button type="submit" disabled={!alterado || !motivo.trim()}>{ocupado ? 'Salvando...' : 'Salvar processo'}</button>
         </fieldset>
       </form>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}

@@ -1,6 +1,8 @@
 # Como ligar o SisDoc
 
 Manual resumido para uma instalação já configurada ou restaurada e aceita.
+Este procedimento cobre Produção. Para versões candidatas e Homologação,
+consulte [Versões, Produção e Homologação](VERSOES_E_AMBIENTES.md).
 Para outra máquina, conclua primeiro a
 [migração Windows Server](MIGRACAO_WINDOWS_SERVER.md). Não execute setup para
 ligar uma instalação existente.
@@ -78,6 +80,9 @@ Get-Service -Name 'SisDoc', 'SisDocCaddy'
 Confira HTTPS/health após reiniciar. O procedimento manual do passo 1 é
 alternativo para instalações sem esses serviços, não para iniciar outra cópia.
 O reinício automático após reboot não foi testado nesta operação.
+Não compile nem atualize o checkout `C:\SisDoc`: o serviço instalado usa esse
+diretório. Deploy de nova versão deve usar um release separado e o
+[procedimento versionado](VERSOES_E_AMBIENTES.md).
 
 Na operação diária, não execute `npm run setup`, testes ou importações para
 ligar o sistema. Build e migrações só são necessários após atualização do
