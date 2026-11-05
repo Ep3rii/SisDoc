@@ -16,15 +16,20 @@ por tag/commit, diretório/build separado, Homologação isolada e acesso
 recomendado `https://127.0.0.1:3444/` (TLS SAN IP, banco/configuração/chaves/PDF
 próprios; sem firewall/Caddy LAN).
 
-**Ainda não publicado nem disponibilizado:** o worktree contém alterações
-não commitadas; o serviço Windows ativo aponta para `C:\SisDoc`, logo build
-nesse caminho pode trocar arquivos servidos. `apps/web/dist/index.html` tinha
-timestamp 05/11/2026 11:26; a página compartilhada de Produção estava apenas
-no login e não foi autenticada. Assim, a interface interna pode refletir o
-build local, mas não foi possível verificar. O primeiro release não foi
-tagueado e não há Homologação provisionada/validada. Evitar novo build em
-`C:\SisDoc`; antes de trocar a API, inspecionar em janela autorizada, testar
-candidato separado, realizar backup verificado e seguir o health check.
+**Produção publicada:** tag local `v0.1.0`, commit `22f38b3`, build em
+`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`. Typecheck/build e 42 testes
+focados passaram; diagnóstico somente leitura confirmou migração 025.
+Serviços `SisDoc`/`SisDocCaddy` Running; health 200, privado sem sessão 401,
+todos os assets do entrypoint conferidos por hash. Nenhuma migração ou
+aprovação de modelo executada. Backup pré-deploy somente do banco, cifrado
+DPAPI, e rollback `0529dc3` foram preservados; detalhes em
+[Progresso](../PROGRESSO.md). O commit/tag ainda não foram enviados ao remoto.
+
+**Homologação ainda não existe:** porta 3444 livre, mas faltam banco/roles
+separados (o papel atual não tem `CREATEDB`/`CREATEROLE`), TLS confiável com
+SAN `127.0.0.1` e bootstrap administrativo interativo. Não reutilizar dados,
+configuração, chaves, TLS ou PDFs de Produção. Solicitar provisionamento
+privilegiado e operador autorizado antes de instalar/iniciar.
 
 ### Revisão visual em 05/11/2026
 

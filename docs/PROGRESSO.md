@@ -2,31 +2,38 @@
 
 ## Separação por versões e ambientes — 05/11/2026
 
-Criadas a [decisão 035](decisoes/035-versoes-e-ambientes.md) e a
-[documentação de releases e ambientes](VERSOES_E_AMBIENTES.md), distinguindo
-início de Produção e Homologação. O procedimento define tags/commits fixos,
-diretórios/builds separados, isolamento total do banco e artefatos de
-Homologação e endpoint recomendado `https://127.0.0.1:3444/` sem exposição LAN.
+Separação documental em
+[Versões, Produção e Homologação](VERSOES_E_AMBIENTES.md) e
+[decisão 035](decisoes/035-versoes-e-ambientes.md).
 
-**Implementado:** orientação documental e registro do estado/limites.
-**Não testado/instalado:** não foi criado banco/configuração/certificado para
-Homologação nem serviço/processo na porta 3444. **Não publicado:** nenhum
-release/tag/commit foi criado e os serviços ativos não foram reiniciados nem
-substituídos. No estado observado, `SisDoc` e `SisDocCaddy` estavam ativos; o
-XML de `SisDoc` usa `C:\SisDoc` como diretório de trabalho. O build web em
-`C:\SisDoc\apps\web\dist` tinha timestamp 05/11/2026 11:26, portanto os
-arquivos estáticos podem já refletir mudanças locais, embora a página
-compartilhada de Produção mostrasse apenas o login. Não foi feita autenticação
-para conferir telas internas. Tratar a versão da interface publicada como
-incerta até inspeção autorizada; não executar novo build nesse caminho. O
-worktree ainda contém alterações sem commit.
+**Implementado, testado e publicado:** release imutável `v0.1.0`, commit
+`22f38b3`, tag local, instalado em
+`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`. `npm ci` sem
+vulnerabilidades reportadas; build e typecheck completos aprovados; 42 testes
+focados em importação, histórico, DOF e DTC aprovados. Diagnóstico de
+instalação somente leitura passou no banco/migração 025. Nenhuma migração de
+schema ou aprovação de template foi aplicada. `SisDoc` e `SisDocCaddy`
+Running; API HTTPS health 200, rota privada sem sessão 401; proxy página 200,
+todos os seis assets do entrypoint comparados por hash. A página compartilhada
+mostrou login, sem autenticação ou gravação.
 
-**Pendências antes do deploy:** fechar o escopo do release; rodar validação
-final das mudanças candidatas; criar release imutável em diretório separado;
-confirmar backup consistente/verificado; provisionar e validar Homologação
-com banco e credenciais próprios; executar aceite e health check em janela.
-Não compartilhar base/configuração de produção e não tratar esta documentação
-como confirmação de publicação.
+Backup pré-deploy do PostgreSQL custom foi validado por `pg_restore --list`,
+cifrado DPAPI CurrentUser e conferido por hash em round-trip:
+`C:\ProgramData\SisDoc\instalacao\backup\release-v0.1.0-20261105\sisdoc.dump.dpapi`
+(SHA-256 do cifrado:
+`61FA0FEDDFF5AFC9884D8314BE3DFCBA6CD9FEDF3CC531ADEC566F57839DA7AA`).
+É backup local apenas do banco; não é backup completo nem ensaio de
+restauração. O release rollback `0529dc3` está em
+`C:\ProgramData\SisDoc\instalacao\releases\v0.0.0-rollback`.
+
+**Homologação pendente e não disponível:** `127.0.0.1:3444` estava livre,
+mas não foi criado banco/configuração/chaves/certificado nem processo. O
+papel PostgreSQL conhecido não tem `CREATEDB` ou `CREATEROLE`; falta conta
+privilegiada para provisionar DB/roles independentes, certificado confiável
+com SAN `127.0.0.1` e operador para bootstrap administrativo interativo.
+Não contornar com configuração/dados de Produção, não executar setup no banco
+produtivo, e não afirmar que Homologação está em execução. Commit e tag não
+foram enviados ao remoto.
 
 ## Revisão visual da importação — 05/11/2026
 

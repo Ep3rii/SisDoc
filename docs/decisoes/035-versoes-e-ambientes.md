@@ -20,26 +20,25 @@ não reverte automaticamente schema/dados.
 
 ## Estado e limites
 
-Esta decisão define o procedimento; não instala, inicia ou publica Homologação
-nem troca o serviço ativo. No estado observado em 05/11/2026, `SisDoc` e
-`SisDocCaddy` estavam registrados/ativos e o XML do serviço SisDoc apontava
-para `C:\SisDoc`. O candidato `v0.1.0` foi compilado em diretório separado
-(`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0-candidate`), com
-`npm ci`, build e 42 testes direcionados aprovados. O typecheck completo do
-candidato também deve passar antes da tag. A publicação e o provisionamento
-de Homologação continuam separados e pendentes até validação operacional.
+O primeiro release `v0.1.0` foi criado no commit `22f38b3`, compilado em
+checkout isolado, aprovado no typecheck e em 42 testes focados e implantado
+em `C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`. A API e o proxy estão
+ativos; health HTTPS 200, rota privada sem sessão 401 e os assets do frontend
+foram comparados por SHA-256. Não houve migração de banco nem alteração das
+aprovações de modelos. O Git commit/tag permanecem locais, sem push ao remoto.
 
-O build web existente em `C:\SisDoc\apps\web\dist` tinha timestamp
-05/11/2026 11:26, e a página compartilhada de Produção mostrava apenas o
-login. Como o serviço usa `C:\SisDoc` como diretório de trabalho, a interface
-estática pode já refletir esse build; não foi possível confirmar a versão de
-todas as telas sem autenticar. Tratar a exposição dos arquivos web como
-potencialmente atualizada e verificar em janela autorizada antes de novo build
-ou troca de versão.
+Backup pré-deploy do banco foi validado e cifrado localmente com DPAPI
+CurrentUser; limitações descritas no
+[guia de ambientes](../VERSOES_E_AMBIENTES.md). Build de rollback `0529dc3`
+preservado em `v0.0.0-rollback`. A primeira partida falhou por ACL ausente
+nos diretórios pais; após conceder leitura/travessia limitada, o release
+iniciou e passou as verificações. Ambos os serviços Windows estão Running.
 
-A criação de banco/configuração e a disponibilização de Homologação dependem
-de provisionamento isolado e validação de TLS/porta/ACLs. A tag `v0.1.0` e
-qualquer troca do serviço permanecem pendentes até concluir o typecheck,
-fechar o commit, validar backup e confirmar o health check.
+**Homologação continua pendente:** porta 3444 livre, mas o papel PostgreSQL
+conhecido não tem `CREATEDB`/`CREATEROLE`; não há configuração/banco/roles ou
+TLS dedicado a `127.0.0.1`. O bootstrap exige credencial privilegiada e
+operador interativo autorizado. Não compartilhar banco, configuração, chaves,
+certificado ou PDFs de Produção, e não iniciar uma segunda instância com a
+configuração produtiva.
 
 Procedimento: [Versões, Produção e Homologação](../VERSOES_E_AMBIENTES.md).
