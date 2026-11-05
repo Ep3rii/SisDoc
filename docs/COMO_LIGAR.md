@@ -7,24 +7,32 @@ Para outra máquina, conclua primeiro a
 [migração Windows Server](MIGRACAO_WINDOWS_SERVER.md). Não execute setup para
 ligar uma instalação existente.
 
-## 1. Abra o PowerShell
+## 1. Inicie Produção
 
-Abra na pasta do checkout. Exemplo para o destino `C:\SisDoc` (na origem,
-use a pasta atual do repositório):
+Nesta VM, Produção é o serviço `SisDoc` e o proxy é `SisDocCaddy`. Para
+iniciá-los, use PowerShell elevado:
 
 ```powershell
-Set-Location 'C:\SisDoc'
+Get-Service -Name 'SisDoc', 'SisDocCaddy'
+Start-Service -Name 'SisDoc'
+Start-Service -Name 'SisDocCaddy'
+```
+
+Se já estiverem ativos, não inicie outra cópia. Para uma instalação sem
+serviços Windows, use o release compilado ativo em
+`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`:
+
+```powershell
+Set-Location 'C:\ProgramData\SisDoc\instalacao\releases\v0.1.0'
 $env:SISDOC_CONFIG = 'C:\ProgramData\SisDoc\instalacao\config\aplicacao.json'
-# Somente se Chromium foi instalado nesse cache compartilhado:
-# $env:PLAYWRIGHT_BROWSERS_PATH = 'C:\ProgramData\SisDoc\instalacao\chromium'
+$env:PLAYWRIGHT_BROWSERS_PATH = 'C:\ProgramData\SisDoc\chromium'
 npm run verificar-instalacao
 if ($LASTEXITCODE -ne 0) { throw 'Corrija a etapa indicada antes de iniciar.' }
 npm start
 ```
 
-Aguarde a mensagem de que o SisDoc está disponível em HTTPS na porta 3443.
-**Mantenha essa janela aberta:** fechar o terminal ou pressionar `Ctrl+C`
-encerra a aplicação iniciada nele.
+Esse modo alternativo mantém o processo ligado ao terminal; `Ctrl+C` o
+encerra. Não use simultaneamente com o serviço Windows.
 
 ## 2. Acesse a aplicação
 
