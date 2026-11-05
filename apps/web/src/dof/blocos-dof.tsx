@@ -138,8 +138,10 @@ export function BlocosDof({
     <>
     <section aria-labelledby="blocos-dof-titulo">
       <h4 id="blocos-dof-titulo">Blocos provisórios da DOF</h4>
+      <details><summary>Orientações e variáveis dos blocos</summary>
       <p>Os blocos começam vazios; nenhum texto oficial foi aprovado. As alterações exigem motivo e ficam apenas no rascunho. Limites técnicos: 200 blocos, 8.000 caracteres por bloco e 20.000 no total.</p>
       <p>Variáveis disponíveis: {'{{nome}}'}, {'{{matricula}}'}, {'{{cpf}}'}, {'{{nascimento}}'}, {'{{nome_mae}}'}, {'{{regime_juridico}}'}, {'{{cargo}}'}, {'{{nivel}}'}, {'{{referencia}}'}, {'{{orgao}}'}, {'{{processo}}'}, {'{{admissao}}'}, {'{{inicio}}'}, {'{{fim}}'}, {'{{dias_periodo}}'}, {'{{tempo_contribuicao}}'} e {'{{efetivo_exercicio}}'}. Variáveis indisponíveis e expressões malformadas são destacadas.</p>
+      </details>
       {bloqueado && <p className="aviso erro">Salve ou descarte as alterações do cálculo e do processo antes de editar os blocos.</p>}
         <form onSubmit={salvar}>
           <fieldset disabled={ocupado || bloqueado || somenteLeitura}>

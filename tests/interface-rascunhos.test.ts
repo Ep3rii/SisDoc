@@ -146,7 +146,11 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
       if (caminho === '/api/v1/notificacoes/declaracoes') {
         return responder(rota, 200, { encaminhados: estado.rascunho?.encaminhamento && !estado.conferido ? 1 : 0, retornos: estado.devolucao ? 1 : 0 });
       }
-      if (caminho === `/api/v1/servidores/${pessoaId}/sugestoes` || caminho === `/api/v1/servidores/${pessoaId}/historico`) {
+      if (caminho === `/api/v1/servidores/${pessoaId}/historico`) {
+        return responder(rota, 200, { itens: [], proximoCursor: null,
+          totais: { registros: 0, proventosPagos: '0.00', descontosPagos: '0.00', proventosEstornados: '0.00', descontosEstornados: '0.00' } });
+      }
+      if (caminho === `/api/v1/servidores/${pessoaId}/sugestoes`) {
         return responder(rota, 200, { itens: [], proximoCursor: null });
       }
       if (caminho === '/api/v1/sincronizacao/situacao') {
@@ -548,6 +552,63 @@ describe('interface de rascunhos com API sintética', () => {
     expect(estado.erros).toEqual([]);
   });
 
+  it('mostra erro recuperável quando o download de uma tela falha', async () => {
+    estado.papel = 'admin';
+    await pagina.route('**/assets/auditoria-*.js', (rota) => rota.abort('failed'));
+    await pagina.goto(endereco);
+    await pagina.getByRole('button', { name: 'Auditoria', exact: true }).click();
+    await pagina.getByRole('alert').getByText('Não foi possível abrir esta tela.').waitFor();
+    expect(await pagina.getByRole('button', { name: 'Recarregar aplicação' }).isVisible()).toBe(true);
+    await pagina.getByRole('button', { name: 'Buscar servidores', exact: true }).click();
+    await pagina.getByRole('button', { name: /Ver vínculos/ }).waitFor();
+  });
+
+  it('filtra histórico globalmente, preserva totais e carrega relacionamentos de todas as páginas', async () => {
+    estado.papel = 'admin';
+    const consultas: URLSearchParams[] = [];
+    const registro = {
+      grupo: 'financeiro', tipo: 'lancamento', situacao: 'pago',
+      inicio: null, fim: null, aquisitivoInicio: null, aquisitivoFim: null, diasInformados: null,
+      especieLicenca: null, ato: null, descricao: 'Pagamento fictício', efeitoTempo: 'nao_informado',
+      efeitoRemuneracao: 'nao_informado', competencia: '2026-01', competenciaOrigem: null,
+      pagamento: '2026-01-30', rubrica: 'ABONO', natureza: 'provento', valor: '25.00', folha: 'normal',
+      origem: 'manual-local', idOrigem: null, eventoId: null, relacionadoId: null,
+    };
+    await pagina.route(`**/api/v1/servidores/${pessoaId}/historico?*`, async (rota) => {
+      const consulta = new URL(rota.request().url()).searchParams;
+      consultas.push(consulta);
+      const segunda = consulta.has('cursor');
+      const itens = consulta.get('grupo') === 'funcional' ? [] : [{
+        id: segunda ? coordenadorId : documentoId, pessoaId, vinculoId, revisao: 1,
+        registro: { ...registro, descricao: segunda ? 'Pagamento página seguinte' : registro.descricao },
+        atualizadoEm: '2026-01-30T12:00:00.000Z', loteId: null, linhaOrigem: null,
+      }];
+      await responder(rota, 200, { itens, proximoCursor: segunda || !itens.length ? null : documentoId,
+        totais: { registros: itens.length ? 2 : 0, proventosPagos: '50.00', descontosPagos: '0.00',
+          proventosEstornados: '0.00', descontosEstornados: '0.00' } });
+    });
+    await pagina.goto(endereco);
+    await pagina.getByRole('button', { name: 'Buscar servidores', exact: true }).click();
+    await pagina.getByRole('button', { name: /Ver vínculos/ }).click();
+    await pagina.getByRole('button', { name: 'Financeiro', exact: true }).click();
+    await pagina.getByText('2 registros em todo o vínculo', { exact: false }).waitFor();
+    await pagina.getByLabel('Competência inicial', { exact: true }).fill('2026-01');
+    await pagina.getByLabel('Rubrica contém').fill('ABONO');
+    await pagina.getByRole('button', { name: 'Aplicar filtros globais' }).click();
+    await expect.poll(() => consultas.some((c) => c.get('competenciaInicio') === '2026-01' && c.get('rubrica') === 'ABONO')).toBe(true);
+    await pagina.getByText('Totais brutos globais filtrados', { exact: false }).waitFor();
+    await pagina.getByRole('button', { name: 'Próxima página de histórico' }).click();
+    await pagina.locator('p').filter({ hasText: /^Pagamento página seguinte$/ }).waitFor({ state: 'attached' });
+    await pagina.locator('summary').filter({ hasText: /^Lançamento financeiro ·/ }).click();
+    expect(await pagina.locator('p').filter({ hasText: /^Pagamento página seguinte$/ }).isVisible()).toBe(true);
+    expect(await pagina.getByText('2 registros em todo o vínculo', { exact: false }).count()).toBe(1);
+    await pagina.getByRole('button', { name: 'Adicionar registro financeiro' }).click();
+    await expect.poll(() => pagina.getByLabel('Registro histórico relacionado').isEnabled()).toBe(true);
+    expect(await pagina.getByLabel('Registro histórico relacionado').locator('option').allTextContents())
+      .toEqual(expect.arrayContaining([expect.stringContaining('Pagamento página seguinte'), expect.stringContaining('Pagamento fictício')]));
+    expect(consultas.filter((c) => c.get('limite') === '100')).toHaveLength(2);
+  });
+
   it('mantém o layout em duas colunas, navega por teclado e protege a edição na busca global', async () => {
     await pagina.goto(endereco);
     await iniciarCalculo(pagina);
@@ -920,8 +981,14 @@ describe('interface de rascunhos com API sintética', () => {
     }
     await pagina.setViewportSize({ width: 1366, height: 900 });
     await pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).click();
+    await pagina.getByRole('dialog', { name: 'Prévia provisória da DOF ampliada', exact: true }).waitFor();
+    expect(await pagina.getByRole('button', { name: 'Recolher prévia', exact: true }).evaluate((el) => el === document.activeElement)).toBe(true);
     expect(await pagina.locator('.visualizador-previa.ampliado').count()).toBe(1);
     await pagina.getByRole('button', { name: 'Recolher prévia', exact: true }).click();
+    await expect.poll(() => pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).evaluate((el) => el === document.activeElement)).toBe(true);
+    await pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).click();
+    await pagina.keyboard.press('Escape');
+    await expect.poll(() => pagina.getByRole('dialog').count()).toBe(0);
     await selecionarAba(pagina, 'Tabela ano a ano');
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Nome ajustado somente na declaração fictícia');

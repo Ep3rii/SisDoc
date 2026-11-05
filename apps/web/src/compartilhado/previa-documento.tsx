@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom';
 
 export function PreviaDocumento({ html, titulo }: { html: string; titulo: string }) {
   const destino = useRef<HTMLDivElement>(null);
+  const dialogo = useRef<HTMLDialogElement>(null);
+  const acionador = useRef<HTMLButtonElement | null>(null);
+  const recolher = useRef<HTMLButtonElement>(null);
   const [largura, setLargura] = useState(794);
   const [modo, setModo] = useState<'largura' | 'pagina' | 'manual'>('largura');
   const [zoom, setZoom] = useState(1);
@@ -43,9 +46,15 @@ export function PreviaDocumento({ html, titulo }: { html: string; titulo: string
   const escala = modo === 'manual' ? zoom : Math.min(largura / 794, modo === 'pagina' ? altura / 1123 : 2);
   useEffect(() => {
     if (!ampliada) return;
-    const fechar = (evento: KeyboardEvent) => { if (evento.key === 'Escape') setAmpliada(false); };
-    window.addEventListener('keydown', fechar);
-    return () => window.removeEventListener('keydown', fechar);
+    const elemento = dialogo.current;
+    if (!elemento) return;
+    elemento.showModal();
+    recolher.current?.focus();
+    atualizarDimensoes();
+    return () => {
+      elemento.close();
+      requestAnimationFrame(() => acionador.current?.focus());
+    };
   }, [ampliada]);
   const visualizador = <div className={`visualizador-previa${ampliada ? ' ampliado' : ''}`}>
     <div className="acoes controles-previa" aria-label="Exibição da prévia">
@@ -55,7 +64,8 @@ export function PreviaDocumento({ html, titulo }: { html: string; titulo: string
         <option value="" disabled>Automático</option>
         {[0.5, 0.75, 1, 1.25, 1.5].map((valor) => <option key={valor} value={valor}>{valor * 100}%</option>)}
       </select></label>
-      <button type="button" className="secundario" aria-pressed={ampliada} onClick={() => setAmpliada((v) => !v)}>
+      <button ref={ampliada ? recolher : acionador} type="button" className="secundario" aria-pressed={ampliada}
+        onClick={() => setAmpliada((v) => !v)}>
         {ampliada ? 'Recolher prévia' : 'Ampliar prévia'}
       </button>
       <label className="ajuste-paineis">Largura do editor ({proporcao}%)
@@ -74,5 +84,6 @@ export function PreviaDocumento({ html, titulo }: { html: string; titulo: string
       </div>
     </div>
   </div>;
-  return ampliada ? createPortal(visualizador, document.body) : visualizador;
+  return ampliada ? createPortal(<dialog ref={dialogo} className="dialogo-previa" aria-label={`${titulo} ampliada`}
+    onCancel={(evento) => { evento.preventDefault(); setAmpliada(false); }}>{visualizador}</dialog>, document.body) : visualizador;
 }

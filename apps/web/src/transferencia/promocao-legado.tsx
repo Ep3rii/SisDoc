@@ -112,7 +112,12 @@ export function PromocaoLegado({ csrf, loteInicial, onErro, onAplicado, renderRe
   const naoUtilizadas = previa?.cabecalhos.filter((_, indice) => !Object.values(mapeamento).includes(indice)) ?? [];
   return <section className="painel separado" aria-labelledby="conversao-legado-titulo">
     <h3 id="conversao-legado-titulo">Disponibilizar Legado para DOF e DTC</h3>
-    <ol><li>Selecionar lote e tipo</li><li>Conferir prévia e mapeamento</li><li>Validar conversão</li><li>Confirmar aplicação no Núcleo</li></ol>
+    <ol className="etapas-importacao" aria-label="Etapas da aplicação no Núcleo">
+      {['Lote e perfil', 'Mapeamento', 'Diferenças', 'Confirmação'].map((titulo, indice) => {
+        const etapa = !previa ? 0 : !resultado ? 1 : resultado.relatorio.modo === 'validacao' ? 2 : 3;
+        return <li key={titulo} aria-current={etapa === indice ? 'step' : undefined}>{indice + 1}. {titulo}</li>;
+      })}
+    </ol>
     <p>O lote original permanece cifrado no Legado. A conversão conserva a origem e preenche campos vazios,
       sem sobrescrever dados existentes ou edições manuais.</p>
     <div className="grade-busca">
@@ -160,6 +165,10 @@ export function PromocaoLegado({ csrf, loteInicial, onErro, onAplicado, renderRe
           onClick={() => void processar('gravar')}>Aplicar no Núcleo</button>
       </div>
       {resultado && <>
+        <p className="aviso">Antes de confirmar: {resultado.relatorio.contagens.validos} linhas válidas;
+          {' '}{resultado.relatorio.contagens.rejeitados} rejeitadas; {resultado.relatorio.contagens.quarentena} em quarentena;
+          {' '}{resultado.relatorio.ocorrencias.filter((item) => item.tipo === 'divergencia').length} divergências nesta prévia.
+          Consulte também as ocorrências fora da prévia no XLSX. Dados existentes e correções manuais não serão substituídos.</p>
         {renderRelatorio(resultado.relatorio)}
         <button type="button" className="secundario" disabled={ocupado} onClick={() => void baixarOcorrencias()}>Baixar todas as ocorrências em XLSX</button>
         <p>O download revalida sem gravar e inclui todas as ocorrências, com dados completos.

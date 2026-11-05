@@ -167,6 +167,7 @@ describe('Editor DTC', () => {
         await pagina.getByLabel('Nome completo', { exact: true }).fill('Nome ajustado na DTC fictícia');
         await quadro.getByText('Nome ajustado na DTC fictícia', { exact: true }).waitFor();
         expect(enviado).toBeNull();
+        await pagina.getByRole('tab', { name: 'Períodos', exact: true }).click();
         await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();
         expect(await pagina.getByLabel('PB em 2020', { exact: true }).isVisible()).toBe(false);
         await pagina.getByText('1º período — datas, deduções e incorporações', { exact: true }).click();
@@ -180,6 +181,9 @@ describe('Editor DTC', () => {
         expect(await pagina.getByLabel('Licença-prêmio em 2020', { exact: true }).inputValue()).toBe('60');
         expect(await pagina.getByLabel('PB em 2021', { exact: true }).inputValue()).toBe('10');
         expect(await pagina.getByLabel('PB em 2022', { exact: true }).inputValue()).toBe('0');
+        await pagina.getByRole('tab', { name: 'Identificação', exact: true }).click();
+        expect(await pagina.getByLabel('Nome completo', { exact: true }).inputValue()).toBe('Nome ajustado na DTC fictícia');
+        await pagina.getByRole('tab', { name: 'Conferência', exact: true }).click();
         await pagina.getByLabel('Motivo da alteração').fill('Conferência fictícia das incorporações');
         await pagina.getByRole('button', { name: 'Salvar rascunho' }).click();
         await pagina.getByRole('button', { name: 'Editar rascunho' }).waitFor();
@@ -190,6 +194,7 @@ describe('Editor DTC', () => {
         expect(documento.resultado.totais).toMatchObject({ pb: 50, pv: 70, licencaPremio: 90 });
         await pagina.getByRole('button', { name: 'Editar rascunho' }).click();
         expect(await pagina.getByLabel('Nome completo', { exact: true }).inputValue()).toBe('Nome ajustado na DTC fictícia');
+        await pagina.getByRole('tab', { name: 'Períodos', exact: true }).click();
         expect(await pagina.getByLabel('PB em 2020', { exact: true }).inputValue()).toBe('40');
         expect(erros).toEqual([]);
       } finally {

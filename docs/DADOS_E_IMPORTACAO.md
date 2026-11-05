@@ -20,6 +20,9 @@ recepção protegida, mapeamento, validação e promoção ocorrem na mesma aba.
 Disponibilizar Legado continua disponível para lotes anteriores. As abas preservam o estado, mas não
 gravam dados. Histórico reúne conferência por origem e lotes, com filtro
 somente dos lotes carregados. Veja [operação](OPERACAO.md#organização-das-telas).
+Os indicadores distinguem recepção do arquivo e aplicação no Núcleo.
+Na promoção, acompanham lote/perfil, mapeamento, diferenças e confirmação;
+o resumo exibe rejeitados, quarentena, divergências e preservação de correções.
 
 | Tipo (`--tipo`) | Chave de identificação | Destino | Obrigatório? |
 | --- | --- | --- | --- |
@@ -344,9 +347,20 @@ Rotas: `GET|POST servidores/:pessoa/historico`,
 `POST servidores/:pessoa/historico/exportar` (`{vinculoId}`).
 Todas sob `/api/v1`, autenticadas/auditadas; escritas exigem CSRF.
 
-Filtros e subtotais da tela se referem à **página carregada**, não ao banco
-inteiro. Subtotais são brutos dos pagamentos visíveis, sem compensação de
-estornos nem inferência de direitos. Exportação XLSX administrativa inclui
+O GET aceita `grupo`, `competenciaInicio/Fim` (`AAAA-MM`), `inicio/fim`,
+`rubrica` (contém), `limite` (1–100) e `cursor`, além de `vinculoId`.
+Competência e rubrica filtram lançamentos financeiros; período usa sobreposição
+dos fatos funcionais ou data do pagamento. Intervalos invertidos são rejeitados.
+Filtros são **globais no vínculo**; resposta inclui `totais.registros`,
+`proventosPagos`, `descontosPagos`, `proventosEstornados`, `descontosEstornados`,
+independentes da página. Valores são strings exatas com duas casas decimais.
+Busca textual da tela continua restrita à página e não altera esses totais.
+Totais brutos mantêm estornos separados, sem inferência de saldo ou direitos.
+Conteúdo cifrado é decifrado/filtrado no servidor; a consulta percorre todos
+os registros do vínculo, não apenas a página. Validar escala com volume real
+antes de declarar capacidade ilimitada.
+Seleção assistida carrega todas as páginas de registros/eventos relacionados.
+Exportação XLSX administrativa inclui
 todo o vínculo até 10 mil registros, sem truncamento; preserva valor como
 texto exato e metadados. O arquivo não é cifrado, não substitui backup e,
 por conter metadados extras, não é modelo de reimportação direta.

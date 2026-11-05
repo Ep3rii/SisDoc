@@ -1,8 +1,20 @@
 # Pontos de memória do projeto
 
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
-Atualizada em **04/11/2026**, após validar a evolução do Núcleo em recursos descartáveis.
+Atualizada em **04/11/2026**, com rascunho de conclusão funcional para retomada.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
+
+## Foco da próxima retomada — conclusão funcional
+
+O responsável retirou migração de máquina do foco ativo; manter seus registros
+apenas como referência, sem apagar evidências ou proteções operacionais.
+Novo [plano em rascunho](../PLANO_CONCLUSAO_APLICACAO_RASCUNHO.md):
+tabelas das fichas financeiras; histórico funcional ainda a apurar;
+dossiês antigos ainda a tratar; revisão das regras/campos; tipos e layout
+da importação do Núcleo. Histórico genérico existente não fecha esses domínios.
+Somente planejamento foi solicitado, sem autorização de implementação.
+Próxima ação: confirmar prioridade e levantar estruturas/fontes de financeiro
+e funcional, sem presumir modelos finais ou usar dados reais em testes.
 
 ## 1. Objetivo e permissões
 
@@ -41,7 +53,7 @@ Detalhes e invariantes de extração: [Arquitetura](../ARQUITETURA.md).
 
 ## 3. Último estado validado
 
-### Evolução funcional autorizada — implementada e testada, publicação pendente
+### Evolução funcional e UI/UX — implementadas, testadas e publicadas
 
 O responsável aprovou o [plano](../PLANO_EVOLUCAO_NUCLEO.md), incluindo sugestões
 no cadastro e contadores de pendências. Código da [decisão 033](../decisoes/033-edicao-contextual-e-historico-local.md)
@@ -49,27 +61,37 @@ implementado: ajustes exclusivos DOF/DTC, correção canônica administrativa
 separada, sugestões derivadas dos ajustes salvos, prévia instantânea compartilhada,
 zoom/proporção/ampliação, encaminhados/retornos, Núcleo mapeado CSV/XLSX/XML
 SisDoc v1 e histórico funcional/financeiro cifrado com revisões/importação/exportação.
-Não calcula folha/direitos; filtros/subtotais históricos são da página carregada.
+Não calcula folha/direitos. Histórico tem filtros globais por competência,
+período/rubrica e totais brutos globais no servidor, separados dos estornos;
+busca textual permanece restrita à página. Seletores carregam todas as páginas
+dos relacionamentos. DTC usa abas com estado preservado e validação focada;
+prévia ampliada usa modal nativo/foco/Escape. Importação mostra etapas reais
+e resumo de divergências; sugestões comparam cadastro e declaração.
+Menu recolhível, orientação compacta, senha revelável e telas sob demanda.
+Falha de download de tela mostra erro e recarga explícita.
 
-Validados: typecheck/build; **43/43** testes de interface DOF/DTC, contratos,
-permissões/tokens; **45 aprovados e um excluído** em emissão, DTC e importação,
-sob LocalService com PostgreSQL descartável. Inclui instalação com 025,
-atualização, PDFs, ajustes no snapshot/cópia, sugestões, retornos e histórico.
-Excluído teste de carga preexistente que cria 48 sessões e exige 64.
-Fundação completa não validada: CLI tenta recompilar código sem ACL de escrita
-sob LocalService. Não ampliar ACL do código nem usar produção para contornar.
-Prévia válida de 45 anos/200 blocos/20 mil caracteres: máximo 135,3 ms nesta VM.
+Validados: typecheck/build; **46/46** testes de interface DOF/DTC, contratos,
+permissões/tokens; **45 aprovados e um excluído** em emissão, DTC e importação
+sob LocalService com PostgreSQL descartável. Inclui instalação/atualização 025,
+PDFs, histórico global/paginação, relacionamentos completos, foco/modal e falha
+de chunk. Excluído teste preexistente que cria 48 sessões e exige 64.
+Fundação completa não validada: CLI recompila código sem ACL de escrita sob
+LocalService. Não ampliar ACL do código nem usar produção para contornar.
+Prévia válida máxima de 131,4 ms no seletor final (45 anos/200 blocos/20 mil caracteres).
 
-**Instalação continua em 024. Não reiniciar usando build candidato sem migrar.**
-Autorização específica de backup/migração/publicação não foi obtida.
-Os builds de validação haviam substituído artefatos locais; para não misturar
-web nova e API antiga, os cinco `dist` foram repostos a partir de uma compilação
-isolada de `f788a6d`, sem reverter fontes. SHA-256 conferido; página HTTPS
-serve o bundle anterior, health 200 e privado 401. Serviços continuam Running,
-sem reinício ou migração nesta etapa. Fontes novas permanecem não commitadas.
-Novo `npm run build` nesta pasta volta a substituir artefatos servidos:
-validar/publicar em janela controlada, com backup e migração 025.
-Avaliação e prioridades visuais: [UI/UX](../AVALIACAO_UI_UX.md).
+Publicação expressamente autorizada: backup cifrado verificado, migração
+**025-historico-servidor** aplicada e API/Caddy reiniciados em ordem.
+Diagnóstico aprovado, serviços automáticos Running sob LocalService,
+health HTTPS 200 e privado 401. Index e 23 assets publicados conferidos
+por SHA-256 com o build final. Nenhuma carga fictícia/restauração em produção,
+nem aprovação de modelos. Backup DPAPI CurrentUser é local/não portável;
+leitura integral do dump e conferência criptográfica não equivalem a ensaio
+de restauração. Backup externo/agendado e aceite com operadores continuam pendentes.
+Base funcional em `3404937`; Git reconferido no planejamento posterior:
+melhorias UX permanecem no worktree, sem novo commit/push.
+Build no checkout substitui artefatos servidos:
+atualizações futuras exigem janela controlada.
+Evidências e limites: [Progresso](../PROGRESSO.md) e [UI/UX](../AVALIACAO_UI_UX.md).
 
 ### Perfis, rascunhos e serviços Windows — 03/11/2026
 
@@ -175,8 +197,8 @@ Migração completa para Windows Server é preparada em
 cifra/HMAC, PDFs e arquivos externos da mesma captura; reaplicar ACLs por
 conta do destino e instalar Chromium no contexto correto. Não executar
 setup sobre restauração. `npm run verificar-instalacao` usa `SISDOC_CONFIG`
-e diagnóstico somente leitura; bootstrap exige 024. Captura/restauração
-operacional e aceite no Windows Server ainda não foram executados.
+e diagnóstico somente leitura; bootstrap exige 025. Restauração operacional
+e aceite formal no Windows Server ainda não foram executados.
 
 No destino, em 03/11/2026, o responsável confirmou VM exclusiva e escolheu
 **instalação limpa**, substituindo a intenção de restaurar a origem.
@@ -187,15 +209,15 @@ licença e Chromium compartilhado preparados. Conta executora não
 administrativa validada: acesso a código/TLS/lista, provisionamento negado,
 HTTPS e PDF em memória aprovados. Fluxo local interativo de conclusão
 disponível fora do Git; detalhes em [Instalação](../INSTALACAO_LOCAL.md).
-Na validação mais recente, configuração/provisionamento já existem e o
-diagnóstico somente leitura passou: banco/login restrito e histórico completo
-até 024, arquivos/TLS/PDF/Chromium acessíveis. Página/health HTTPS 200 e
-privados 401. API e Caddy ativos sob a conta dedicada (`LocalService`), porém
-como processos diretos (sem serviços WinSW registrados); não repetir setup.
-Pendente validar execução sob conta dedicada, primeiro login/troca e aceite
-funcional, conferir um formato de processo configurado e aprovar formalmente
-os quatro templates v2. `SISDOC_CONFIG` não persistida: definir por sessão.
-Serviço automático e backup/recuperação continuam separados.
+Na validação mais recente, configuração/provisionamento já existem,
+banco/login restrito e histórico completo até 025 foram confirmados.
+Arquivos/TLS/PDF/Chromium acessíveis; página/health HTTPS 200 e privados 401.
+API e Caddy são serviços Windows automáticos sob `LocalService`; não repetir setup.
+Primeiro login/troca, aceite funcional institucional, formato de processo e
+aprovação formal dos quatro templates v2 continuam pendentes.
+`SISDOC_CONFIG` está configurada no serviço; terminais separados precisam
+defini-la por sessão. Backup local protegido foi capturado na publicação;
+agendamento, cópia externa e ensaio de recuperação não estão homologados.
 Tentativa adicional da suíte fundação falhou na preparação dos recursos
 descartáveis (27 casos não executados); não declarar regressão aprovada.
 

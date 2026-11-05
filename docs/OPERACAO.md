@@ -16,6 +16,9 @@ ativos como serviços Windows. A execução observada usa `LocalService`, API em
 `127.0.0.1:3443` e proxy Caddy em `192.168.70.26:443`, com regra de firewall
 LAN em escopo restrito. Ao atualizar, valide caminhos,
 certificados, ACLs e ordem de dependência (PostgreSQL -> SisDoc -> Caddy).
+Em 04/11/2026, publicação autorizada aplicou `025-historico-servidor`,
+após backup local cifrado/verificado. Serviços automáticos Running e HTTPS
+validado; detalhes e limites do backup em [Progresso](PROGRESSO.md).
 
 ## Novos modelos de saída — versão 2
 
@@ -46,6 +49,8 @@ na prévia sem gravação a cada tecla. Campos inválidos mostram pendências e
 retiram totais antigos. A prova auditada continua sendo da revisão salva;
 salve/revalide antes de conferir. Zoom, página inteira, proporção e ampliação
 afetam só a exibição, não o PDF emitido.
+Ampliação usa modal nativo: o foco vai ao botão de recolher, o fundo fica
+isolado, Escape fecha e o foco retorna ao acionador.
 
 Na DTC, a prévia de edição usa o mesmo motor puro da API e referências locais,
 incluindo períodos IPAM ativos. Não substitui a prova de conferência.
@@ -66,12 +71,24 @@ entrada continua invalidando a confirmação. Nenhum dado é gravado ao trocar
 abas. No Núcleo, o assistente com mapeamento reúne recepção protegida e
 promoção na mesma aba. Lotes legados anteriores conservam o fluxo próprio.
 CSV/XLSX e XML SisDoc v1 são documentados em [Dados e importação](DADOS_E_IMPORTACAO.md).
+O assistente sinaliza recepção e promoção em etapas distintas, com diferenças,
+rejeições e preservação das correções visíveis antes da confirmação.
 
 Em DOF/DTC, **Ajustar nesta declaração** não modifica o cadastro; ao salvar,
 gera sugestões comparáveis no Cadastro. **Corrigir cadastro local** é ação
 administrativa separada, com motivo e confirmação. No Cadastro também há
 histórico funcional/financeiro por vínculo, com revisões e importação.
 Não há cálculo de folha ou direitos.
+O histórico por vínculo tem filtros globais de competência/período/rubrica,
+totais brutos pagos e estornados separados e seletores de relacionamentos.
+Sua busca textual filtra somente a página; filtros globais são processados
+no servidor. Sugestões mostram cadastro atual e valor sugerido lado a lado.
+
+DTC tem abas Identificação, Períodos, Cargos/Documentação conforme o tipo e
+Conferência. Trocar aba preserva lançamentos; salve pela Conferência.
+Campos inválidos abrem a aba correspondente antes da validação.
+As categorias do menu podem ser recolhidas. Telas são carregadas por demanda;
+falha de download oferece recarga explícita, avisando sobre dados não salvos.
 
 Os círculos de **Encaminhados** e **Retornos** contam pendências, não leituras.
 Abrir não zera; uma nova gravação atende o retorno. Atualização após escritas,
@@ -82,7 +99,9 @@ auditoria e lotes compartilham **Filtrar lista carregada**, **Limpar filtro**
 e **Atualizar lista**, com quantidade de resultados. A busca ignora acentos
 e caixa, mas filtra somente registros já carregados — não o banco inteiro.
 Para pesquisar servidores no banco, use a busca global; nas demais listas,
-respeite o escopo e a paginação existentes. Filtros não ampliam permissões.
+respeite o escopo e a paginação existentes. A exceção são os filtros globais
+explícitos do histórico funcional/financeiro descritos acima.
+Filtros não ampliam permissões.
 
 O cadastro local separa identificação/contato, documentos e vínculo.
 Ao abrir um resultado, o vínculo escolhido já é selecionado para consulta.

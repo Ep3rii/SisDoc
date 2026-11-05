@@ -1,7 +1,11 @@
 # Plano de evolução — edição local, prévias e Núcleo
 
-**Estado: implementação e validação direcionada concluídas; análise UI/UX
-entregue. Publicação operacional ainda não autorizada/aplicada.**
+**Estado: expansão implementada, validada e publicada em 04/11/2026, com
+autorização expressa. Registro histórico de escopo.**
+
+Para a próxima etapa, consultar o
+[rascunho de conclusão funcional](PLANO_CONCLUSAO_APLICACAO_RASCUNHO.md),
+que depende da apuração das fontes financeiras/funcionais, dossiês e regras.
 
 Este plano preserva a análise original como referência de escopo, não como
 descrição da instalação atual. A autorização confirmou os dois escopos de
@@ -237,8 +241,9 @@ zoom, proporção e ampliação; contadores/lista de retornos; importação mape
 no Núcleo e XML/abas XLSX; histórico funcional/financeiro cifrado, importação,
 exportação administrativa e consulta de revisões.
 
-Limites desta expansão: filtros/subtotais históricos são da página carregada,
-explicitamente rotulados; não há reconciliação automática de direitos/folha,
+Na continuação UI/UX publicada, histórico passou a ter filtros e totais
+globais no servidor; somente a busca textual permanece restrita à página.
+Limites desta expansão: não há reconciliação automática de direitos/folha,
 linha do tempo unificada de todas as fontes nem interpretação de XML de
 terceiros. Relações históricas exigem identificadores existentes.
 

@@ -1195,6 +1195,20 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     const estorno = { ...corpo, registro: { ...registro, situacao: 'estornado', relacionadoId: item.id, idOrigem: 'ESTORNO-FICTICIO' } };
     const estornado = await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo: estorno });
     expect(estornado.status, estornado.corpo).toBe(201);
+    const consultaGlobal = await requisitar({ metodo: 'GET', rota: `${rota}?${new URLSearchParams({
+      vinculoId: fonte.vinculoId, grupo: 'financeiro', limite: '1', competenciaInicio: '2024-01', competenciaFim: '2024-01', rubrica: 'ficticia',
+    })}`, sessao: sessao('analista') });
+    expect(consultaGlobal.status, consultaGlobal.corpo).toBe(200);
+    const paginaGlobal = JSON.parse(consultaGlobal.corpo);
+    expect(paginaGlobal.itens).toHaveLength(1);
+    expect(paginaGlobal.proximoCursor).not.toBeNull();
+    expect(paginaGlobal.totais).toEqual({ registros: 2, proventosPagos: '1234.56', descontosPagos: '0.00',
+      proventosEstornados: '1234.56', descontosEstornados: '0.00' });
+    const paginaSeguinte = await requisitar({ metodo: 'GET', rota: `${rota}?${new URLSearchParams({
+      vinculoId: fonte.vinculoId, grupo: 'financeiro', limite: '1', cursor: paginaGlobal.proximoCursor,
+    })}`, sessao: sessao('analista') });
+    expect(JSON.parse(paginaSeguinte.corpo).itens[0].id).not.toBe(paginaGlobal.itens[0].id);
+    expect(JSON.parse(paginaSeguinte.corpo).totais).toEqual(paginaGlobal.totais);
     expect((await requisitar({ metodo: 'POST', rota, sessao: sessao('admin'), corpo: { ...estorno, registro: { ...estorno.registro, idOrigem: 'OUTRO-ESTORNO' } } })).status).toBe(409);
     const mudar = await requisitar({ metodo: 'PATCH', rota: `${rota}/${item.id}`, sessao: sessao('admin'),
       corpo: { ...corpo, revisao: 1, registro: { ...registro, valor: '1.00' } } });

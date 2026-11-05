@@ -1,5 +1,82 @@
 # Progresso da construção
 
+## Rascunho de conclusão funcional — 04/11/2026
+
+Por orientação do responsável, migração de máquina deixa o foco ativo;
+seus registros ficam como referência histórica, sem exclusão de evidências.
+Criado [plano em rascunho](PLANO_CONCLUSAO_APLICACAO_RASCUNHO.md) para
+retomada: fichas financeiras, histórico funcional ainda a apurar, dossiês
+antigos ainda a tratar, revisão de regras/campos e tipos/layout de importação.
+Inclui levantamento de fontes, dependências, entregáveis, aceite e ponto
+exato de retomada, distinguindo o histórico genérico já existente do domínio
+definitivo ainda não apurado.
+
+**Realizado:** planejamento documental e atualização dos pontos de memória.
+**Pendente:** confirmação de prioridade, apuração e aprovação das propostas;
+nenhuma implementação dessas frentes, importação, mudança de banco/serviços
+ou publicação nesta etapa. Git conferido: base `3404937`, alterações UX
+anteriores ainda no worktree e preservadas. Sem novo commit/push.
+Validação documental por leitura e `git diff --check`; testes de código não
+se aplicam a esta entrega exclusivamente documental.
+
+## Publicação autorizada e melhorias UI/UX — 04/11/2026
+
+Pedido expresso do responsável autorizou publicar a evolução anterior e
+executar as prioridades de [UI/UX](AVALIACAO_UI_UX.md). Estado atual:
+**implementado, testado e publicado**; os registros abaixo sobre publicação
+pendente são históricos, anteriores a esta autorização.
+
+- DTC organizada em abas com lançamentos preservados, totais e próximo passo;
+  campo inválido abre a aba correta antes de apresentar validação.
+- Prévia ampliada em modal nativo, fundo isolado, foco inicial/retorno e Escape.
+  Menu recolhível, cabeçalho móvel/avisos compactos e orientações secundárias
+  recolhidas sem esconder pendências. Senhas têm revelação acessível e requisito.
+- Importação mostra etapas reais e resumo de rejeitados/quarentena/divergências
+  antes da aplicação. Sugestões comparam campo atual e sugerido lado a lado,
+  com documento/revisão/alcance e confirmação administrativa preservados.
+- Histórico com rótulos de negócio, seleção de relacionamentos de todas as
+  páginas e filtros globais por competência/período/rubrica. API calcula totais
+  exatos do resultado completo, sem compensar estornos ou inferir direitos.
+  Busca textual identifica seu alcance restrito à página.
+- Telas carregadas sob demanda, com tratamento explícito de falha de download.
+  Maior chunk: 486,48 kB; sem aviso >500 kB nem alteração artificial do limite.
+  Entrada 32,05 kB; com React, contratos, validação e runtime, aproximadamente
+  796 kB/187 kB gzip iniciais, contra cerca de 1.030 kB/248 kB gzip anteriores.
+  Não confundir o tamanho da entrada com todo o carregamento inicial.
+
+Validação final: typecheck e build aprovados; **46/46** testes em cinco
+arquivos (interface DOF/DTC, evolução Núcleo, permissões/tokens).
+Sob LocalService, PostgreSQLs descartáveis: **45 aprovados/um excluído**
+em DTC/emissão/importação, incluindo totais globais constantes entre páginas.
+Excluído somente o teste preexistente de carga que cria 48 sessões e exige 64.
+Prévia válida: 61,3 ms em 45 anos, 131,4 ms no máximo 200 blocos/20 mil caracteres;
+entrada malformada 257,9 ms. Nenhuma operação fictícia na base operacional.
+Não é nova regressão integral nem certificação por operadores/leitor de tela.
+
+### Publicação e proteção operacional
+
+Proxy e API suspensos, PostgreSQL preservado ativo. Captura consistente incluiu
+dump custom, configuração/material criptográfico/TLS, PDFs e serviços.
+Dump conferido por listagem e leitura integral; pacote cifrado com DPAPI
+CurrentUser, decifrado em memória e hash comparado. Capturas plaintext
+temporárias removidas; runtime anterior preservado para contingência.
+Backup protegido é local e vinculado à conta/máquina: **não é cópia externa
+portável nem ensaio de restauração**. Agendamento/recuperação seguem pendentes.
+
+Aplicada somente `025-historico-servidor`; diagnóstico somente leitura
+aprovado, mantendo quatro aprovações v2 pendentes. API iniciada/health validado
+antes de iniciar Caddy. Ambos serviços automáticos Running sob LocalService;
+HTTPS via proxy health 200 e privado sem sessão 401. Certificado/nome
+validados com `--ssl-no-revoke` (revogação não verificada).
+Index e 23 assets servidos são idênticos ao build final por SHA-256.
+Login HTTPS também aberto em navegador limpo, sem autenticar/gravar e sem
+erros JavaScript. O Zod registra aviso CSP ao sondar compilação dinâmica,
+mantendo a validação sem liberar `unsafe-eval`; 401 de sessão anônima é esperado.
+Sem aprovação automática, importação real, restauração ou reinício do PostgreSQL.
+Não houve novo commit/push: base funcional `3404937`, UX no worktree.
+Tarefa/arquivos temporários removidos e ACLs de atributos dos dois executáveis
+de teste restauradas. Backup protegido e runtime anterior foram preservados.
+
 ## Evolução autorizada do Núcleo — 04/11/2026
 
 Implementado o [plano aprovado](PLANO_EVOLUCAO_NUCLEO.md), conforme

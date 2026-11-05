@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
-import { ajustesCadastroSchema, aplicarAjustesCadastro, registroHistoricoSchema, somarValoresMonetarios, type RegistroHistorico } from '@sisdoc/contratos';
+import { ajustesCadastroSchema, aplicarAjustesCadastro, registroHistoricoSchema, somarValoresMonetarios,
+  consultaHistoricoServidorSchema, filtrarHistorico, type RegistroHistorico } from '@sisdoc/contratos';
 import { calcularPreviaDof } from '@sisdoc/calculo';
 import { cpfSintetico } from './dados-sinteticos';
 
@@ -19,6 +20,20 @@ export function pagamentoSintetico(): RegistroHistorico {
   };
 }
 describe('evolução local do Núcleo', () => {
+  it('filtra histórico completo por competência, rubrica e intervalo sem inventar datas', () => {
+    const consulta = consultaHistoricoServidorSchema.parse({ vinculoId: '00000000-0000-4000-8000-000000000001',
+      grupo: 'financeiro', competenciaInicio: '2024-01', competenciaFim: '2024-02',
+      inicio: '2024-01-15', fim: '2024-02-01', rubrica: 'ficticia' });
+    const registro = pagamentoSintetico();
+    expect(filtrarHistorico(registro, consulta)).toBe(true);
+    for (const mudanca of [{ competencia: null }, { competencia: '2023-12' }, { rubrica: 'Outra' }, { pagamento: null }, { pagamento: '2024-02-02' }])
+      expect(filtrarHistorico({ ...registro, ...mudanca }, consulta)).toBe(false);
+    expect(consultaHistoricoServidorSchema.safeParse({ ...consulta, inicio: '2024-03-01' }).success).toBe(false);
+    expect(consultaHistoricoServidorSchema.safeParse({ ...consulta, competenciaFim: '2023-12' }).success).toBe(false);
+    const funcional = registroHistoricoSchema.parse({ ...registro, grupo: 'funcional', tipo: 'outro', situacao: 'informado',
+      competencia: null, rubrica: null, natureza: null, valor: null, folha: null, pagamento: null, inicio: '2023-12-01', fim: '2024-01-20' });
+    expect(filtrarHistorico(funcional, consultaHistoricoServidorSchema.parse({ vinculoId: consulta.vinculoId, inicio: '2024-01-01', fim: '2024-01-31' }))).toBe(true);
+  });
   it('preserva a fonte e remove ajustes sem reaproveitar o valor ajustado', () => {
     const fonte = { nome: 'Nome sintético', matricula: 'FICTICIA', admissao: '1980-01-01', cpf: cpfSintetico(), nomeMae: 'Mãe sintética' };
     const ajustes = ajustesCadastroSchema.parse({ nome: 'Nome ajustado', nomeMae: null, cpf: cpfSintetico(123456780) });

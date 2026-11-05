@@ -2,7 +2,8 @@ import { BadRequestException, ConflictException, NotFoundException, Unprocessabl
 import { randomUUID } from 'node:crypto';
 import { DatabaseError, type Pool, type PoolClient } from 'pg';
 import { registroHistoricoSchema, itemHistoricoServidorSchema, paginaHistoricoServidorSchema, resultadoHistoricoServidorSchema,
-  alteracaoHistoricoSchema, revisoesHistoricoSchema, type Configuracao, type RegistroHistorico } from '@sisdoc/contratos';
+  alteracaoHistoricoSchema, revisoesHistoricoSchema, filtrarHistorico, somarValoresMonetarios,
+  type ConsultaHistoricoServidor, type Configuracao, type RegistroHistorico } from '@sisdoc/contratos';
 import { transacao } from '../banco';
 import { ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
@@ -30,17 +31,23 @@ export class HistoricoServidorService {
     const resultado = await cliente.query(`SELECT id FROM nucleo.vinculo WHERE pessoa_id = $1 AND id = $2 ${bloquear ? 'FOR UPDATE' : ''}`, [pessoaId, vinculoId]);
     if (!resultado.rowCount) throw new NotFoundException('Vínculo não encontrado para esta pessoa.');
   }
-  async listar(sessao: SessaoAutenticada, ip: string, pessoaId: string, vinculoId: string, limite: number, cursor?: string) {
+  async listar(sessao: SessaoAutenticada, ip: string, pessoaId: string, filtros: ConsultaHistoricoServidor) {
+    const { vinculoId, limite, cursor } = filtros;
     return transacao(this.banco, async (cliente) => {
       await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_pessoa'));
       await this.vinculo(cliente, pessoaId, vinculoId);
       const consulta = await cliente.query<Linha>(`SELECT * FROM nucleo.historico_servidor
-        WHERE pessoa_id = $1 AND vinculo_id = $2 AND ($3::uuid IS NULL OR id > $3) ORDER BY id LIMIT $4`,
-      [pessoaId, vinculoId, cursor ?? null, limite + 1]);
+        WHERE pessoa_id = $1 AND vinculo_id = $2 ORDER BY id`, [pessoaId, vinculoId]);
+      const itens = consulta.rows.map((linha) => this.apresentar(linha)).filter((item) => filtrarHistorico(item.registro, filtros));
+      const pagina = itens.filter((item) => !cursor || item.id > cursor).slice(0, limite + 1);
+      const soma = (situacao: 'pago' | 'estornado', natureza: 'provento' | 'desconto') => somarValoresMonetarios(
+        itens.flatMap(({ registro }) => registro.situacao === situacao && registro.natureza === natureza && registro.valor ? [registro.valor] : []));
       await auditarConsultaFuncional(cliente, sessao, 'historico_servidor_consultado', 'vinculo', vinculoId, pessoaId, ip);
       return paginaHistoricoServidorSchema.parse({
-        itens: consulta.rows.slice(0, limite).map((linha) => this.apresentar(linha)),
-        proximoCursor: consulta.rows.length > limite ? consulta.rows[limite - 1].id : null,
+        itens: pagina.slice(0, limite),
+        proximoCursor: pagina.length > limite ? pagina[limite - 1].id : null,
+        totais: { registros: itens.length, proventosPagos: soma('pago', 'provento'), descontosPagos: soma('pago', 'desconto'),
+          proventosEstornados: soma('estornado', 'provento'), descontosEstornados: soma('estornado', 'desconto') },
       });
     });
   }

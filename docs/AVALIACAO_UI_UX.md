@@ -8,18 +8,21 @@ Os três editores DTC foram testados com a CSP real. Cadastro/histórico/importa
 foram analisados no código e em integrações API; isso não equivale a teste
 visual completo dessas telas. Não houve edição de documentos operacionais.
 Não é teste de usabilidade com operadores nem certificação de acessibilidade.
-As melhorias desta evolução estão no código validado, **ainda não publicadas**.
+As nove prioridades abaixo foram implementadas, testadas e **publicadas**
+em 04/11/2026, após autorização expressa. Migração 025 e serviços validados;
+46 testes de interface/contratos/permissões e 45 integrações aprovados
+(um teste preexistente excluído). Isso não certifica toda a matriz de usabilidade.
 Situação operacional em [Progresso](PROGRESSO.md).
 
 O layout tem uma base coerente: menu por perfil, busca global, tabelas
 paginadas, confirmação de ações sensíveis e editor com prévia lateral.
-Os principais problemas remanescentes são espaço vertical consumido por
+O diagnóstico que orientou esta rodada identificou espaço vertical consumido por
 orientações/controles, formulários extensos, rótulos técnicos e hierarquia
 entre lista/editor. No modo página inteira, uma A4 cabe no espaço disponível,
 mas fica pequena em 1366×768: largura e ampliação são necessárias para leitura.
 Em 390px, menu/cabeçalho/avisos ocupam boa parte da primeira tela.
 
-## Próximas melhorias recomendadas — não implementadas
+## Prioridades executadas nesta publicação
 
 | Prioridade | Área | Recomendação e aceite |
 |---|---|---|
@@ -32,6 +35,26 @@ Em 390px, menu/cabeçalho/avisos ocupam boa parte da primeira tela.
 | Média | Menu/móvel | Recolher categorias e compactar cabeçalho/avisos; manter contadores legíveis sem depender só de cor. Validar tarefas reais em 390px, não apenas ausência de overflow. |
 | Média | Sugestões cadastrais | Comparação lado a lado: valor atual, valor sugerido, documento/revisão e alcance. Resolução deve continuar administrativa e explícita. |
 | Média | Desempenho inicial | Carregar administração, importação e editores por demanda. Bundle candidato: cerca de 1.030 kB minificado/248 kB gzip; não aumentar o limite do bundler para esconder o aviso. |
+
+Resultado:
+- Hierarquia: avisos compactados, orientações secundárias recolhidas e
+  estado não salvo/próximo passo preservados.
+- DTC: abas Identificação, Períodos, Cargos/Documentação e Conferência,
+  com resumo de totais e validação abrindo o painel do campo inválido.
+- Importação: indicadores das etapas reais de recepção e promoção,
+  resumo de rejeitados/quarentena/divergências e preservação antes da aplicação.
+- Histórico: rótulos e seleção assistida de relações, carregadas em todas as
+  páginas; competência/período/rubrica e totais exatos globais no servidor.
+- Prévia: modal nativo com isolamento do fundo, foco inicial, retorno e Escape.
+  Navegação por teclado automatizada; leitor de tela ainda requer aceite humano.
+- Menu: categorias recolhíveis, cabeçalho móvel/aviso compactos e contadores
+  preservados com nomes acessíveis.
+- Sugestões: comparação tabular, documento/revisão/alcance e ação administrativa
+  explícita, sem aplicação automática.
+- Desempenho: telas lazy, fallback de carregamento e proteção contra falha de
+  chunk com recarga explícita. Maior chunk 486,48 kB, sem elevar o limite.
+  Inicial completo aproximadamente 796 kB/187 kB gzip; entrada isolada 32,05 kB.
+- Login/troca: senha revelável por botão acessível e mínimo junto à nova senha.
 
 Aceite com operadores: localizar um vínculo, ajustar somente a declaração,
 identificar a sugestão cadastral, corrigir o cadastro com motivo e tratar um
@@ -84,8 +107,10 @@ leitor de tela, foco e controles móveis; esses cenários não foram certificado
 - Orientações antigas de emissão indisponível na DOF substituídas pelo fluxo
   Salvar → Conferir → Emitir, sem liberar emissão direta de rascunhos.
 
-A tabela abaixo atualiza a avaliação por tela; recomendações não equivalem
-a recursos publicados.
+A tabela abaixo preserva o diagnóstico e o roteiro por tela. As nove
+prioridades acima já estão publicadas; o restante (por exemplo filtros globais
+de auditoria/documentos e painel contextual de usuários) continua evolução
+posterior, não deve ser confundido com aceite concluído de toda a tabela.
 
 | Tela | Diagnóstico | Melhoria recomendada | Prioridade |
 |---|---|---|---|
@@ -129,11 +154,12 @@ bloqueio de CSS arbitrário e scripts inseridos na prévia DTC.
 
 1. Concluído: integração visual das prévias e mensagens antigas de emissão.
 2. Concluído: filtros da lista carregada, grupos cadastrais e abas de transferência.
-3. Concluído: grupos DTC e separação das ações destrutivas. Próximos opcionais:
-   filtros globais, abas DTC, menus de ações e compactação do menu.
-4. Código validado nesta evolução: ajustes/sugestões, prévia instantânea,
-   visualizador e contadores. Máximo observado de 135,3 ms com 45 anos,
-   200 blocos e 20.000 caracteres válidos, abaixo da meta de 200 ms.
+3. Concluído: grupos/abas DTC, separação das ações destrutivas, filtros globais
+   do histórico por vínculo e compactação do menu. Menus de ações e filtros
+   globais nas demais listas continuam evolução posterior.
+4. Publicados: ajustes/sugestões, prévia instantânea, visualizador, contadores
+   e nove prioridades desta rodada. Máximo de 131,4 ms no seletor final com
+   45 anos, 200 blocos e 20.000 caracteres válidos, abaixo da meta de 200 ms.
 5. Validar com operadores: localizar servidor, corrigir referência, salvar,
    conferir e emitir; medir passos, tempo e erros sem registrar dados pessoais.
 

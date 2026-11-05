@@ -1,30 +1,31 @@
-# Instalação e estado atual — 03/11/2026
+# Instalação e estado atual — 04/11/2026
 
 ## Destino atual: instalação e aceite a confirmar
 
-Estado consolidado em 03/11/2026 20:42 (somente leitura):
+Estado consolidado após publicação autorizada em 04/11/2026:
 - Configuração externa e provisionamento existem.
 - `npm run verificar-instalacao` aprovado com histórico até
-  `024-perfil-secretario-adjunto`.
+  `025-historico-servidor`.
 - API ativa em `127.0.0.1:3443` e proxy Caddy ativo em `192.168.70.26:443`.
 - Health 200 e rota privada 401 sem sessão, em acesso direto e via proxy.
-- API e Caddy executam sob `NT AUTHORITY\LOCAL SERVICE`, porém como processos
-  diretos (serviços WinSW ainda não registrados).
+- API e Caddy são serviços Windows automáticos sob `NT AUTHORITY\LOCAL SERVICE`,
+  confirmados em Running após reinício em ordem.
 - Regra de firewall LAN HTTPS está ativa em escopo restrito.
 - Um formato de processo está configurado e as quatro aprovações de template
   v2 seguem pendentes.
 
 Primeiro login/troca de senha e aceite funcional ainda precisam de validação
-operacional formal. Serviço automático e backup/recuperação continuam como
-pendências separadas.
+operacional formal. Backup local cifrado/verificado foi capturado antes da
+migração; agendamento, cópia externa e ensaio de recuperação seguem pendentes.
+Evidências e limites em [Progresso](PROGRESSO.md).
 
 **Não repetir setup nem o fluxo de conclusão abaixo.**
 
-Este checkout adiciona a migração obrigatória `024-perfil-secretario-adjunto`.
-Bases ainda em 023 não iniciam o build novo até aplicar a
-migração com a aplicação parada, após backup validado. Os modelos WinSW/Caddy estão preparados em `ops/windows`, mas ainda não foram
-ativados como serviços registrados; o início atual permanece manual por
-processo. A configuração externa vigente usa Caddy na LAN com escopo de rede
+Este checkout exige a migração obrigatória `025-historico-servidor`.
+Bases anteriores não iniciam o build novo até aplicar as migrações
+com a aplicação parada, após backup validado. Os modelos WinSW/Caddy estão em
+`ops/windows`; os serviços já estão registrados nesta VM.
+A configuração externa vigente usa Caddy na LAN com escopo de rede
 restrito por firewall.
 
 ### Histórico da preparação inicial, anterior a essa verificação
@@ -137,7 +138,8 @@ máquina antiga não configura a conta do destino. Reaplique ACLs locais.
 Windows Server/Server Core, execução desassistida e concorrência no destino
 **não estão certificados pela suíte executada na origem**. Server Core exige
 validação específica antes de adotar este guia. Modelos WinSW/Caddy foram
-preparados, mas não estão instalados como serviços. Backup agendado e
+preparados e os serviços estão ativos na VM atual; outro destino exige
+instalação/aceite próprios. Backup agendado e
 restauração automatizada não estão implementados. O endpoint LAN via Caddy foi
 adotado com escopo de rede restrito; mudanças de firewall/escopo exigem
 aprovação operacional.
@@ -146,7 +148,7 @@ aprovação operacional.
 
 **Instalação nova:** provisionar banco/papéis/TLS/lista de senhas e uma raiz
 inexistente; depois `npm ci`, instalar Chromium e executar `npm run setup`
-em terminal interativo. O setup aplica até `024-perfil-secretario-adjunto`, gera
+em terminal interativo. O setup aplica até `025-historico-servidor`, gera
 chaves novas e administrador com troca obrigatória. Não cria PostgreSQL,
 banco, papéis, certificado, confiança Windows nem serviço da aplicação.
 A aprovação institucional continua separada.
@@ -176,5 +178,5 @@ Saída zero **não autoriza emissão nem substitui o aceite da restauração**.
 
 Para ligar, veja [Como ligar](COMO_LIGAR.md). Atualizações autorizadas exigem
 parar a aplicação, preservar cópia consistente, compilar e aplicar apenas
-migrações conhecidas com `npm run migrar`. O bootstrap exige a versão 024.
+migrações conhecidas com `npm run migrar`. O bootstrap exige a versão 025.
 Regressão anterior e validações desta preparação: [Progresso](PROGRESSO.md).

@@ -1,20 +1,35 @@
 import { notificacoesDeclaracoesSchema, type NotificacoesDeclaracoes, type RespostaSessao } from '@sisdoc/contratos';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Auditoria } from '../administracao/auditoria';
-import { nomesPerfis, Usuarios } from '../administracao/usuarios';
+import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Login, TrocaSenha } from '../autenticacao/acesso';
 import { BuscaGlobal } from '../cadastro/busca-global';
 import type { Consulta } from '../cadastro/contexto';
-import { Servidores } from '../cadastro/servidores';
 import '../compartilhado/estilos.css';
-import { Historico } from '../documentos/historico';
-import { ConferidosDof } from '../dof/conferidos-dof';
-import { RascunhosDof } from '../dof/rascunhos-dof';
-import { TelaDtc } from '../dtc/dtc';
 import { api, ErroApi, requisitar, validar } from '../infraestrutura/api';
-import { Retornos } from '../documentos/retornos';
-import { ImportacaoAdmin } from '../transferencia/importacao';
 import { AvisoSincronizacao, EstadoSincronizacao, SincronizacaoAdmin } from '../transferencia/sincronizacao';
+
+const Usuarios = lazy(() => import('../administracao/usuarios').then((m) => ({ default: m.Usuarios })));
+const Auditoria = lazy(() => import('../administracao/auditoria').then((m) => ({ default: m.Auditoria })));
+const Servidores = lazy(() => import('../cadastro/servidores').then((m) => ({ default: m.Servidores })));
+const Historico = lazy(() => import('../documentos/historico').then((m) => ({ default: m.Historico })));
+const ConferidosDof = lazy(() => import('../dof/conferidos-dof').then((m) => ({ default: m.ConferidosDof })));
+const RascunhosDof = lazy(() => import('../dof/rascunhos-dof').then((m) => ({ default: m.RascunhosDof })));
+const TelaDtc = lazy(() => import('../dtc/dtc').then((m) => ({ default: m.TelaDtc })));
+const Retornos = lazy(() => import('../documentos/retornos').then((m) => ({ default: m.Retornos })));
+const ImportacaoAdmin = lazy(() => import('../transferencia/importacao').then((m) => ({ default: m.ImportacaoAdmin })));
+const nomesPerfis = { admin: 'Administrador', analista: 'Analista', coordenador: 'Coordenador' };
+
+class ProtecaoTela extends Component<{ children: ReactNode; confirmarSaida: () => boolean }, { falhou: boolean }> {
+  state = { falhou: false };
+  static getDerivedStateFromError() { return { falhou: true }; }
+  render() {
+    if (this.state.falhou) return <section className="aviso erro" role="alert">
+      <h2>Não foi possível abrir esta tela.</h2>
+      <p>Verifique a conexão e recarregue a aplicação. Alterações não salvas não serão recuperadas.</p>
+      <button type="button" onClick={() => { if (this.props.confirmarSaida()) window.location.reload(); }}>Recarregar aplicação</button>
+    </section>;
+    return this.props.children;
+  }
+}
 
 /** Compõe navegação por perfil, sessão e proteção global de alterações não salvas. */
 export function App() {
@@ -170,7 +185,7 @@ export function App() {
               onClick={() => setMenuAberto((valor) => !valor)}>Menu</button>
             <nav id="navegacao-principal" aria-label="Navegação">
               {sessao.usuario.papel === 'admin' && <>
-                <p className="grupo-menu">Administração</p>
+                <details className="categoria-menu" open><summary>Administração</summary>
                   <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
                     onClick={() => navegar('usuarios')}>Usuários</button>
                   <button type="button" aria-current={tela === 'importacao' ? 'page' : undefined}
@@ -179,12 +194,14 @@ export function App() {
                     onClick={() => navegar('sincronizacao')}>Sincronização</button>
                 <button type="button" aria-current={tela === 'auditoria' ? 'page' : undefined}
                   onClick={() => navegar('auditoria')}>Auditoria</button>
+                </details>
               </>}
               {funcional && <>
-                <p className="grupo-menu">Cadastro de pessoas</p>
+                <details className="categoria-menu" open><summary>Cadastro de pessoas</summary>
                 <button type="button" aria-label="Buscar servidores" aria-current={tela === 'busca' ? 'page' : undefined}
                   onClick={() => navegar('busca')}>Buscar servidores<span>Dados de referência · DOF e DTC</span></button>
-                <p className="grupo-menu">DOFs</p>
+                </details>
+                <details className="categoria-menu" open><summary>DOFs</summary>
                 {podeSalvar && <>
                   <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>Rascunhos</button>
                   <button type="button" aria-current={tela === 'conferidos' ? 'page' : undefined} onClick={() => navegar('conferidos')}>DOFs conferidas</button>
@@ -199,18 +216,21 @@ export function App() {
                   {notificacoes && notificacoes.retornos > 0 && <span className="contador-notificacao" aria-label={`${notificacoes.retornos} declarações devolvidas pendentes`}>{notificacoes.retornos}</span>}
                 </button>}
                 {erroNotificacoes && <p role="status">Contagem de notificações indisponível. A atualização será tentada novamente.</p>}
+                </details>
                 {podeSalvar && <>
-                  <p className="grupo-menu">DTCs</p>
+                  <details className="categoria-menu" open><summary>DTCs</summary>
                   <button type="button" aria-current={tela === 'DTC_IPAM' ? 'page' : undefined}
                     onClick={() => navegar('DTC_IPAM')}>DTC IPAM<span>Anexo III</span></button>
                   <button type="button" aria-current={tela === 'DTC_COMISSIONADO' ? 'page' : undefined}
                     onClick={() => navegar('DTC_COMISSIONADO')}>DTC Comissionado<span>Benefício junto ao INSS</span></button>
                   <button type="button" aria-current={tela === 'DTC_INSS' ? 'page' : undefined}
                     onClick={() => navegar('DTC_INSS')}>DTC INSS<span>RGPS · modelo provisório</span></button>
+                  </details>
                 </>}
-                <p className="grupo-menu">Documentos emitidos</p>
+                <details className="categoria-menu" open><summary>Documentos emitidos</summary>
                 <div className="menu-separado"><button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
                   onClick={() => navegar('historico')}>Histórico<span>Emissões, PDF e cópias</span></button></div>
+                </details>
               </>}
             </nav>
           </>
@@ -231,7 +251,7 @@ export function App() {
       <div className="conteudo">
         <h1 className="sr-only">DOF e DTC</h1>
         <details className="situacao-implantacao">
-          <summary>Uso operacional autorizado em 31/10/2026 — emissão de DOF e DTCs depende de aprovação formal de cada modelo</summary>
+          <summary>Emissão oficial depende de aprovação do modelo · orientações</summary>
           <p>Consulta, cálculo, rascunhos, prévia e conferência da DOF e das DTCs (IPAM, Comissionado e INSS) estão liberados. A emissão com número e PDF só é liberada, por tipo, depois que a regra e o modelo forem aprovados formalmente pelo administrador com npm run aprovar-modelo. Até lá, as regras e a prévia seguem identificadas como provisórias. Os totais da DTC Comissionado são inferidos e o modelo da DTC INSS é provisório (textos oficiais pendentes).</p>
         </details>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
@@ -241,7 +261,8 @@ export function App() {
         ) : sessao.usuario.trocaSenhaObrigatoria ? (
           <TrocaSenha sessao={sessao} onConcluir={() => encerrarLocal('Senha alterada. Entre novamente.')} onErro={tratarErro} />
         ) : (
-          <>
+          <ProtecaoTela key={`${tela}-${chaveTela}`} confirmarSaida={confirmarSaida}>
+          <Suspense fallback={<p role="status">Carregando tela...</p>}>
             {alteracoesPendentes && <p className="etiqueta" role="status">Há alterações não salvas.</p>}
             {funcional && <AvisoSincronizacao key={`situacao-${chaveTela}`} />}
             {sessao.usuario.papel === 'admin' && tela === 'sincronizacao' && (
@@ -282,7 +303,8 @@ export function App() {
             {(sessao.usuario.papel === 'admin' && tela === 'auditoria') && (
               <Auditoria onErro={tratarErro} />
             )}
-          </>
+          </Suspense>
+          </ProtecaoTela>
         )}
       </div>
       </main>

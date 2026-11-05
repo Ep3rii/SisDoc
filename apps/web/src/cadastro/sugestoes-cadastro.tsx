@@ -31,8 +31,13 @@ export function SugestoesCadastro({ pessoaId, vinculoId, cadastro, onErro, onApl
         {!sugestoes.length && <p>Nenhuma divergência sugerida para este vínculo nesta página.</p>}
         {sugestoes.map((item) => <details key={item.documentoId} className="grupo-formulario">
           <summary>{item.tipo} · revisão {item.revisao} · {item.campos.length} sugestão(ões)</summary>
-          <dl>{item.campos.map(([campo, rotulo]) => <div key={campo}><dt>{rotulo}</dt>
-            <dd>Cadastro: {cadastro[campoCadastro(campo)] ?? 'Não informado'} → Declaração: {item.ajustes[campo] ?? 'Não informado'}</dd></div>)}</dl>
+          <p>Documento {item.documentoId} · vínculo atual · revisão {item.revisao}.
+            Revisar a sugestão não altera o cadastro até confirmar a gravação com motivo.</p>
+          <table className="comparacao-cadastro"><caption>Comparação com o cadastro local</caption>
+            <thead><tr><th>Campo</th><th>Cadastro atual</th><th>Sugerido na declaração</th></tr></thead>
+            <tbody>{item.campos.map(([campo, rotulo]) => <tr key={campo}><th scope="row">{rotulo}</th>
+              <td>{cadastro[campoCadastro(campo)] ?? 'Não informado'}</td><td>{item.ajustes[campo] ?? 'Não informado'}</td></tr>)}</tbody>
+          </table>
           {onAplicar && <button type="button" className="secundario" onClick={() => {
             if (!window.confirm('Preparar correção do cadastro local com esta sugestão? Confira os campos e informe motivo antes de salvar.')) return;
             const novo = { ...cadastro };

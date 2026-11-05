@@ -21,6 +21,7 @@ import { renderizarDocumentoDtc } from '@sisdoc/templates';
 import { AjustesDeclaracao } from '../compartilhado/ajustes-declaracao';
 import { PreviaDocumento } from '../compartilhado/previa-documento';
 import { CorrecaoNoDocumento } from '../cadastro/correcao-no-documento';
+import { Abas } from '../compartilhado/abas';
 import { anosDoPeriodo } from './anos-dtc';
 import { cargoVazio, DESCRICOES, inssPadrao, periodoVazio, Servidor, textoOuNulo } from './contexto';
 
@@ -51,6 +52,7 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
   onPendente: (valor: boolean) => void;
 }) {
   const [conteudo, setConteudo] = useState<ConteudoDtc>(inicial);
+  const [aba, setAba] = useState('identificacao');
   const [motivo, setMotivo] = useState('');
   const [confirmacao, setConfirmacao] = useState(false);
   const [ocupado, setOcupado] = useState(false);
@@ -110,6 +112,15 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
   /** Cria ou revisa rascunho usando CSRF; só libera a edição pendente após confirmação da API. */
   async function salvar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+    const invalido = evento.currentTarget.querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input:invalid, textarea:invalid, select:invalid');
+    if (invalido) {
+      const painel = invalido.closest('[role="tabpanel"]');
+      if (painel) setAba(painel.id.split('-painel-')[1]);
+      const grupo = invalido.closest('details');
+      if (grupo) grupo.open = true;
+      requestAnimationFrame(() => { invalido.focus(); invalido.reportValidity(); });
+      return;
+    }
     try {
       onLimpar();
       setOcupado(true);
@@ -134,7 +145,7 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
           setFonte(fonteDaReferencia(dados, fonte.periodosIpam));
           onPendente(true);
         }} />}
-      <form className="editor-dof" onSubmit={(evento) => void salvar(evento)} aria-label={`Editor da ${ROTULOS_DTC[tipo]}`}
+      <form noValidate className="editor-dof" onSubmit={(evento) => void salvar(evento)} aria-label={`Editor da ${ROTULOS_DTC[tipo]}`}
       onInvalidCapture={(evento) => {
         if (evento.target instanceof HTMLElement) {
           const grupo = evento.target.closest('details');
@@ -143,10 +154,17 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
       }}>
       <p className="identificador-documento">{documento ? `Rascunho · revisão ${documento.revisao}` : 'Novo rascunho'}</p>
       <h2>{ROTULOS_DTC[tipo]} — {servidor.nome}</h2>
-      <p>Matrícula {servidor.matricula}. {DESCRICOES[tipo]}</p>
+      <p>Matrícula {servidor.matricula}. Ajustes exclusivos desta declaração; cadastro e fonte externa não são alterados.</p>
+      <details><summary>Orientações do modelo e fluxo</summary><p>{DESCRICOES[tipo]} Salvar → conferir → emitir após aprovação do modelo.</p></details>
+      <p role="status">{JSON.stringify(inicial) !== JSON.stringify(conteudo) || motivo ? 'Há alterações locais não salvas.' : 'Revisão carregada sem alterações locais.'}
+        {' '}Próximo passo: revisar os dados e salvar na aba Conferência.</p>
+      <Abas atual={aba} onSelecionar={setAba} rotulo="Edição da DTC" itens={[
+        { id: 'identificacao', titulo: 'Identificação', conteudo: <>
       {fonte && <AjustesDeclaracao fonte={fonte} ajustes={conteudo.ajustesCadastro ?? {}} bloqueado={ocupado}
         onAlterar={(ajustesCadastro) => alterar({ ...conteudo, ajustesCadastro })} />}
       {!fonte && <p role="status">Carregando dados do servidor...</p>}
+        </> },
+        { id: 'periodos', titulo: 'Períodos', conteudo: <>
       <fieldset>
         <legend><strong>Períodos ({conteudo.periodos.length} de {MAXIMO_PERIODOS_DTC})</strong></legend>
         {conteudo.periodos.map((periodo, indice) => (
@@ -191,6 +209,8 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
         {conteudo.periodos.length < MAXIMO_PERIODOS_DTC && <div className="acoes"><button type="button" className="secundario"
           onClick={() => alterar({ ...conteudo, periodos: [...conteudo.periodos, periodoVazio(tipo)] })}>Adicionar período</button></div>}
       </fieldset>
+        </> },
+        ...(tipo !== 'DTC_IPAM' ? [{ id: 'complementos', titulo: tipo === 'DTC_COMISSIONADO' ? 'Cargos' : 'Documentação', conteudo: <>
       {tipo === 'DTC_COMISSIONADO' && <fieldset className="separado">
         <legend><strong>Cargos em comissão ({conteudo.cargos.length} de {MAXIMO_CARGOS_COMISSIONADOS})</strong></legend>
         {conteudo.cargos.map((cargo, indice) => (
@@ -244,6 +264,12 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
         <label>Observações<textarea maxLength={2000} value={inss.observacao ?? ''}
           onChange={(evento) => alterarInss({ observacao: textoOuNulo(evento.target.value) })} /></label>
       </fieldset>}
+        </> }] : []),
+        { id: 'conferencia', titulo: 'Conferência', conteudo: <>
+      <h3>Revisão antes de salvar</h3>
+      {'erro' in calculoLocal ? <p className="aviso erro">{calculoLocal.erro}</p> :
+        <p>Contribuição: {calculoLocal.resultado.totais.totalContribuicao} dias · efetivo exercício: {calculoLocal.resultado.totais.efetivoExercicio} dias.
+          Totais provisórios do formulário, sem validade oficial.</p>}
       <fieldset className="grupo-formulario">
         <legend><strong>Processo e confirmações</strong></legend>
         <label>Número do processo{documento?.mascarasProcesso.length ? ` (${documento.mascarasProcesso.join(' ou ')})` : ''}
@@ -253,15 +279,18 @@ export function Editor({ tipo, inicial, documento, servidor, csrf, onSalvo, onCa
           onChange={(evento) => alterar({ ...conteudo, confirmarInicioAjustado: evento.target.checked })} />
           Confirmo o ajuste do início à data de posse, se o cálculo o indicar</label>
         {documento ? (
-          <label>Motivo da alteração<textarea required maxLength={2000} value={motivo} onChange={(evento) => setMotivo(evento.target.value)} /></label>
+          <label>Motivo da alteração<textarea required maxLength={2000} value={motivo} onChange={(evento) => { setMotivo(evento.target.value); onPendente(true); }} /></label>
         ) : (
           <label className="marcador"><input type="checkbox" checked={confirmacao} onChange={(evento) => setConfirmacao(evento.target.checked)} />
             Confirmo que conferi os dados do servidor e os períodos informados</label>
         )}
       </fieldset>
+        </> },
+      ]} />
       {problemas.length > 0 && <ul className="aviso erro">{problemas.map((problema) => <li key={problema.caminho + problema.mensagem}>{problema.mensagem}</li>)}</ul>}
       <div className="acoes">
-        <button type="submit" disabled={ocupado || problemas.length > 0 || (documento ? !motivo.trim() : !confirmacao)}>
+        {aba !== 'conferencia' && <button type="button" onClick={() => setAba('conferencia')}>Revisar e salvar</button>}
+        <button type="submit" hidden={aba !== 'conferencia'} disabled={ocupado || problemas.length > 0 || (documento ? !motivo.trim() : !confirmacao)}>
           {ocupado ? 'Salvando...' : 'Salvar rascunho'}</button>
         <button type="button" className="secundario" disabled={ocupado} onClick={onCancelar}>Cancelar</button>
       </div>

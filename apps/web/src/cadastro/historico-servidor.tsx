@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { paginaHistoricoServidorSchema, resultadoHistoricoServidorSchema, salvarHistoricoSchema,
-  somarValoresMonetarios, revisoesHistoricoSchema, type RegistroHistorico } from '@sisdoc/contratos';
+  consultaHistoricoServidorSchema, referenciaServidorSchema, revisoesHistoricoSchema, type RegistroHistorico } from '@sisdoc/contratos';
 import { requisitar, validar, ErroApi } from '../infraestrutura/api';
 import { TransferenciaHistorico } from './transferencia-historico';
 
@@ -16,6 +16,22 @@ const nomes: Record<RegistroHistorico['tipo'], string> = {
   ferias: 'Férias', licenca: 'Licença', abono_pecuniario: 'Abono pecuniário',
   abono_permanencia: 'Abono de permanência', outro: 'Outro fato', lancamento: 'Lançamento financeiro',
 };
+const rotulos: Record<keyof RegistroHistorico, string> = {
+  grupo: 'Grupo', tipo: 'Tipo', situacao: 'Situação', inicio: 'Início', fim: 'Fim',
+  aquisitivoInicio: 'Período aquisitivo — início', aquisitivoFim: 'Período aquisitivo — fim',
+  diasInformados: 'Dias informados', especieLicenca: 'Espécie de licença', ato: 'Ato de referência',
+  descricao: 'Descrição', efeitoTempo: 'Efeito no tempo', efeitoRemuneracao: 'Efeito na remuneração',
+  competencia: 'Competência', competenciaOrigem: 'Competência de origem', pagamento: 'Data do pagamento',
+  rubrica: 'Rubrica', natureza: 'Natureza', valor: 'Valor', folha: 'Modalidade da folha',
+  origem: 'Origem', idOrigem: 'Identificador na origem', eventoId: 'Evento funcional relacionado', relacionadoId: 'Registro relacionado',
+};
+const valoresRotulados: Record<string, string> = {
+  nao_informado: 'Não informado', sem_efeito: 'Sem efeito (informado)', com_efeito: 'Com efeito (informado)',
+  abono_pecuniario: 'Abono pecuniário', abono_permanencia: 'Abono de permanência', lancamento: 'Lançamento financeiro',
+};
+const valorApresentado = (valor: unknown) => typeof valor === 'string'
+  ? (valoresRotulados[valor] ?? valor.replace(/_/g, ' '))
+  : String(valor ?? 'Não informado');
 
 export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErro, onPendente, confirmarSaida }: {
   pessoaId: string; vinculoId: string; csrf: string; podeEditar: boolean;
@@ -33,6 +49,42 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
   const [ocupado, setOcupado] = useState(false);
   const [mensagem, setMensagem] = useState('');
   const [exportando, setExportando] = useState(false);
+  const [filtros, setFiltros] = useState({ competenciaInicio: '', competenciaFim: '', inicio: '', fim: '', rubrica: '' });
+  const [aplicados, setAplicados] = useState(filtros);
+  const [opcoes, setOpcoes] = useState<{ historico: NonNullable<typeof pagina>['itens']; eventos: Array<{ id: string; texto: string }> } | null>(null);
+  const [falhaOpcoes, setFalhaOpcoes] = useState(false);
+  const [tentativaOpcoes, setTentativaOpcoes] = useState(0);
+  const editando = registro !== null;
+  useEffect(() => {
+    if (!editando) return;
+    let ativa = true; setOpcoes(null); setFalhaOpcoes(false);
+    async function carregar() {
+      const historico: NonNullable<typeof pagina>['itens'] = [];
+      const eventos: Array<{ id: string; texto: string }> = [];
+      let proximo: string | null = null;
+      do {
+        const dados: NonNullable<typeof pagina> = validar(paginaHistoricoServidorSchema, await requisitar(`servidores/${pessoaId}/historico?${new URLSearchParams({
+          vinculoId, limite: '100', ...(proximo ? { cursor: proximo } : {}),
+        })}`));
+        if (!ativa) return;
+        historico.push(...dados.itens); proximo = dados.proximoCursor;
+      } while (proximo);
+      do {
+        const dados: ReturnType<typeof referenciaServidorSchema.parse> = validar(referenciaServidorSchema, await requisitar(`servidores/${pessoaId}/referencias?${new URLSearchParams({
+          vinculoId, tipo: 'eventos_funcionais', limite: '50', ...(proximo ? { cursor: proximo } : {}),
+        })}`));
+        if (!ativa) return;
+        eventos.push(...dados.registros.filter((e) => e.campos.removido_na_fonte_em === null).map((e) => ({
+          id: e.id, texto: Object.entries(e.campos).filter(([chave]) => !chave.endsWith('_id') && chave !== 'removido_na_fonte_em')
+            .map(([, valor]) => valor).filter(Boolean).join(' · '),
+        })));
+        proximo = dados.proximoCursor;
+      } while (proximo);
+      if (ativa) setOpcoes({ historico, eventos });
+    }
+    void carregar().catch((erro: unknown) => { if (ativa) { setFalhaOpcoes(true); onErro(erro); } });
+    return () => { ativa = false; };
+  }, [pessoaId, vinculoId, editando, versao, tentativaOpcoes, onErro]);
   async function exportar() {
     setExportando(true);
     try {
@@ -51,11 +103,12 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
   }
   useEffect(() => {
     let ativa = true; setPagina(null); setFalhou(false);
-    requisitar(`servidores/${pessoaId}/historico?${new URLSearchParams({ vinculoId, limite: '50', ...(cursor ? { cursor } : {}) })}`)
+    requisitar(`servidores/${pessoaId}/historico?${new URLSearchParams({ vinculoId, grupo, limite: '50',
+      ...Object.fromEntries(Object.entries(aplicados).filter(([, valor]) => valor !== '')), ...(cursor ? { cursor } : {}) })}`)
       .then((dados) => { if (ativa) setPagina(validar(paginaHistoricoServidorSchema, dados)); })
       .catch((erro: unknown) => { if (ativa) { setFalhou(true); onErro(erro); } });
     return () => { ativa = false; };
-  }, [pessoaId, vinculoId, cursor, versao, onErro]);
+  }, [pessoaId, vinculoId, grupo, aplicados, cursor, versao, onErro]);
   function alterar(mudanca: Partial<RegistroHistorico>) { setRegistro((atual) => atual ? { ...atual, ...mudanca } : atual); onPendente(true); }
   function fechar(): boolean {
     if (!confirmarSaida()) return false;
@@ -91,9 +144,32 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
       {exportando ? 'Exportando...' : 'Exportar histórico do vínculo (XLSX)'}
     </button>}
     <div className="acoes" role="group" aria-label="Tipo de histórico">
-      <button type="button" className="secundario" aria-pressed={grupo === 'funcional'} onClick={() => { if (fechar()) setGrupo('funcional'); }}>Funcional</button>
-      <button type="button" className="secundario" aria-pressed={grupo === 'financeiro'} onClick={() => { if (fechar()) setGrupo('financeiro'); }}>Financeiro</button>
+      <button type="button" className="secundario" aria-pressed={grupo === 'funcional'} onClick={() => { if (fechar()) { setGrupo('funcional'); setCursor(undefined); } }}>Funcional</button>
+      <button type="button" className="secundario" aria-pressed={grupo === 'financeiro'} onClick={() => { if (fechar()) { setGrupo('financeiro'); setCursor(undefined); } }}>Financeiro</button>
     </div>
+    <form onSubmit={(evento) => {
+      evento.preventDefault();
+      const consulta = consultaHistoricoServidorSchema.safeParse({ vinculoId, grupo, ...Object.fromEntries(Object.entries(filtros).filter(([, valor]) => valor !== '')) });
+      if (!consulta.success) { onErro(new ErroApi(400, 'Confira as competências e o intervalo dos filtros.')); return; }
+      if (registro && !fechar()) return;
+      setAplicados({ ...filtros }); setCursor(undefined); setFiltro('');
+    }}>
+      <h4>Filtrar todo o histórico do vínculo</h4>
+      <p>Período: sobreposição dos fatos funcionais ou data de pagamento. Competências e rubrica aplicam-se aos lançamentos financeiros.</p>
+      <div className="grade-formulario">
+        {(['competenciaInicio', 'competenciaFim', 'inicio', 'fim', 'rubrica'] as const).map((campo) => <label key={campo}>
+          {{ competenciaInicio: 'Competência inicial', competenciaFim: 'Competência final', inicio: 'Período inicial', fim: 'Período final', rubrica: 'Rubrica contém' }[campo]}
+          <input type={campo.startsWith('competencia') ? 'month' : campo === 'rubrica' ? 'text' : 'date'} maxLength={200}
+            value={filtros[campo]} onChange={(e) => setFiltros((atual) => ({ ...atual, [campo]: e.target.value }))} />
+        </label>)}
+      </div>
+      <button type="submit">Aplicar filtros globais</button>
+      <button type="button" className="secundario" onClick={() => {
+        if (registro && !fechar()) return;
+        const vazios = { competenciaInicio: '', competenciaFim: '', inicio: '', fim: '', rubrica: '' };
+        setFiltros(vazios); setAplicados(vazios); setCursor(undefined); setFiltro('');
+      }}>Limpar filtros globais</button>
+    </form>
     <label>Filtrar registros carregados (descrição, competência, rubrica, origem)<input value={filtro} onChange={(e) => setFiltro(e.target.value)} /></label>
     {podeEditar && !registro && <button type="button" onClick={() => { setRegistro(historicoVazio(grupo)); setEdicao(null); setMensagem(''); }}>Adicionar registro {grupo}</button>}
     {podeEditar && !registro && <TransferenciaHistorico pessoaId={pessoaId} vinculoId={vinculoId} csrf={csrf}
@@ -105,7 +181,7 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
         {grupo === 'funcional' && <label>Tipo<select value={registro.tipo} onChange={(e) => alterar({ tipo: e.target.value as RegistroHistorico['tipo'] })}>
           {Object.entries(nomes).filter(([tipo]) => tipo !== 'lancamento').map(([tipo, nome]) => <option key={tipo} value={tipo}>{nome}</option>)}</select></label>}
         <label>Situação<select value={registro.situacao} onChange={(e) => alterar({ situacao: e.target.value as RegistroHistorico['situacao'] })}>
-          {(grupo === 'funcional' ? ['informado', 'concedido', 'gozado', 'cancelado'] : ['previsto', 'informado', 'pago', 'estornado']).map((situacao) => <option key={situacao} value={situacao}>{situacao}</option>)}</select></label>
+          {(grupo === 'funcional' ? ['informado', 'concedido', 'gozado', 'cancelado'] : ['previsto', 'informado', 'pago', 'estornado']).map((situacao) => <option key={situacao} value={situacao}>{valorApresentado(situacao)}</option>)}</select></label>
         {grupo === 'funcional' ? <>
           {texto('inicio', 'Início', 'date')}{texto('fim', 'Fim', 'date')}
           {texto('aquisitivoInicio', 'Período aquisitivo — início', 'date')}{texto('aquisitivoFim', 'Período aquisitivo — fim', 'date')}
@@ -121,11 +197,21 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
             <option value="normal">Normal</option><option value="complementar">Complementar</option><option value="retroativa">Retroativa</option></select></label>
         </>}
         {texto('ato', 'Ato/concessão de referência')}{texto('origem', 'Origem técnica')}{texto('idOrigem', 'Identificador na origem')}
-        {texto('eventoId', 'UUID de evento funcional existente (opcional)')}
-        <label>Registro histórico relacionado<select value={registro.relacionadoId ?? ''} onChange={(e) => alterar({ relacionadoId: e.target.value || null })}>
-          <option value="">Sem relacionamento</option>{pagina?.itens.filter((item) => item.id !== edicao?.id).map((item) =>
-            <option key={item.id} value={item.id}>{nomes[item.registro.tipo]} — {item.registro.descricao.slice(0, 80)} — {item.id}</option>)}
+        <label>Evento funcional relacionado<select disabled={!opcoes} value={registro.eventoId ?? ''} onChange={(e) => alterar({ eventoId: e.target.value || null })}>
+          <option value="">Sem evento relacionado</option>
+          {registro.eventoId && !opcoes?.eventos.some((e) => e.id === registro.eventoId) && <option value={registro.eventoId}>Evento já relacionado (consulte a rastreabilidade)</option>}
+          {opcoes?.eventos.map((item) => <option key={item.id} value={item.id}>{item.texto || 'Evento sem descrição'} · {item.id}</option>)}
         </select></label>
+        <label>Registro histórico relacionado<select disabled={!opcoes} value={registro.relacionadoId ?? ''} onChange={(e) => alterar({ relacionadoId: e.target.value || null })}>
+          <option value="">Sem relacionamento</option>
+          {registro.relacionadoId && !opcoes?.historico.some((e) => e.id === registro.relacionadoId) && <option value={registro.relacionadoId}>Registro já relacionado (consulte a rastreabilidade)</option>}
+          {opcoes?.historico.filter((item) => item.id !== edicao?.id && (registro.situacao !== 'estornado' ||
+            (item.registro.situacao === 'pago' && item.registro.natureza === registro.natureza && item.registro.valor === registro.valor &&
+              !opcoes.historico.some((outro) => outro.id !== edicao?.id && outro.registro.situacao === 'estornado' && outro.registro.relacionadoId === item.id)))).map((item) =>
+            <option key={item.id} value={item.id}>{nomes[item.registro.tipo]} — {item.registro.descricao.slice(0, 80)} — {item.registro.competencia ?? item.registro.inicio} — {item.registro.valor ?? ''}</option>)}
+        </select></label>
+        {!opcoes && <p role="status">{falhaOpcoes ? 'Não foi possível carregar os relacionamentos.' : 'Carregando todos os relacionamentos do vínculo...'}</p>}
+        {falhaOpcoes && <button type="button" onClick={() => setTentativaOpcoes((v) => v + 1)}>Tentar carregar relacionamentos</button>}
         {(['efeitoTempo', 'efeitoRemuneracao'] as const).map((campo) => <label key={campo}>{campo === 'efeitoTempo' ? 'Efeito informado no tempo' : 'Efeito informado na remuneração'}
           <select value={registro[campo]} onChange={(e) => alterar({ [campo]: e.target.value })}>
             <option value="nao_informado">Não informado</option><option value="sem_efeito">Sem efeito (informado)</option><option value="com_efeito">Com efeito (informado)</option>
@@ -143,14 +229,15 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
         </summary>
           <p>{item.registro.descricao}</p>
           <dl className="dados-servidor">{Object.entries(item.registro).filter(([, valor]) => valor !== null).map(([campo, valor]) =>
-            <div key={campo}><dt>{campo}</dt><dd>{String(valor)}</dd></div>)}</dl>
+            <div key={campo}><dt>{rotulos[campo as keyof RegistroHistorico]}</dt><dd>{valorApresentado(valor)}</dd></div>)}</dl>
           <p>Registro {item.id} · revisão {item.revisao} · atualizado em {new Date(item.atualizadoEm).toLocaleString('pt-BR')}.</p>
           <RevisoesHistorico pessoaId={pessoaId} id={item.id} revisao={item.revisao} onErro={onErro} />
           {podeEditar && !registro && <button type="button" className="secundario" onClick={() => { setRegistro(item.registro); setEdicao({ id: item.id, revisao: item.revisao }); setMotivo(''); }}>Editar com motivo</button>}
         </details>)}
-        {grupo === 'financeiro' && <p>Subtotais brutos dos pagamentos visíveis nesta página — proventos: {somarValoresMonetarios(itens.flatMap((i) => i.registro.situacao === 'pago' && i.registro.natureza === 'provento' && i.registro.valor ? [i.registro.valor] : []))};
-          descontos: {somarValoresMonetarios(itens.flatMap((i) => i.registro.situacao === 'pago' && i.registro.natureza === 'desconto' && i.registro.valor ? [i.registro.valor] : []))}.
-          Não representa saldo líquido, direitos ou total do histórico; estornos são registros separados.</p>}
+        <p>{pagina.totais.registros} registros em todo o vínculo com os filtros globais aplicados. A busca textual acima filtra somente esta página e não altera esses totais.</p>
+        {grupo === 'financeiro' && <p>Totais brutos globais filtrados — proventos pagos: {pagina.totais.proventosPagos};
+          descontos pagos: {pagina.totais.descontosPagos}; proventos estornados: {pagina.totais.proventosEstornados};
+          descontos estornados: {pagina.totais.descontosEstornados}. Não representa saldo líquido nem direitos; estornos são exibidos separadamente.</p>}
         <div className="acoes"><button type="button" disabled={!cursor || !!registro} onClick={() => setCursor(undefined)}>Primeira página de histórico</button>
           <button type="button" disabled={!pagina.proximoCursor || !!registro} onClick={() => setCursor(pagina.proximoCursor ?? undefined)}>Próxima página de histórico</button></div>
       </>}
@@ -183,7 +270,7 @@ function RevisoesHistorico({ pessoaId, id, revisao, onErro }: {
           <p>Motivo: {item.alteracao.motivo}</p>
           <dl>{Object.entries(item.alteracao.novo).filter(([campo, valor]) =>
             Reflect.get(item.alteracao.anterior ?? {}, campo) !== valor).map(([campo, valor]) =>
-            <div key={campo}><dt>{campo}</dt><dd>{String(Reflect.get(item.alteracao.anterior ?? {}, campo) ?? 'Não informado')} → {String(valor ?? 'Não informado')}</dd></div>)}</dl>
+            <div key={campo}><dt>{rotulos[campo as keyof RegistroHistorico]}</dt><dd>{valorApresentado(Reflect.get(item.alteracao.anterior ?? {}, campo))} → {valorApresentado(valor)}</dd></div>)}</dl>
         </details>)}
         <div className="acoes"><button type="button" disabled={!cursor} onClick={() => setCursor(undefined)}>Revisões recentes</button>
           <button type="button" disabled={!pagina.proximoCursor} onClick={() => setCursor(pagina.proximoCursor ?? undefined)}>Revisões anteriores</button></div>

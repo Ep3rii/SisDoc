@@ -302,7 +302,14 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
         divergências ficam indicadas para revisão, sem substituição automática.</p>
       <Abas atual={aba} onSelecionar={setAba} rotulo="Transferência de dados" itens={[
         { id: 'importar', titulo: 'Importar', conteudo: <>
-      <p className="etiqueta">1. Selecionar arquivo → 2. Validar e revisar → 3. Confirmar gravação</p>
+      <ol className="etapas-importacao" aria-label="Etapas da recepção">
+        {['Arquivo', 'Aba/perfil', 'Validação e diferenças', 'Confirmação da recepção'].map((titulo, indice) => {
+          const atual = !arquivo ? 0 : xlsx && !abaArquivo ? 1 : validadoPara === assinatura ? 3 : 2;
+          return <li key={titulo} aria-current={atual === indice ? 'step' : undefined}>{indice + 1}. {titulo}</li>;
+        })}
+      </ol>
+      {destino === 'nucleo' && mapear && <p>Após receber o arquivo: Mapeamento → Diferenças → Confirmação no Núcleo.
+        A recepção guarda o original, ainda não altera os cadastros.</p>}
       <div className="painel">
         <form className="formulario-importacao" onSubmit={(evento) => { evento.preventDefault(); void processar('validar'); }}>
           <label>Schema de destino<select value={destino} onChange={(e) => {

@@ -1,5 +1,5 @@
 import type { RespostaSessao } from '@sisdoc/contratos';
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { api, ErroApi } from '../infraestrutura/api';
 
 /** Lê um campo textual obrigatório sem converter arquivos ou valores ausentes silenciosamente. */
@@ -7,6 +7,18 @@ function campo(formulario: FormData, nome: string): string {
   const valor = formulario.get(nome);
   if (typeof valor !== 'string') throw new ErroApi(400, 'Preencha os campos obrigatórios.');
   return valor;
+}
+function CampoSenha({ nome, titulo, nova = false }: { nome: string; titulo: string; nova?: boolean }) {
+  const [visivel, setVisivel] = useState(false);
+  const id = useId();
+  return <div><label htmlFor={id}>{titulo}</label>
+    <input id={id} name={nome} type={visivel ? 'text' : 'password'} autoComplete={nova ? 'new-password' : 'current-password'}
+      minLength={nova ? 10 : undefined} maxLength={1024} required aria-describedby={nova ? `${id}-requisito` : undefined} />
+    {nova && <small id={`${id}-requisito`}>Pelo menos 10 caracteres; evite senhas comuns.</small>}
+    <button type="button" className="secundario" aria-pressed={visivel} aria-controls={id} onClick={() => setVisivel((valor) => !valor)}>
+      {visivel ? 'Ocultar' : 'Mostrar'} {titulo.toLocaleLowerCase('pt-BR')}
+    </button>
+  </div>;
 }
 
 /** Apresenta autenticação e descarta os valores do formulário somente após receber a sessão. */
@@ -32,7 +44,7 @@ export function Login({ onEntrar, onErro }: { onEntrar: (sessao: RespostaSessao)
     <form className="painel login" onSubmit={entrar}>
       <h2>Entrar</h2>
       <label>Matrícula<input name="matricula" autoComplete="username" maxLength={100} required /></label>
-      <label>Senha<input name="senha" type="password" autoComplete="current-password" maxLength={1024} required /></label>
+      <CampoSenha nome="senha" titulo="Senha" />
       <button type="submit" disabled={ocupado}>{ocupado ? 'Entrando...' : 'Entrar'}</button>
     </form>
   );
@@ -65,9 +77,9 @@ export function TrocaSenha({ sessao, onConcluir, onErro }: {
     <form className="painel login" onSubmit={trocar}>
       <h2>Troca obrigatória de senha</h2>
       <p>Defina uma senha de pelo menos 10 caracteres. A sessão será encerrada após a troca.</p>
-      <label>Senha atual<input name="senhaAtual" type="password" autoComplete="current-password" required /></label>
-      <label>Nova senha<input name="senhaNova" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required /></label>
-      <label>Confirme a nova senha<input name="confirmacao" type="password" autoComplete="new-password" minLength={10} maxLength={1024} required /></label>
+      <CampoSenha nome="senhaAtual" titulo="Senha atual" />
+      <CampoSenha nome="senhaNova" titulo="Nova senha" nova />
+      <CampoSenha nome="confirmacao" titulo="Confirme a nova senha" nova />
       <button type="submit" disabled={ocupado}>Alterar senha</button>
     </form>
   );

@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Req, Res } from '@nestjs/common';
-import { eventosServidorQuerySchema, salvarHistoricoSchema, importarHistoricoQuerySchema, paginaUuidQuerySchema } from '@sisdoc/contratos';
+import { consultaHistoricoServidorSchema, salvarHistoricoSchema, importarHistoricoQuerySchema, paginaUuidQuerySchema } from '@sisdoc/contratos';
 import type { ServerResponse } from 'node:http';
 import { z } from 'zod';
 import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } from '../seguranca/guarda';
@@ -43,9 +43,9 @@ export class HistoricoServidorController {
   @ExigirAcao('consultar_pessoa')
   @Get()
   listar(@Param('pessoa') pessoa: string, @Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
-    const dados = eventosServidorQuerySchema.safeParse(consulta);
+    const dados = consultaHistoricoServidorSchema.safeParse(consulta);
     if (!dados.success) throw new BadRequestException('Informe vínculo e paginação válida.');
-    return this.historico.listar(exigirSessao(req), ipRequisicao(req), uuid(pessoa), dados.data.vinculoId, dados.data.limite, dados.data.cursor);
+    return this.historico.listar(exigirSessao(req), ipRequisicao(req), uuid(pessoa), dados.data);
   }
   @ExigirAcao('editar_servidor')
   @Post()

@@ -62,7 +62,38 @@ export const itemHistoricoServidorSchema = z.strictObject({
 });
 export const paginaHistoricoServidorSchema = z.strictObject({
   itens: z.array(itemHistoricoServidorSchema), proximoCursor: z.uuid().nullable(),
+  totais: z.strictObject({
+    registros: z.number().int().nonnegative(),
+    proventosPagos: z.string().regex(/^[0-9]+\.[0-9]{2}$/),
+    descontosPagos: z.string().regex(/^[0-9]+\.[0-9]{2}$/),
+    proventosEstornados: z.string().regex(/^[0-9]+\.[0-9]{2}$/),
+    descontosEstornados: z.string().regex(/^[0-9]+\.[0-9]{2}$/),
+  }),
 });
+const competenciaFiltro = z.string().regex(/^[0-9]{4}-(0[1-9]|1[0-2])$/);
+export const consultaHistoricoServidorSchema = z.strictObject({
+  vinculoId: z.uuid(), limite: z.coerce.number().int().min(1).max(100).default(50), cursor: z.uuid().optional(),
+  grupo: z.enum(['funcional', 'financeiro']).optional(),
+  competenciaInicio: competenciaFiltro.optional(), competenciaFim: competenciaFiltro.optional(),
+  inicio: dataFuncionalSchema.optional(), fim: dataFuncionalSchema.optional(),
+  rubrica: z.string().trim().min(1).max(200).optional(),
+}).superRefine((dados, contexto) => {
+  if (dados.inicio && dados.fim && dados.inicio > dados.fim)
+    contexto.addIssue({ code: 'custom', path: ['fim'], message: 'Período invertido.' });
+  if (dados.competenciaInicio && dados.competenciaFim && dados.competenciaInicio > dados.competenciaFim)
+    contexto.addIssue({ code: 'custom', path: ['competenciaFim'], message: 'Competências invertidas.' });
+});
+export type ConsultaHistoricoServidor = z.infer<typeof consultaHistoricoServidorSchema>;
+export function filtrarHistorico(registro: RegistroHistorico, consulta: ConsultaHistoricoServidor): boolean {
+  if (consulta.grupo && registro.grupo !== consulta.grupo) return false;
+  if (consulta.competenciaInicio && (!registro.competencia || registro.competencia < consulta.competenciaInicio)) return false;
+  if (consulta.competenciaFim && (!registro.competencia || registro.competencia > consulta.competenciaFim)) return false;
+  const inicio = registro.grupo === 'financeiro' ? registro.pagamento : registro.inicio;
+  const fim = registro.grupo === 'financeiro' ? registro.pagamento : registro.fim ?? registro.inicio;
+  if (consulta.inicio && (!fim || fim < consulta.inicio)) return false;
+  if (consulta.fim && (!inicio || inicio > consulta.fim)) return false;
+  return !consulta.rubrica || (registro.rubrica ?? '').toLocaleLowerCase('pt-BR').includes(consulta.rubrica.toLocaleLowerCase('pt-BR'));
+}
 export const resultadoHistoricoServidorSchema = z.strictObject({
   item: itemHistoricoServidorSchema, avisos: z.array(z.string()),
 });
