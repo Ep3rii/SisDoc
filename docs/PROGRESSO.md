@@ -33,7 +33,9 @@ privilegiada para provisionar DB/roles independentes, certificado confiável
 com SAN `127.0.0.1` e operador para bootstrap administrativo interativo.
 Não contornar com configuração/dados de Produção, não executar setup no banco
 produtivo, e não afirmar que Homologação está em execução. Commit e tag não
-foram enviados ao remoto.
+foram enviados ao remoto. A tentativa de conexão PostgreSQL administrativa sem
+senha também foi recusada; nenhum acesso privilegiado foi inferido ou tentado
+por outros meios.
 
 ## Revisão visual da importação — 05/11/2026
 

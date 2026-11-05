@@ -41,4 +41,8 @@ operador interativo autorizado. Não compartilhar banco, configuração, chaves,
 certificado ou PDFs de Produção, e não iniciar uma segunda instância com a
 configuração produtiva.
 
+Tentativa adicional somente de leitura: a conexão administrativa local
+PostgreSQL sem senha foi recusada. Não foi possível provisionar Homologação
+sem solicitar ao operador a credencial privilegiada e autoridade TLS próprias.
+
 Procedimento: [Versões, Produção e Homologação](../VERSOES_E_AMBIENTES.md).
