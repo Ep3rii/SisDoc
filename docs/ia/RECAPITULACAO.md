@@ -1,35 +1,40 @@
 # Pontos de memória do projeto
 
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
-Atualizada em **05/11/2026**, com separação documental de Produção e
-Homologação.
+Atualizada em **05/11/2026**, com a decisão de manter uma instalação editável
+única chamada Produção.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
 
-## Foco atual da retomada — prévia, motivos e lote
+## Foco atual da retomada — ambiente único
 
-### Produção e Homologação — estado em 05/11/2026
+O checkout `C:\SisDoc` é a única versão editável e deve também servir a
+aplicação pelo serviço Windows. Não criar Homologação/staging, banco
+operacional duplicado, cópias de projeto ou fluxo de promoção/publicação.
+Configuração externa, dados persistentes e salvaguardas de alterações no banco
+continuam válidos. Consulte [Ambiente único — Produção](../AMBIENTE_PRODUCAO.md),
+[Invariantes](INVARIANTES.md) e [decisão 035](../decisoes/035-versoes-e-ambientes.md).
 
-O usuário solicitou publicar as alterações, separar versões e iniciar
-Homologação em porta dedicada. A [decisão 035](../decisoes/035-versoes-e-ambientes.md)
-e o [guia de ambientes](../VERSOES_E_AMBIENTES.md) definem releases imutáveis
-por tag/commit, diretório/build separado, Homologação isolada e acesso
-recomendado `https://127.0.0.1:3444/` (TLS SAN IP, banco/configuração/chaves/PDF
-próprios; sem firewall/Caddy LAN).
+**Estado validado em 05/11/2026:** SisDoc e SisDocCaddy estão ativos; o XML do
+serviço SisDoc aponta para `C:\SisDoc`. Typecheck e build passaram. Smoke
+somente leitura: API health `200`, rota privada sem sessão `401`, proxy `200`
+e seis assets servidos iguais ao build do checkout. As cópias de projeto nos
+diretórios de release foram removidas. Nenhuma gravação ou migração de banco
+foi executada.
 
-**Produção publicada:** tag local `v0.1.0`, commit `22f38b3`, build em
-`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`. Typecheck/build e 42 testes
-focados passaram; diagnóstico somente leitura confirmou migração 025.
-Serviços `SisDoc`/`SisDocCaddy` Running; health 200, privado sem sessão 401,
-todos os assets do entrypoint conferidos por hash. Nenhuma migração ou
-aprovação de modelo executada. Backup pré-deploy somente do banco, cifrado
-DPAPI, e rollback `0529dc3` foram preservados; detalhes em
-[Progresso](../PROGRESSO.md). O commit/tag ainda não foram enviados ao remoto.
+### Histórico da primeira publicação — 05/11/2026
 
-**Homologação ainda não existe:** porta 3444 livre, mas faltam banco/roles
-separados (o papel atual não tem `CREATEDB`/`CREATEROLE`), TLS confiável com
-SAN `127.0.0.1` e bootstrap administrativo interativo. Não reutilizar dados,
-configuração, chaves, TLS ou PDFs de Produção. Solicitar provisionamento
-privilegiado e operador autorizado antes de instalar/iniciar.
+Em 05/11/2026 foi publicado o release local `v0.1.0`, commit `22f38b3`, no
+diretório `C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`. Build, typecheck,
+42 testes focados e verificações somente leitura passaram; health HTTPS 200,
+rota privada sem sessão 401 e assets do entrypoint foram conferidos. Nenhuma
+migração ou aprovação de modelo foi executada. O backup pré-deploy somente do
+banco e o rollback `0529dc3` foram preservados; detalhes em
+[Progresso](../PROGRESSO.md). O commit/tag não foram enviados ao remoto.
+
+Naquele estado, Homologação não existia por falta de recursos independentes e
+permissões de provisionamento. A proposta foi posteriormente substituída pela
+decisão de instalação única; as evidências de release acima são históricas,
+não instruções para alternar ambientes.
 
 ### Revisão visual em 05/11/2026
 

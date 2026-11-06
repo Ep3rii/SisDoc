@@ -56,8 +56,8 @@ automático da aplicação ainda não estão implementados.
   não cria banco/papéis e não registra aprovação formal.
 - **Uso diário:** [Como ligar](docs/COMO_LIGAR.md). HTTPS somente em loopback;
   não volta automaticamente após reiniciar o Windows.
-- **Versões e ambientes:** [Produção, releases e Homologação](docs/VERSOES_E_AMBIENTES.md).
-  Os ambientes precisam de diretórios, configurações e bancos separados.
+- **Ambiente único:** [Produção editável](docs/AMBIENTE_PRODUCAO.md).
+  Código e build servido são mantidos no checkout `C:\SisDoc`.
 
 Na raiz do checkout já compilado, com a conta executora:
 
@@ -103,7 +103,7 @@ caminhos ASCII ou 8.3; consulte [operação](docs/OPERACAO.md).
 - [Instalação local e próximas etapas](docs/INSTALACAO_LOCAL.md).
 - [Migração completa e aceite no Windows Server](docs/MIGRACAO_WINDOWS_SERVER.md).
 - [Operação, controles e uso da interface](docs/OPERACAO.md).
-- [Versões, Produção e Homologação](docs/VERSOES_E_AMBIENTES.md).
+- [Ambiente único — Produção](docs/AMBIENTE_PRODUCAO.md).
 - [Dados e importação](docs/DADOS_E_IMPORTACAO.md).
 - [Progresso e evidências de verificação](docs/PROGRESSO.md).
 - [Contexto e convenções de construção](docs/ia/CONTEXTO.md).

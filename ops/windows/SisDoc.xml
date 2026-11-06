@@ -4,7 +4,7 @@
   <description>API local do SisDoc</description>
   <executable>C:\Program Files\nodejs\node.exe</executable>
   <arguments>apps\api\dist\main.js</arguments>
-  <workingdirectory>C:\ProgramData\SisDoc\instalacao\releases\v0.1.0</workingdirectory>
+  <workingdirectory>C:\SisDoc</workingdirectory>
   <env name="SISDOC_CONFIG" value="C:\ProgramData\SisDoc\instalacao\config\aplicacao.json" />
   <env name="PLAYWRIGHT_BROWSERS_PATH" value="C:\ProgramData\SisDoc\chromium" />
   <logpath>C:\ProgramData\SisDoc\logs</logpath>

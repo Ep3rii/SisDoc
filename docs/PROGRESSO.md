@@ -1,41 +1,53 @@
 # Progresso da construção
 
-## Separação por versões e ambientes — 05/11/2026
+## Instalação única editável — 05/11/2026
 
-Separação documental em
-[Versões, Produção e Homologação](VERSOES_E_AMBIENTES.md) e
+A diretriz atual é manter uma única versão editável, chamada Produção, no
+checkout `C:\SisDoc`. Não criar Homologação/staging, banco operacional
+duplicado, cópias de projeto ou fluxo de promoção/publicação. O serviço
+Windows deve usar o mesmo checkout; configuração externa, dados persistentes e
+salvaguardas do banco permanecem separados do código. Ver
+[Ambiente único — Produção](AMBIENTE_PRODUCAO.md) e
 [decisão 035](decisoes/035-versoes-e-ambientes.md).
 
-**Implementado, testado e publicado:** release imutável `v0.1.0`, commit
-`22f38b3`, tag local, instalado em
-`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`. `npm ci` sem
-vulnerabilidades reportadas; build e typecheck completos aprovados; 42 testes
-focados em importação, histórico, DOF e DTC aprovados. Diagnóstico de
-instalação somente leitura passou no banco/migração 025. Nenhuma migração de
-schema ou aprovação de template foi aplicada. `SisDoc` e `SisDocCaddy`
-Running; API HTTPS health 200, rota privada sem sessão 401; proxy página 200,
-todos os seis assets do entrypoint comparados por hash. A página compartilhada
-mostrou login, sem autenticação ou gravação.
+**Implementado e validado diretamente na instalação única:** o serviço
+Windows SisDoc usa `C:\SisDoc`; as cópias `v0.1.0`,
+`v0.1.0-candidate` e `v0.0.0-rollback` foram removidas após a troca. O
+typecheck e o build passaram. Smoke test somente leitura: health da API
+`200`, rota privada sem sessão `401`, proxy `200` e os seis assets servidos
+correspondem ao build do checkout (`200`). Nenhum dado foi gravado no banco;
+testes automatizados de lógica não foram executados porque a alteração foi
+documental e de configuração operacional.
 
-Backup pré-deploy do PostgreSQL custom foi validado por `pg_restore --list`,
+**Histórico da primeira publicação — 05/11/2026:** release `v0.1.0`, commit
+`22f38b3`, foi instalado em
+`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`. Naquele estado, `npm ci`
+não reportou vulnerabilidades; build e typecheck completos passaram; 42 testes
+focados em importação, histórico, DOF e DTC passaram. O diagnóstico de
+instalação somente leitura passou no banco/migração 025. Nenhuma migração de
+schema ou aprovação de template foi aplicada. A validação então registrou
+`SisDoc` e `SisDocCaddy` ativos, API HTTPS health 200, rota privada sem sessão
+401, proxy página 200 e os seis assets do entrypoint comparados por hash. A
+página compartilhada mostrou login, sem autenticação ou gravação.
+
+O backup pré-deploy do PostgreSQL custom foi validado por `pg_restore --list`,
 cifrado DPAPI CurrentUser e conferido por hash em round-trip:
 `C:\ProgramData\SisDoc\instalacao\backup\release-v0.1.0-20261105\sisdoc.dump.dpapi`
 (SHA-256 do cifrado:
 `61FA0FEDDFF5AFC9884D8314BE3DFCBA6CD9FEDF3CC531ADEC566F57839DA7AA`).
 É backup local apenas do banco; não é backup completo nem ensaio de
-restauração. O release rollback `0529dc3` está em
-`C:\ProgramData\SisDoc\instalacao\releases\v0.0.0-rollback`.
+restauração. O rollback `0529dc3` foi mantido em
+`C:\ProgramData\SisDoc\instalacao\releases\v0.0.0-rollback` naquele momento;
+a cópia foi removida após a troca para o checkout único, e o commit continua
+disponível no histórico Git. Esses registros são históricos, não instruções
+para promover ou alternar instalações.
 
-**Homologação pendente e não disponível:** `127.0.0.1:3444` estava livre,
-mas não foi criado banco/configuração/chaves/certificado nem processo. O
-papel PostgreSQL conhecido não tem `CREATEDB` ou `CREATEROLE`; falta conta
-privilegiada para provisionar DB/roles independentes, certificado confiável
-com SAN `127.0.0.1` e operador para bootstrap administrativo interativo.
-Não contornar com configuração/dados de Produção, não executar setup no banco
-produtivo, e não afirmar que Homologação está em execução. Commit e tag não
-foram enviados ao remoto. A tentativa de conexão PostgreSQL administrativa sem
-senha também foi recusada; nenhum acesso privilegiado foi inferido ou tentado
-por outros meios.
+Na publicação anterior, Homologação não foi criada: a porta `127.0.0.1:3444`
+estava livre, faltavam banco/configuração/chaves/certificado independentes e o
+papel PostgreSQL conhecido não tinha `CREATEDB` ou `CREATEROLE`. Esse plano foi
+substituído pela decisão de instalação única. O commit/tag da publicação não
+foram enviados ao remoto; a tentativa de conexão PostgreSQL administrativa
+sem senha foi recusada.
 
 ## Revisão visual da importação — 05/11/2026
 

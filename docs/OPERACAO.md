@@ -3,8 +3,8 @@
 ## Escolha o procedimento
 
 - Ligar diariamente: [Como ligar](COMO_LIGAR.md).
-- Iniciar/verificar uma versão e separar Produção de Homologação:
-  [Versões, Produção e Homologação](VERSOES_E_AMBIENTES.md).
+- Alterar e operar a instalação editável única:
+  [Ambiente único — Produção](AMBIENTE_PRODUCAO.md).
 - Instalar vazio: [Instalação e requisitos atuais](INSTALACAO_LOCAL.md).
 - Transferir dados/usuários/documentos para outra máquina:
   [Migração completa Windows Server](MIGRACAO_WINDOWS_SERVER.md).
@@ -12,16 +12,15 @@
   `npm run verificar-instalacao` com a conta executora. Somente leitura,
   sem aprovação automática; não substitui ACLs e aceite da restauração.
 
-Os modelos WinSW e Caddy em `ops/windows` continuam sendo referência de
-implantação. Na última verificação, API e Caddy já estavam registrados e
-ativos como serviços Windows. A execução observada usa `LocalService`, API em
-`127.0.0.1:3443` e proxy Caddy em `192.168.70.26:443`, com regra de firewall
-LAN em escopo restrito. Ao atualizar, valide caminhos,
+Os modelos WinSW e Caddy em `ops/windows` são referência da instalação única.
+API e Caddy estão registrados como serviços Windows. A execução observada usa
+`LocalService`, API em `127.0.0.1:3443` e proxy Caddy em `192.168.70.26:443`,
+com regra de firewall LAN em escopo restrito. Ao atualizar, valide caminhos,
 certificados, ACLs e ordem de dependência (PostgreSQL -> SisDoc -> Caddy).
-O serviço `SisDoc` observado usa `C:\SisDoc` como diretório de trabalho;
-não compile nesse checkout durante operação. Releases e Homologação precisam
-de diretórios/builds próprios. O passo a passo está na decisão
-[035 — versões e ambientes](decisoes/035-versoes-e-ambientes.md).
+O serviço SisDoc e o checkout editável usam `C:\SisDoc`; após alterações,
+faça o build e reinicie o serviço pelo
+[guia da instalação única](AMBIENTE_PRODUCAO.md). Não há release separado,
+Homologação ou promoção entre instalações.
 Em 04/11/2026, publicação autorizada aplicou `025-historico-servidor`,
 após backup local cifrado/verificado. Serviços automáticos Running e HTTPS
 validado; detalhes e limites do backup em [Progresso](PROGRESSO.md).

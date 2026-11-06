@@ -1,13 +1,13 @@
 # Como ligar o SisDoc
 
-Manual resumido para uma instalação já configurada ou restaurada e aceita.
-Este procedimento cobre Produção. Para versões candidatas e Homologação,
-consulte [Versões, Produção e Homologação](VERSOES_E_AMBIENTES.md).
+Manual resumido para a instalação única já configurada. Código e serviço
+usam o checkout editável `C:\SisDoc`; consulte
+[Ambiente único — Produção](AMBIENTE_PRODUCAO.md).
 Para outra máquina, conclua primeiro a
 [migração Windows Server](MIGRACAO_WINDOWS_SERVER.md). Não execute setup para
 ligar uma instalação existente.
 
-## 1. Inicie Produção
+## 1. Inicie o SisDoc
 
 Nesta VM, Produção é o serviço `SisDoc` e o proxy é `SisDocCaddy`. Para
 iniciá-los, use PowerShell elevado:
@@ -19,11 +19,10 @@ Start-Service -Name 'SisDocCaddy'
 ```
 
 Se já estiverem ativos, não inicie outra cópia. Para uma instalação sem
-serviços Windows, use o release compilado ativo em
-`C:\ProgramData\SisDoc\instalacao\releases\v0.1.0`:
+serviços Windows, use o checkout único em `C:\SisDoc`:
 
 ```powershell
-Set-Location 'C:\ProgramData\SisDoc\instalacao\releases\v0.1.0'
+Set-Location 'C:\SisDoc'
 $env:SISDOC_CONFIG = 'C:\ProgramData\SisDoc\instalacao\config\aplicacao.json'
 $env:PLAYWRIGHT_BROWSERS_PATH = 'C:\ProgramData\SisDoc\chromium'
 npm run verificar-instalacao
@@ -88,9 +87,10 @@ Get-Service -Name 'SisDoc', 'SisDocCaddy'
 Confira HTTPS/health após reiniciar. O procedimento manual do passo 1 é
 alternativo para instalações sem esses serviços, não para iniciar outra cópia.
 O reinício automático após reboot não foi testado nesta operação.
-Não compile nem atualize o checkout `C:\SisDoc`: o serviço instalado usa esse
-diretório. Deploy de nova versão deve usar um release separado e o
-[procedimento versionado](VERSOES_E_AMBIENTES.md).
+O serviço e o desenvolvimento direto usam o mesmo checkout `C:\SisDoc`.
+Após uma alteração de código, faça o build e reinicie o serviço conforme o
+[guia da instalação única](AMBIENTE_PRODUCAO.md). Não execute `npm start`
+enquanto o serviço estiver ativo.
 
 Na operação diária, não execute `npm run setup`, testes ou importações para
 ligar o sistema. Build e migrações só são necessários após atualização do

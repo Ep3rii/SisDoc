@@ -343,6 +343,6 @@ operacional. O teste de composição carrega o build CommonJS por
 `createRequire` para preservar a identidade dos tokens/classes do Nest;
 imports intermediados pelo runner podem criar outra identidade de símbolo.
 
-A produção recebe apenas builds validados, com reinício controlado do PID
-confirmado e verificação HTTPS. Nenhuma migração é necessária para a
-extração dos módulos.
+A instalação única é atualizada no próprio checkout após build e validação,
+com reinício controlado do serviço e verificação HTTPS. Nenhuma migração é
+necessária para a extração dos módulos.

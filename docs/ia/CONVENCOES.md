@@ -17,7 +17,7 @@
 - Testes usam PostgreSQL e arquivos descartáveis quando necessários e nunca
   chamam fontes reais. Verificar os limiares e fluxos completos exigidos,
   não apenas presença de componentes.
-- Git local em `main`; commits pequenos em português após testes e varredura
-  de segredos, com tag ao fim de cada fatia quando o gate estiver verde.
+- Git local em `main`; commits descritivos em português registram o histórico
+  das alterações. Não usar tags ou cópias como fluxo de promoção entre ambientes.
 - Comentários de domínio explicam regras não óbvias e citam a seção pertinente
   do documento de regras. Decisões divergentes ficam em `docs/decisoes/`.

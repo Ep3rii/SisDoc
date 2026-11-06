@@ -69,9 +69,9 @@ da suíte fundação em [Progresso](PROGRESSO.md).
 
 ## Referência da instalação de origem
 
-Este documento descreve a instalação de origem e os requisitos do release
-atual. Não é um instalador automático nem evidência de homologação em outra
-máquina. Para a **migração completa para Windows Server x64**, use o
+Este documento descreve os requisitos da instalação inicial e da versão atual
+do código. Não é um instalador automático nem substitui a verificação do
+estado operacional. Para a **migração completa para Windows Server x64**, use o
 [procedimento de migração](MIGRACAO_WINDOWS_SERVER.md).
 
 ## O que está implementado
