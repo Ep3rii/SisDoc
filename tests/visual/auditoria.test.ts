@@ -107,6 +107,9 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
               el.getClientRects().length && /^(Carregando|Buscando|Verificando sessão)/.test(el.textContent ?? '')));
           expect(await page.getByText('O servidor retornou dados inválidos. Contate o administrador.', { exact: true }).count()).toBe(0);
           if (config.estado !== 'erro') expect(await page.locator('.conteudo > p[role="alert"]').count()).toBe(0);
+          if (fase !== 'baseline' && cenario.id === 'importacao-historico' && config.estado === 'erro') {
+            expect(await page.getByRole('status').filter({ hasText: 'Carregando lotes' }).count()).toBe(0);
+          }
           await page.screenshot({ path: path.join(pasta, `${nome}.png`), animations: 'disabled' });
           await page.evaluate(axe.source);
           const acessibilidade = await page.evaluate(async () => window.axe.run(document, {
@@ -148,6 +151,8 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
           if (config.estado === 'dados' && config.viewport.width === 1366 && config.zoom === 100) {
             for (let i = 0; i < 30; i++) {
               await page.keyboard.press('Tab');
+              await page.evaluate(() => new Promise<void>((resolve) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
               const problema = await page.evaluate(() => {
                 const el = document.activeElement;
                 const barra = document.querySelector('.barra-totais');
@@ -179,6 +184,10 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
               .not.toContain('teclado:foco-encoberto');
             expect(registro.problemas, `Altura da prévia em ${cenario.id} ${nome}`)
               .not.toContain('preview:altura-insuficiente');
+            expect(acessibilidade.violations, `Axe em ${cenario.id} ${nome}`).toEqual([]);
+            expect(medidas.fontesPequenas, `Fontes de interface em ${cenario.id} ${nome}`).toEqual([]);
+            expect(registro.problemas).not.toContain('layout:overflow-horizontal');
+            expect(registro.problemas).not.toContain('contraste:botao-desabilitado');
           }
           expect(mock.inesperadas).toEqual([]);
           expect(erros).toEqual([]);

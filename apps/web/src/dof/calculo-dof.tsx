@@ -98,7 +98,7 @@ export function CalculoDof(props: Props) {
                 </div>
               )}
               <p>{tabela.anos.length} ano(s) no intervalo efetivo. Exibindo {pagina * tamanhoPagina + 1} a {Math.min((pagina + 1) * tamanhoPagina, tabela.anos.length)}. Valores são dias, não datas.</p>
-              <div className="tabela"><table>
+              <div className="tabela" role="region" aria-label="Tabela anual da DOF" tabIndex={0}><table>
                 <thead><tr><th scope="col">Ano</th><th scope="col">Intervalo</th>{campos.map(([campo, titulo]) => <th key={campo} scope="col">{titulo}</th>)}</tr></thead>
                 <tbody>{anosPagina.map((ano) => {
                   const anoTexto = String(ano).padStart(4, '0');
@@ -138,7 +138,7 @@ export function CalculoDof(props: Props) {
           <p>Admissão considerada: {resultado.admissaoConsiderada}. Período efetivo: {resultado.periodo.inicioEfetivo} a {resultado.periodo.fim}. Regra {resultado.regra.codigo}, versão {resultado.regra.versao}.</p>
           <ul>{resultado.avisos.map((aviso, indice) => <li key={`${aviso.codigo}-${indice}`}>{aviso.mensagem}</li>)}</ul>
           <p>Dias do período: <strong>{resultado.totais.diasBrutos.toLocaleString('pt-BR')}</strong>. Tempo líquido de contribuição: <strong>{resultado.totais.totalContribuicao.toLocaleString('pt-BR')}</strong> dias. Efetivo exercício: <strong>{resultado.totais.efetivoExercicio.toLocaleString('pt-BR')}</strong> dias.</p>
-          <div className="tabela"><table>
+          <div className="tabela" role="region" aria-label="Resultado anual da DOF" tabIndex={0}><table>
             <thead><tr><th scope="col">Ano</th><th scope="col">Dias do período</th><th scope="col">Faltas</th><th scope="col">T/S</th><th scope="col">P/F</th><th scope="col">I/P</th><th scope="col">Outros</th><th scope="col">Contribuição</th><th scope="col">Efetivo exercício</th><th scope="col">PB</th><th scope="col">PV</th><th scope="col">Licença-prêmio</th></tr></thead>
             <tbody>{resultado.periodo.linhas.map((linha) => (
               <tr key={linha.ano}><th scope="row">{linha.ano}</th><td>{linha.diasBrutos}</td><td>{linha.faltas}</td><td>{linha.ts}</td><td>{linha.pf}</td><td>{linha.ip}</td><td>{linha.outros}</td><td>{linha.contribuicao}</td><td>{linha.efetivoExercicio}</td><td>{linha.pb}</td><td>{linha.pv}</td><td>{linha.licencaPremio}</td></tr>

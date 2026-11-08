@@ -14,16 +14,11 @@
   "medidas": {
     "largura": 1024,
     "scrollWidth": 1024,
-    "fontesPequenas": [
-      "button.secundario:12.8px",
-      "p.:12.8px",
-      "span.:12px",
-      "strong.:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "BODY",
     "alturaPrevia": null,
     "contrasteDesabilitados": [],
-    "primarios": 1
+    "primarios": 0
   },
   "focosEncobertos": [],
   "erros": [],

@@ -57,7 +57,7 @@ export function PreviaDocumento({ html, titulo }: { html: string; titulo: string
     };
   }, [ampliada]);
   const visualizador = <div className={`visualizador-previa${ampliada ? ' ampliado' : ''}`}>
-    <div className="acoes controles-previa" aria-label="Exibição da prévia">
+    <div className="acoes controles-previa" role="group" aria-label="Exibição da prévia">
       <button type="button" className="secundario" onClick={() => setModo('largura')}>Ajustar à largura</button>
       <button type="button" className="secundario" onClick={() => setModo('pagina')}>Página inteira</button>
       <label>Zoom<select value={modo === 'manual' ? zoom : ''} onChange={(e) => { setZoom(Number(e.target.value)); setModo('manual'); }}>
@@ -75,7 +75,7 @@ export function PreviaDocumento({ html, titulo }: { html: string; titulo: string
         }} />
       </label>
     </div>
-    <div className="janela-previa" ref={destino} style={{ height: altura }}>
+    <div className="janela-previa" ref={destino} role="region" aria-label={titulo} tabIndex={0} style={{ height: altura }}>
       <div style={{ width: 794 * escala, height: altura, margin: '0 auto' }}>
         <iframe title={titulo} sandbox="" srcDoc={html} style={{
           width: 794, height: altura / Math.max(escala, 0.1),
