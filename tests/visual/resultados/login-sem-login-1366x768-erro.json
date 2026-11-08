@@ -14,7 +14,9 @@
   "medidas": {
     "largura": 1366,
     "scrollWidth": 1366,
-    "fontesPequenas": [],
+    "fontesPequenas": [
+      "p.aviso erro:12.8px"
+    ],
     "foco": "BODY",
     "alturaPrevia": null,
     "contrasteDesabilitados": [],

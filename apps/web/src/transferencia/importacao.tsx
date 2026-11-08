@@ -226,7 +226,6 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
   const [validadoPara, setValidadoPara] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [pagina, setPagina] = useState<PaginaLotesImportacao | null>(null);
-  const [falhouListagem, setFalhouListagem] = useState(false);
   const [cursor, setCursor] = useState<string | undefined>();
   const [conferencia, setConferencia] = useState<ConferenciaImportacao | null>(null);
   const [versao, setVersao] = useState(0);
@@ -238,13 +237,12 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
 
   useEffect(() => {
     let ativa = true;
-    setFalhouListagem(false);
     Promise.all([listarLotes(cursor), carregarConferencia()]).then(([lotes, totais]) => {
       if (!ativa) return;
       setPagina(lotes);
       setConferencia(totais);
     }).catch((erro: unknown) => {
-      if (ativa) { setFalhouListagem(true); onErro(erro); }
+      if (ativa) onErro(erro);
     });
     return () => { ativa = false; };
   }, [cursor, versao, onErro]);
@@ -415,10 +413,9 @@ export function ImportacaoAdmin({ csrf, onErro, onMensagem }: {
       )}
       <h3>Lotes de importação</h3>
       <FiltrosLista filtro={filtro} onAtualizar={() => setVersao((atual) => atual + 1)} />
-      {falhouListagem ? <p role="status">Não foi possível carregar os lotes. Use Atualizar lista para tentar novamente.</p>
-        : !pagina ? <p role="status">Carregando lotes...</p> : (
+      {!pagina ? <p role="status">Carregando lotes...</p> : (
         <>
-          <div className="tabela" role="region" aria-label="Lotes de importação" tabIndex={0}>
+          <div className="tabela">
             <table>
               <thead><tr><th scope="col">Início</th><th scope="col">Tipo</th><th scope="col">Origem</th><th scope="col">Canal</th><th scope="col">Situação</th><th scope="col">Inseridos</th><th scope="col">Atualizados</th><th scope="col">Usuário</th><th scope="col">Lote</th></tr></thead>
               <tbody>

@@ -32,7 +32,7 @@ export function Auditoria({ onErro }: { onErro: (erro: unknown) => void }) {
       <FiltrosLista filtro={filtro} onAtualizar={() => setVersao((atual) => atual + 1)} />
       {falhou ? <button type="button" className="secundario" onClick={() => setVersao((atual) => atual + 1)}>Tentar carregar auditoria novamente</button> : !pagina ? <p role="status">Carregando auditoria...</p> : (
         <>
-          <div className="tabela" role="region" aria-label="Eventos de auditoria" tabIndex={0}>
+          <div className="tabela">
             <table>
               <thead><tr><th scope="col">Data e hora</th><th scope="col">Ação</th><th scope="col">Entidade</th><th scope="col">Alvo administrativo</th><th scope="col">Identificador do usuário</th></tr></thead>
               <tbody>
