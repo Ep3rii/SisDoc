@@ -1,21 +1,19 @@
-import { notificacoesDeclaracoesSchema, type NotificacoesDeclaracoes, type RespostaSessao } from '@sisdoc/contratos';
+import { type AbaDocumentos, type TipoDtc, type RespostaSessao } from '@sisdoc/contratos';
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Login, TrocaSenha } from '../autenticacao/acesso';
 import { BuscaGlobal } from '../cadastro/busca-global';
 import type { Consulta } from '../cadastro/contexto';
 import type { Servidor } from '../dtc/contexto';
 import '../compartilhado/estilos.css';
-import { api, ErroApi, requisitar, validar } from '../infraestrutura/api';
+import { api, ErroApi } from '../infraestrutura/api';
 import { AvisoSincronizacao, EstadoSincronizacao, SincronizacaoAdmin } from '../transferencia/sincronizacao';
+import { hashRota, lerRota, telaAdministrativa, type Rota, type Tela } from './rotas';
 
 const Usuarios = lazy(() => import('../administracao/usuarios').then((m) => ({ default: m.Usuarios })));
 const Auditoria = lazy(() => import('../administracao/auditoria').then((m) => ({ default: m.Auditoria })));
 const Servidores = lazy(() => import('../cadastro/servidores').then((m) => ({ default: m.Servidores })));
 const Historico = lazy(() => import('../documentos/historico').then((m) => ({ default: m.Historico })));
-const ConferidosDof = lazy(() => import('../dof/conferidos-dof').then((m) => ({ default: m.ConferidosDof })));
-const RascunhosDof = lazy(() => import('../dof/rascunhos-dof').then((m) => ({ default: m.RascunhosDof })));
-const TelaDtc = lazy(() => import('../dtc/dtc').then((m) => ({ default: m.TelaDtc })));
-const Retornos = lazy(() => import('../documentos/retornos').then((m) => ({ default: m.Retornos })));
+const ListaDocumentosTela = lazy(() => import('../documentos/lista-documentos').then((m) => ({ default: m.ListaDocumentosTela })));
 const ImportacaoAdmin = lazy(() => import('../transferencia/importacao').then((m) => ({ default: m.ImportacaoAdmin })));
 const nomesPerfis = { admin: 'Administrador', analista: 'Analista', coordenador: 'Coordenador' };
 
@@ -38,15 +36,15 @@ export function App() {
   const [carregando, setCarregando] = useState(true);
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
-  const [tela, setTela] = useState<'usuarios' | 'auditoria' | 'busca' | 'rascunhos' | 'encaminhados' | 'retornos' | 'conferidos' | 'historico'
-    | 'DTC_IPAM' | 'DTC_COMISSIONADO' | 'DTC_INSS' | 'sincronizacao' | 'importacao'>('busca');
+  const [tela, setTela] = useState<Tela>('busca');
+  const [aba, setAba] = useState<AbaDocumentos>('rascunhos');
+  const [tipoDtc, setTipoDtc] = useState<TipoDtc | undefined>();
   const [chaveTela, setChaveTela] = useState(0);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
   const [servidorDtc, setServidorDtc] = useState<Servidor | undefined>();
   const [menuAberto, setMenuAberto] = useState(false);
   const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
-  const [notificacoes, setNotificacoes] = useState<NotificacoesDeclaracoes | null>(null);
-  const [erroNotificacoes, setErroNotificacoes] = useState(false);
+  const aoMudarHash = useRef<() => void>(() => {});
   const pendencias = useRef(false);
   const buscaSelecionarServidor = useRef<((consulta: Consulta) => void) | null>(null);
   const registrarBusca = useCallback((buscar: ((consulta: Consulta) => void) | null) => {
@@ -73,36 +71,10 @@ export function App() {
   }, [registrarPendencia]);
 
   useEffect(() => {
-    if (!sessao || sessao.usuario.trocaSenhaObrigatoria) { setNotificacoes(null); return; }
-    let ativa = true;
-    let ocupado = false;
-    let pendente = false;
-    async function atualizar() {
-      if (!ativa || document.visibilityState === 'hidden') return;
-      if (ocupado) { pendente = true; return; }
-      ocupado = true;
-      try {
-        const dados = validar(notificacoesDeclaracoesSchema, await requisitar('notificacoes/declaracoes'));
-        if (ativa) { setNotificacoes(dados); setErroNotificacoes(false); }
-      } catch (erro: unknown) {
-        if (ativa) { setNotificacoes(null); setErroNotificacoes(true); if (erro instanceof ErroApi && erro.status === 401) tratarErro(erro); }
-      } finally {
-        ocupado = false;
-        if (pendente && ativa) { pendente = false; void atualizar(); }
-      }
-    }
-    void atualizar();
-    const intervalo = window.setInterval(() => void atualizar(), 30000);
-    window.addEventListener('sisdoc:alteracao', atualizar);
-    window.addEventListener('focus', atualizar);
-    document.addEventListener('visibilitychange', atualizar);
-    return () => {
-      ativa = false; window.clearInterval(intervalo);
-      window.removeEventListener('sisdoc:alteracao', atualizar);
-      window.removeEventListener('focus', atualizar);
-      document.removeEventListener('visibilitychange', atualizar);
-    };
-  }, [sessao, tratarErro]);
+    const mudar = () => aoMudarHash.current();
+    window.addEventListener('hashchange', mudar);
+    return () => window.removeEventListener('hashchange', mudar);
+  }, []);
 
   useEffect(() => {
     function focarBusca(evento: KeyboardEvent) {
@@ -134,7 +106,12 @@ export function App() {
     api.sessao().then((resultado) => {
       if (ativa) {
         setSessao(resultado);
-        setTela('busca');
+        const rota = lerRota(window.location.hash || `#${window.location.pathname}`);
+        if (telaAdministrativa(rota.tela) && resultado.usuario.papel !== 'admin') {
+          rota.tela = 'busca'; setErro('Administração disponível apenas para administradores.');
+        }
+        setTela(rota.tela); setAba(rota.aba); setTipoDtc(rota.tipo);
+        window.history.replaceState(null, '', `/${hashRota(rota)}`);
       }
     }).catch((problema: unknown) => {
       if (ativa && (!(problema instanceof ErroApi) || problema.status !== 401)) tratarErro(problema);
@@ -165,6 +142,8 @@ export function App() {
     setMensagem('');
     setServidorDtc(undefined);
     setTela('busca');
+    setAba('rascunhos'); setTipoDtc(undefined);
+    window.history.replaceState(null, '', '#/inicio');
   };
   const encerrarLocal = (texto: string) => {
     setSessao(null);
@@ -180,15 +159,27 @@ export function App() {
     setErro('');
     setMensagem('');
   };
-  const navegar = (destino: typeof tela, busca: Consulta | null = null) => {
+  const aplicarRota = (rota: Rota, busca: Consulta | null = null) => {
+    setTela(rota.tela); setAba(rota.aba); setTipoDtc(rota.tipo);
+    setChaveTela((atual) => atual + 1); setConsulta(busca); setServidorDtc(undefined);
+    setMenuAberto(false); registrarPendencia(false); limparMensagens();
+  };
+  const navegar = (destino: Tela, busca: Consulta | null = null, abaDestino: AbaDocumentos = 'rascunhos', tipo?: TipoDtc) => {
     if (!confirmarSaida()) return;
-    registrarPendencia(false);
-    limparMensagens();
-    setChaveTela((atual) => atual + 1);
-    setTela(destino);
-    setConsulta(busca);
-    setServidorDtc(undefined);
-    setMenuAberto(false);
+    const rota = { tela: destino, aba: abaDestino, tipo };
+    aplicarRota(rota, busca);
+    const hash = hashRota(rota);
+    if (window.location.hash !== hash) window.history.pushState(null, '', hash);
+  };
+  aoMudarHash.current = () => {
+    if (!sessao || sessao.usuario.trocaSenhaObrigatoria) return;
+    if (!confirmarSaida()) { window.history.replaceState(null, '', hashRota({ tela, aba, tipo: tipoDtc })); return; }
+    const rota = lerRota(window.location.hash);
+    const acessoNegado = telaAdministrativa(rota.tela) && sessao.usuario.papel !== 'admin';
+    if (acessoNegado) rota.tela = 'busca';
+    aplicarRota(rota);
+    if (acessoNegado) setErro('Administração disponível apenas para administradores.');
+    window.history.replaceState(null, '', hashRota(rota));
   };
   const buscarServidor = (busca: Consulta) => {
     if (buscaSelecionarServidor.current) {
@@ -212,54 +203,12 @@ export function App() {
             <button type="button" className="menu-toggle" aria-expanded={menuAberto} aria-controls="navegacao-principal"
               onClick={() => setMenuAberto((valor) => !valor)}>Menu</button>
             <nav id="navegacao-principal" aria-label="Navegação">
-              {sessao.usuario.papel === 'admin' && <>
-                <details className="categoria-menu" open><summary>Administração</summary>
-                  <button type="button" aria-current={tela === 'usuarios' ? 'page' : undefined}
-                    onClick={() => navegar('usuarios')}>Usuários</button>
-                  <button type="button" aria-current={tela === 'importacao' ? 'page' : undefined}
-                    onClick={() => navegar('importacao')}>Importação e exportação</button>
-                  <button type="button" aria-current={tela === 'sincronizacao' ? 'page' : undefined}
-                    onClick={() => navegar('sincronizacao')}>Sincronização</button>
-                <button type="button" aria-current={tela === 'auditoria' ? 'page' : undefined}
-                  onClick={() => navegar('auditoria')}>Auditoria</button>
-                </details>
-              </>}
-              {funcional && <>
-                <details className="categoria-menu" open><summary>Cadastro de pessoas</summary>
-                <button type="button" aria-label="Início" aria-current={tela === 'busca' ? 'page' : undefined}
-                  onClick={() => navegar('busca')}>Início<span>Buscar servidores · DOF e DTC</span></button>
-                </details>
-                <details className="categoria-menu" open><summary>DOFs</summary>
-                {podeSalvar && <>
-                  <button type="button" aria-current={tela === 'rascunhos' ? 'page' : undefined} onClick={() => navegar('rascunhos')}>Rascunhos</button>
-                  <button type="button" aria-current={tela === 'conferidos' ? 'page' : undefined} onClick={() => navegar('conferidos')}>DOFs conferidas</button>
-                </>}
-                {podeEmitir && <button type="button" className="aba-notificada"
-                  aria-current={tela === 'encaminhados' ? 'page' : undefined} onClick={() => navegar('encaminhados')}>
-                  {sessao.usuario.papel === 'admin' ? 'Todos os encaminhados' : 'Encaminhados a mim'}
-                  {notificacoes && notificacoes.encaminhados > 0 && <span className="contador-notificacao" aria-label={`${notificacoes.encaminhados} declarações encaminhadas pendentes`}>{notificacoes.encaminhados}</span>}
-                </button>}
-                {podeSalvar && <button type="button" className="aba-notificada" aria-current={tela === 'retornos' ? 'page' : undefined}
-                  onClick={() => navegar('retornos')}>Retornos para ajustes
-                  {notificacoes && notificacoes.retornos > 0 && <span className="contador-notificacao" aria-label={`${notificacoes.retornos} declarações devolvidas pendentes`}>{notificacoes.retornos}</span>}
-                </button>}
-                {erroNotificacoes && <p role="status">Contagem de notificações indisponível. A atualização será tentada novamente.</p>}
-                </details>
-                {podeSalvar && <>
-                  <details className="categoria-menu" open><summary>DTCs</summary>
-                  <button type="button" aria-current={tela === 'DTC_IPAM' ? 'page' : undefined}
-                    onClick={() => navegar('DTC_IPAM')}>DTC IPAM<span>Anexo III</span></button>
-                  <button type="button" aria-current={tela === 'DTC_COMISSIONADO' ? 'page' : undefined}
-                    onClick={() => navegar('DTC_COMISSIONADO')}>DTC Comissionado<span>Benefício junto ao INSS</span></button>
-                  <button type="button" aria-current={tela === 'DTC_INSS' ? 'page' : undefined}
-                    onClick={() => navegar('DTC_INSS')}>DTC INSS<span>RGPS · modelo provisório</span></button>
-                  </details>
-                </>}
-                <details className="categoria-menu" open><summary>Documentos emitidos</summary>
-                <div className="menu-separado"><button type="button" aria-current={tela === 'historico' ? 'page' : undefined}
-                  onClick={() => navegar('historico')}>Histórico<span>Emissões, PDF e cópias</span></button></div>
-                </details>
-              </>}
+              <button type="button" aria-current={tela === 'busca' ? 'page' : undefined} onClick={() => navegar('busca')}>Início</button>
+              <button type="button" aria-current={tela === 'dofs' ? 'page' : undefined} onClick={() => navegar('dofs')}>DOFs</button>
+              <button type="button" aria-current={tela === 'dtcs' ? 'page' : undefined} onClick={() => navegar('dtcs')}>DTCs</button>
+              <button type="button" aria-current={tela === 'historico' ? 'page' : undefined} onClick={() => navegar('historico')}>Histórico</button>
+              {sessao.usuario.papel === 'admin' && <button type="button"
+                aria-current={telaAdministrativa(tela) ? 'page' : undefined} onClick={() => navegar('usuarios')}>Administração</button>}
             </nav>
           </>
         )}
@@ -293,6 +242,14 @@ export function App() {
           <ProtecaoTela key={`${tela}-${chaveTela}`} confirmarSaida={confirmarSaida}>
           <Suspense fallback={<p role="status">Carregando tela...</p>}>
             {alteracoesPendentes && <p className="etiqueta" role="status">Há alterações não salvas.</p>}
+            {sessao.usuario.papel === 'admin' && telaAdministrativa(tela) && <>
+              <h2>Administração</h2>
+              <nav className="abas-documentos" aria-label="Seções da Administração">
+                {([['usuarios', 'Usuários'], ['importacao', 'Importação e exportação'], ['sincronizacao', 'Sincronização'], ['auditoria', 'Auditoria']] as const)
+                  .map(([destino, rotulo]) => <button type="button" className="secundario" key={destino}
+                    aria-current={tela === destino ? 'page' : undefined} onClick={() => navegar(destino)}>{rotulo}</button>)}
+              </nav>
+            </>}
             {funcional && <AvisoSincronizacao key={`situacao-${chaveTela}`} />}
             {sessao.usuario.papel === 'admin' && tela === 'sincronizacao' && (
               <SincronizacaoAdmin key={chaveTela} csrf={sessao.csrf} onErro={tratarErro} onMensagem={informar} />
@@ -306,31 +263,18 @@ export function App() {
               consulta={consulta} onBuscar={buscarServidor} onTrocarServidor={() => navegar('busca')}
               onNovaDtc={(tipo, servidor) => {
                 if (sessao.usuario.papel === 'admin' || !confirmarSaida()) return;
-                navegar(tipo); setServidorDtc(servidor);
+                navegar('dtcs', null, 'rascunhos', tipo); setServidorDtc(servidor);
               }}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
-            {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf} administrador={sessao.usuario.papel === 'admin'}
-              onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida}
-              onBuscarServidor={() => navegar('busca')} />}
-            {podeSalvar && tela === 'retornos' && <Retornos key={chaveTela} csrf={sessao.csrf} papel={sessao.usuario.papel}
+            {(tela === 'dofs' || tela === 'dtcs') && <ListaDocumentosTela key={`${tela}-${chaveTela}`} grupo={tela === 'dofs' ? 'DOF' : 'DTC'}
+              aba={aba} tipo={tipoDtc} csrf={sessao.csrf} papel={sessao.usuario.papel} servidorInicial={servidorDtc}
+              onNavegar={(destino, tipo) => navegar(tela, null, destino, tipo)}
+              onBuscarServidor={() => navegar('busca')} onRegistrarBusca={registrarBusca}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
-            {podeSalvar && tela === 'conferidos' && <ConferidosDof key={chaveTela} csrf={sessao.csrf}
-              administrador={sessao.usuario.papel === 'admin'} podeDevolver={podeEmitir} podeEmitir={podeEmitir}
-              onErro={tratarErro} onLimpar={limparMensagens}
-              onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
-            {podeEmitir && tela === 'encaminhados' && (
-              <RascunhosDof key={chaveTela} csrf={sessao.csrf} recebidos administrador={sessao.usuario.papel === 'admin'}
-                onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
-            )}
-            {podeSalvar && (tela === 'DTC_IPAM' || tela === 'DTC_COMISSIONADO' || tela === 'DTC_INSS') && (
-              <TelaDtc key={`dtc-${tela}-${chaveTela}`} tipo={tela} csrf={sessao.csrf} papel={sessao.usuario.papel}
-                onRegistrarBusca={registrarBusca} servidorInicial={servidorDtc}
-                onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
-            )}
             {tela === 'historico' && (
               <Historico key={chaveTela} csrf={sessao.csrf} escopos={escoposHistorico}
                 onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida}
-                {...(podeSalvar ? { onAbrirRascunhos: () => navegar('rascunhos') } : {})} />
+                {...(podeSalvar ? { onAbrirRascunhos: () => navegar('dofs') } : {})} />
             )}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
               <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />

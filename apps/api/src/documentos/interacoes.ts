@@ -12,12 +12,13 @@ import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } fr
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
 
-const retornos = `SELECT documento_id, max(em) AS em FROM (
+export const consultaRetornosDocumentos = `SELECT documento_id, max(em) AS em FROM (
   SELECT documento_id, recolhido_em AS em FROM documentos.encaminhamento_dof
     WHERE recolhido_em IS NOT NULL AND recolhido_por <> encaminhado_por
   UNION ALL SELECT documento_id, devolvido_em AS em FROM documentos.devolucao_conferido_dof
   UNION ALL SELECT documento_id, devolvido_em AS em FROM documentos.devolucao_conferido_dtc
 ) r GROUP BY documento_id`;
+const retornos = consultaRetornosDocumentos;
 const acessiveis = `d.status = 'rascunho' AND (d.criado_por = $1 OR $2::boolean)
   AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x WHERE x.documento_id = d.id AND x.status = 'pendente')`;
 

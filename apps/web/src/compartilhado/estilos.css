@@ -94,6 +94,24 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .ficha-vinculo { padding: 1rem; margin-bottom: .75rem; border: 1px solid #b8cbd5; border-radius: .4rem; background: #f7f9fc; }
 .ficha-vinculo.selecionado { border-color: #075768; box-shadow: inset 4px 0 #075768; }
 .ficha-vinculo > button { flex-shrink: 0; }
+.abas-documentos { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0; }
+.abas-documentos button { display: flex; align-items: center; gap: .65rem; }
+.abas-documentos button[aria-current="page"] { color: #fff; background: #0d4b6a; border-color: #0d4b6a; }
+.contador-aba { display: inline-grid; place-items: center; min-width: 1.65rem; padding: .1rem .4rem; border-radius: 999px; color: #073c5b; background: #dcebf8; font-size: .8125rem; }
+.filtro-tipo-documento { max-width: 24rem; }
+.tabela-documentos th, .tabela-documentos td { padding: .4rem .55rem; }
+.tabela-documentos { position: relative; }
+.tabela-documentos tbody td { vertical-align: middle; }
+.tabela.tabela-documentos button { min-height: 1.5rem; }
+.tabela-documentos .abrir-documento { padding: 0; }
+.ordenar-coluna { padding: .2rem .1rem; border-color: transparent !important; background: transparent !important; }
+.linha-documento { cursor: pointer; }
+.linha-documento:hover, .linha-documento:focus-within { background: #edf4f9; }
+.abrir-documento { padding: 0; border: 0; background: transparent !important; text-align: left; text-decoration: underline; }
+.tabela-documentos small { display: block; color: #526775; }
+.menu-documento { padding: .25rem 0; }
+.confirmacao-exclusao { margin: 1rem 0; }
+.paginacao-documentos { align-items: center; font-size: .875rem; }
 .login { width: min(100%, 32rem); margin: 0 auto; }
 .sem-sessao { grid-template-columns: minmax(0, 1fr); }
 .sem-sessao main { min-height: calc(100dvh - 64px); }

@@ -1,5 +1,22 @@
 # Pontos de memória do projeto
 
+## Navegação e listas documentais — 08/11/2026
+
+Menu reduzido a Início, DOFs, DTCs, Histórico e Administração (admin).
+DOF/DTC usam lista compartilhada com abas Rascunhos/Encaminhadas/Devolvidas/
+Conferidas e contagens totais; filtro DTC por tipo. GET `documentos/lista`
+ordena e pagina todo o conjunto autorizado, sem migração. Analista lista
+próprios rascunhos, admin/coordenador todos; acesso/edição compartilhados
+individuais preservados pela decisão 030. Encaminhadas DOF inclui autoria
+e destinatário autorizado; DTC não tem encaminhamento. Abas disjuntas.
+Tabela compacta, abertura pela linha/teclado e menu ⋯ com exclusão confirmada.
+URLs hash e aliases HTTP, back/forward protegido; emissão em lote preservada.
+Typecheck/build, 28 regressões UI (com correções/retestes) e dois testes API
+descartáveis cobertos. Capturas fictícias observadas em 1366/768/390 px.
+Instalação reiniciada e conferida com TLS: health 200, lista sem sessão 401,
+SPA 200, quatro aliases 302, index/sete assets iguais ao build.
+Sem escrita de teste na base real. Evidências em [Progresso](../PROGRESSO.md).
+
 ## Filtro único do histórico — 08/11/2026
 
 Histórico do vínculo tem apenas filtro de período, competência e rubrica,

@@ -18,14 +18,16 @@ type Props = {
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
   confirmarSaida: () => boolean;
+  documentoInicial?: PaginaConferidosDof['itens'][number];
+  onVoltarLista?: (mensagem?: string) => void;
 };
 
 type Conferido = PaginaConferidosDof['itens'][number];
 
-export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = false, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
+export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = false, onErro, onLimpar, onPendente, confirmarSaida, documentoInicial, onVoltarLista }: Props) {
   const [pagina, setPagina] = useState<PaginaConferidosDof | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
-  const [selecionado, setSelecionado] = useState<Conferido | null>(null);
+  const [selecionado, setSelecionado] = useState<Conferido | null>(documentoInicial ?? null);
   const [previa, setPrevia] = useState<PreviaConferidaDof | null>(null);
   const [falhaPrevia, setFalhaPrevia] = useState(false);
   const [versaoPrevia, setVersaoPrevia] = useState(0);
@@ -47,6 +49,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
   }, []);
 
   useEffect(() => {
+    if (documentoInicial) return;
     let corrente = true;
     setPagina(null);
     setFalhou(false);
@@ -56,7 +59,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
       if (corrente) { setFalhou(true); onErro(erro); }
     });
     return () => { corrente = false; };
-  }, [cursor, versao, onErro]);
+  }, [cursor, versao, onErro, documentoInicial]);
 
   useEffect(() => {
     let corrente = true;
@@ -95,6 +98,10 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
         setVersao((atual) => atual + 1);
         setMensagem('DOF devolvida ao autor como rascunho. A conferência anterior foi preservada no registro.');
         concluido = true;
+        if (onVoltarLista) {
+          onPendente(false);
+          onVoltarLista('DOF devolvida ao autor como rascunho. A conferência anterior foi preservada no registro.');
+        }
       }
     } catch (erro) {
       if (ativa.current) onErro(erro instanceof ErroApi && erro.status === 0
@@ -137,6 +144,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
 
   function fechar() {
     setSelecionado(null); setMotivo(''); setRevisado(false); setEmissao(null); onPendente(false);
+    onVoltarLista?.();
   }
 
   if (selecionado && emissao) {

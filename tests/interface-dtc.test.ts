@@ -51,6 +51,19 @@ function documentoSintetico(tipo: TipoDtc, conteudo: ConteudoDtc, revisao = 1) {
   });
 }
 
+function listaSintetica(documentos: ReturnType<typeof documentoSintetico>[], url: URL) {
+  const todos = documentos.filter((item) => !url.searchParams.get('tipo') || item.tipo === url.searchParams.get('tipo'));
+  const aba = url.searchParams.get('aba') ?? 'rascunhos';
+  const itens = todos.filter((item) => (item.status === 'conferido' ? 'conferidas' : 'rascunhos') === aba);
+  return { itens: itens.map((item) => ({
+    id: item.id, pessoaId: item.pessoaId, vinculoId: item.vinculoId, tipo: item.tipo, nome: item.nome, matricula: item.matricula,
+    autorNome: item.autorNome, situacao: item.status === 'conferido' ? 'conferidas' : 'rascunhos',
+    revisao: item.revisao, atualizadoEm: item.atualizadoEm, somenteLeitura: false, conferenciaDof: null,
+  })), total: itens.length, totalPaginas: itens.length ? 1 : 0, pagina: 1,
+  contagens: { rascunhos: todos.filter((item) => item.status === 'rascunho').length, encaminhadas: 0, devolvidas: 0,
+    conferidas: todos.filter((item) => item.status === 'conferido').length } };
+}
+
 describe('Editor DTC', () => {
   let navegador: Browser;
   let servidor: PreviewServer;
@@ -100,8 +113,8 @@ describe('Editor DTC', () => {
         resposta = { itens: [pessoaId, '99999999-9999-4999-8999-999999999999'].map((id) => ({
           pessoaId: id, vinculoId: id === pessoaId ? vinculoId : id, nome, matricula: '15-1', cpf: cpfSintetico(920000011),
           orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false })), proximoCursor: null };
-      } else if (url.pathname === '/api/v1/dtc') {
-        resposta = { itens: [] };
+      } else if (url.pathname === '/api/v1/documentos/lista') {
+        resposta = listaSintetica([], url);
       } else {
         erros.push(`${rota.request().method()} ${url.pathname}`);
         return rota.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Rota inesperada"}' });
@@ -127,7 +140,7 @@ describe('Editor DTC', () => {
         expect(url.searchParams.get('tipo')).toBe(tipo);
         await central.waitFor();
       }
-      await pagina.getByRole('button', { name: /^DTC IPAM/ }).click();
+      await pagina.getByRole('button', { name: 'DTCs', exact: true }).click();
       await pagina.getByRole('button', { name: 'Nova DTC IPAM', exact: true }).waitFor();
       await pagina.getByRole('button', { name: 'Nova DTC IPAM', exact: true }).focus();
       await pagina.keyboard.press('/');
@@ -326,9 +339,8 @@ describe('Editor DTC', () => {
             },
             pessoa: { Nome: nome }, registros: [], proximoCursor: null,
           };
-        } else if (url.pathname === '/api/v1/dtc') {
-          const { id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome } = documento;
-          resposta = { itens: [{ id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome }] };
+        } else if (url.pathname === '/api/v1/documentos/lista') {
+          resposta = listaSintetica([documento], url);
         } else if (url.pathname === `/api/v1/dtc/${documentoId}/previa`) {
           resposta = { documento, fonte: {
             documentoId, revisao: documento.revisao, provaFonte: 'b'.repeat(64), consultadoEm: '2026-10-31T12:00:00.000Z',
@@ -350,13 +362,14 @@ describe('Editor DTC', () => {
       });
       try {
         await pagina.goto(endereco);
-        await pagina.getByRole('button', { name: new RegExp(`^${ROTULOS_DTC[tipo]}`) }).click();
+        await pagina.getByRole('button', { name: 'DTCs', exact: true }).click();
+        await pagina.getByLabel('Tipo de DTC').selectOption(tipo);
         expect(await pagina.getByRole('button', { name: `Nova ${ROTULOS_DTC[tipo]}` }).count()).toBe(0);
-        await pagina.getByRole('searchbox', { name: 'Filtrar lista carregada' }).fill('inexistente');
-        expect(await pagina.getByRole('button', { name: `Abrir ${nome}` }).count()).toBe(0);
-        await pagina.getByRole('button', { name: 'Limpar filtro', exact: true }).click();
-        expect(await pagina.locator('.exclusao-documento.zona-perigo').count()).toBe(1);
-        await pagina.getByRole('button', { name: `Abrir ${nome}` }).click();
+        expect(await pagina.getByRole('searchbox', { name: 'Filtrar lista carregada' }).count()).toBe(0);
+        expect(await pagina.locator('.exclusao-documento.zona-perigo').count()).toBe(0);
+        await pagina.getByRole('button', { name: `Ações de ${nome}` }).click();
+        await pagina.getByRole('button', { name: 'Excluir', exact: true }).waitFor();
+        await pagina.getByRole('button', { name: `Abrir ${tipo} de ${nome}` }).click();
         const quadro = pagina.frameLocator(`iframe[title="Prévia da ${ROTULOS_DTC[tipo]}"]`);
         await quadro.locator('body').waitFor();
         expect(await quadro.locator('body').evaluate((elemento) => getComputedStyle(elemento).fontFamily))
@@ -462,9 +475,8 @@ describe('Editor DTC', () => {
           limiteHoras: 24, avisoAtraso: false, disjuntorAberto: false };
       } else if (url.pathname === '/api/v1/servidores') {
         resposta = { itens: [], proximoCursor: null };
-      } else if (url.pathname === '/api/v1/dtc') {
-        resposta = { itens: documentos.map(({ id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome }) =>
-          ({ id, tipo, nome, matricula, status, revisao, atualizadoEm, autorNome })) };
+      } else if (url.pathname === '/api/v1/documentos/lista') {
+        resposta = listaSintetica(documentos, url);
       } else {
         const previa = /^\/api\/v1\/dtc\/([^/]+)\/previa$/.exec(url.pathname);
         const emissao = /^\/api\/v1\/dtc\/([^/]+)\/emitir$/.exec(url.pathname);
@@ -513,8 +525,8 @@ describe('Editor DTC', () => {
 
     try {
       await pagina.goto(endereco);
-      await pagina.getByRole('button', { name: /^DTC IPAM/ }).click();
-      await pagina.getByLabel('Situação').selectOption('conferido');
+      await pagina.getByRole('button', { name: 'DTCs', exact: true }).click();
+      await pagina.getByRole('button', { name: /^Conferidas/ }).click();
       await pagina.locator('.emissao-lote > summary').click();
       await pagina.getByRole('checkbox', { name: /Pessoa DTC fictícia 1/ }).check();
       await pagina.getByRole('checkbox', { name: /Pessoa DTC fictícia 2/ }).check();

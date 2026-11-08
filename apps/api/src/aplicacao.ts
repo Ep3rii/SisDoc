@@ -47,6 +47,21 @@ export async function criarAplicacao(configuracao: Configuracao, banco: Pool): P
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
+  const rotasAntigas: Readonly<Record<string, string>> = {
+    '/rascunhos': '/#/dofs/rascunhos',
+    '/dofs-conferidas': '/#/dofs/conferidas', '/conferidos': '/#/dofs/conferidas',
+    '/todos-os-encaminhados': '/#/dofs/encaminhadas', '/encaminhados': '/#/dofs/encaminhadas',
+    '/retornos-para-ajustes': '/#/dofs/devolvidas', '/retornos': '/#/dofs/devolvidas',
+  };
+  app.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    const destino = rotasAntigas[(req.url ?? '').split('?')[0]];
+    if (req.method === 'GET' && destino) {
+      res.writeHead(302, { Location: destino });
+      res.end();
+      return;
+    }
+    next();
+  });
   app.useStaticAssets(path.resolve(__dirname, '..', '..', 'web', 'dist'), {
     index: 'index.html',
     redirect: false,

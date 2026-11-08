@@ -10,10 +10,11 @@ type Props = {
   onErro: (erro: unknown) => void;
   onPendente: (valor: boolean) => void;
   onConcluido: (resultado: ResultadoExclusaoDocumento) => void;
+  inicialmenteAberto?: boolean;
 };
 
 export function ExclusaoDocumento({
-  csrf, documentoId, revisao, descricao, onErro, onPendente, onConcluido,
+  csrf, documentoId, revisao, descricao, onErro, onPendente, onConcluido, inicialmenteAberto = false,
 }: Props) {
   const [motivo, setMotivo] = useState('');
   const [confirmacao, setConfirmacao] = useState('');
@@ -38,7 +39,7 @@ export function ExclusaoDocumento({
   }
 
   return (
-    <details className="exclusao-documento zona-perigo">
+    <details className="exclusao-documento zona-perigo" open={inicialmenteAberto || undefined}>
       <summary>Excluir</summary>
       <form onSubmit={(evento) => void excluir(evento)}>
         <p>Exclusão física de {descricao}, revisão {revisao}. Esta ação é irreversível e não reutiliza números oficiais.</p>

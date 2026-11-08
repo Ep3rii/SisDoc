@@ -4,11 +4,13 @@ import {
   atualizarBlocosDofSchema, atualizarProcessoDofSchema, atualizarRascunhoDofSchema, criarRascunhoDofSchema,
   conferirDofSchema, confirmarInicioDofSchema, devolverConferidoDofSchema, devolverRascunhoDofSchema,
   encaminharRascunhoDofSchema, paginaUuidQuerySchema, previaConferidaDofSchema, provaFonteDofSchema, recolherRascunhoDofSchema,
+  consultaListaDocumentosSchema,
 } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { z } from 'zod';
 import { ExigirAcao, exigirSessao, ipRequisicao, type RequisicaoAutenticada } from '../seguranca/guarda';
 import { RascunhosService } from './rascunhos';
+import { ListaDocumentosService } from './lista-documentos';
 
 function idDocumento(valor: string): string {
   const resultado = z.uuid().safeParse(valor);
@@ -26,7 +28,15 @@ function responderPrevia(resposta: ServerResponse, html: string, revisao: number
 
 @Controller('documentos')
 export class RascunhosController {
-  constructor(private readonly rascunhos: RascunhosService) {}
+  constructor(private readonly rascunhos: RascunhosService, private readonly lista: ListaDocumentosService) {}
+
+  @ExigirAcao('consultar_documentos')
+  @Get('lista')
+  listarDocumentos(@Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = consultaListaDocumentosSchema.safeParse(consulta);
+    if (!dados.success) throw new BadRequestException('Filtros ou ordenação de documentos inválidos.');
+    return this.lista.listar(exigirSessao(req), ipRequisicao(req), dados.data);
+  }
 
   @ExigirAcao('consultar_documentos')
   @Get()

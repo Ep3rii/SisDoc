@@ -1,5 +1,46 @@
 # Progresso da construção
 
+## Navegação e listas documentais — 08/11/2026
+
+**Implementado:** menu Início/DOFs/DTCs/Histórico/Administração (admin).
+Subseções administrativas ficam fora da sidebar. Lista compartilhada DOF/DTC
+com quatro abas e contagens completas, filtro DTC por tipo, cinco colunas,
+ordenação global (atualização decrescente por padrão), paginação de 50,
+abertura pela linha/teclado e Excluir no menu ⋯ com confirmação existente.
+Mantidos editores, prévias, conferência, emissão individual/em lote e guards.
+Corrigidos descarte de resultados do lote durante recarga, mensagens de
+transição e contenção da tabela rolável no celular.
+
+GET `documentos/lista`, contrato Zod e consulta única com snapshot comum às
+contagens/página; autorização, sessão e auditoria mantidas. Sem migração ou
+alteração do motor. Analista lista os próprios rascunhos, admin/coordenador
+todos; acesso/edição compartilhados individuais da decisão 030 preservados.
+Autor continua encontrando e recolhendo DOFs encaminhadas; destinatário
+autorizado permanece em consulta/conferência/devolução. Abas são disjuntas;
+Devolvidas só conta retornos sem ajuste. DTC não ganhou encaminhamento.
+URLs por hash, back/forward com guard, aliases em hash e quatro redirects
+HTTP explícitos, sem wildcard que esconda erros da API.
+
+**Testado:** typecheck completo e builds API/web passaram. As duas suítes
+de interface cobriram 28 testes; cinco regressões da integração foram
+corrigidas e retestadas, incluindo retry idempotente do lote e recolhimento.
+Dois testes de integração HTTPS/PostgreSQL descartável passaram: nova lista
+(52 rascunhos próprios mais terceiro, sort/paginação/contadores/perfis,
+encaminhamento/exclusão/tipos/validação/redirects) e regressão da ficha.
+Última rodada focada: quatro testes aprovados. UI observada em capturas
+fictícias de 1366/768/390 px; sem overflow global, tabela rolando internamente.
+Nenhum teste foi redirecionado ao banco operacional.
+
+**Servido:** serviços SisDoc/SisDocCaddy ativos após reinício em ordem de
+dependência. HTTPS com cadeia/hostname validados: health `200`, novo endpoint
+sem sessão `401`, SPA `200`; quatro aliases `302` para a aba correta.
+Index e sete assets (incluindo lista documental) iguais ao build. Sem
+login, emissão, importação ou alteração manual de dados reais nesta etapa.
+
+**Execução:** subagente de API acionado em paralelo à interface, mas retornou
+vazio, inclusive no follow-up. Implementação e integração concluídas pelo
+agente principal; não houve alterações de arquivos pelo subagente.
+
 ## Filtro único do histórico — 08/11/2026
 
 **Implementado:** removida a busca textual da página carregada e o aviso

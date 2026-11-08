@@ -11,6 +11,7 @@ import {
   dadosFontePreviaDofSchema,
   fichaServidorSchema,
   documentosServidorSchema,
+  listaDocumentosSchema,
   documentoDtcSchema,
   historicoEmissoesSchema,
   OBSERVACAO_PADRAO_INSS,
@@ -253,7 +254,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
   }
 
   async function requisitar(opcoesPedido: {
-    metodo: 'GET' | 'POST' | 'PATCH'; rota: string; corpo?: unknown; arquivo?: Buffer; sessao?: Sessao; provaFonte?: string; chave?: string;
+    metodo: 'GET' | 'POST' | 'PATCH'; rota: string; corpo?: unknown; arquivo?: Buffer; sessao?: Sessao; provaFonte?: string; chave?: string; web?: boolean;
   }): Promise<Resposta> {
     const conteudo = opcoesPedido.arquivo ?? (opcoesPedido.corpo === undefined ? undefined : JSON.stringify(opcoesPedido.corpo));
     return new Promise((resolve, reject) => {
@@ -261,7 +262,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
         host: '127.0.0.1',
         port: portaHttps,
         servername: nomeTls,
-        path: `/api/v1/${opcoesPedido.rota}`,
+        path: `${opcoesPedido.web ? '/' : '/api/v1/'}${opcoesPedido.rota}`,
         method: opcoesPedido.metodo,
         ca: caPem,
         rejectUnauthorized: true,
@@ -1249,6 +1250,88 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     const outraFonte = await criarFonte('Outra pessoa sintética do histórico');
     expect((await requisitar({ metodo: 'GET', rota: `servidores/${outraFonte.pessoaId}/historico/${item.id}/revisoes`, sessao: sessao('admin') })).status).toBe(404);
   });
+  it('lista documentos por abas com contagens globais, ordenação, tipos e escopo de autoria', async () => {
+    const consultar = async (quem: string, parametros = 'grupo=DTC&tipo=DTC_INSS') => {
+      const resposta = await requisitar({ metodo: 'GET', rota: `documentos/lista?${parametros}`, sessao: sessao(quem) });
+      expect(resposta.status, resposta.corpo).toBe(200);
+      return listaDocumentosSchema.parse(JSON.parse(resposta.corpo));
+    };
+    const inicial = await consultar('analista');
+    const ids: string[] = [];
+    for (let n = 1; n <= 52; n += 1) {
+      const criado = await criarDtc('DTC_INSS', `Lista fictícia ${String(53 - n).padStart(2, '0')}`, 1);
+      ids.push(criado.id);
+    }
+    const terceiro = await criarDtc('DTC_INSS', 'Lista fictícia de outro autor', 1, 'analista2');
+    const recente = await consultar('analista');
+    expect(recente.total).toBe(inicial.total + 52);
+    expect(recente.contagens.rascunhos).toBe(recente.total);
+    expect(recente.itens).toHaveLength(50);
+    expect(recente.totalPaginas).toBeGreaterThanOrEqual(2);
+    expect(recente.itens[0].id).toBe(ids.at(-1));
+    expect(recente.itens.some((item) => item.id === terceiro.id)).toBe(false);
+    const segunda = await consultar('analista', 'grupo=DTC&tipo=DTC_INSS&pagina=2');
+    expect(segunda.contagens).toEqual(recente.contagens);
+    expect(segunda.itens.every((item) => !recente.itens.some((primeiro) => primeiro.id === item.id))).toBe(true);
+    const asc = await consultar('analista', 'grupo=DTC&tipo=DTC_INSS&ordem=nome&direcao=asc');
+    expect(asc.itens.find((item) => ids.includes(item.id))?.nome).toBe('Lista fictícia 01');
+    const desc = await consultar('analista', 'grupo=DTC&tipo=DTC_INSS&ordem=nome&direcao=desc');
+    expect(desc.itens.find((item) => ids.includes(item.id))?.nome).toBe('Lista fictícia 52');
+    for (const ordem of ['matricula', 'autor', 'situacao', 'atualizadoEm']) {
+      expect((await consultar('analista', `grupo=DTC&tipo=DTC_INSS&ordem=${ordem}&direcao=asc`)).total).toBe(recente.total);
+    }
+    const admin = await consultar('admin');
+    expect(admin.total).toBeGreaterThan(recente.total);
+    const compartilhado = await requisitar({ metodo: 'GET', rota: `dtc/${terceiro.id}`, sessao: sessao('analista') });
+    expect(compartilhado.status).toBe(200);
+    const conf = await conferir(terceiro.id);
+    expect((await consultar('analista', 'grupo=DTC&tipo=DTC_INSS&aba=conferidas')).itens.some((item) => item.id === terceiro.id)).toBe(false);
+    expect((await consultar('coordenador', 'grupo=DTC&tipo=DTC_INSS&aba=conferidas')).itens.some((item) => item.id === terceiro.id)).toBe(true);
+    const devolvida = await requisitar({ metodo: 'POST', rota: `dtc/${terceiro.id}/devolver`, sessao: sessao('admin'),
+      corpo: { revisao: conf.revisao, motivo: 'Devolução fictícia de teste da listagem' } });
+    expect(devolvida.status, devolvida.corpo).toBe(200);
+    const retorno = await consultar('analista2', 'grupo=DTC&tipo=DTC_INSS&aba=devolvidas');
+    expect(retorno.itens.map((item) => item.id)).toContain(terceiro.id);
+    expect((await consultar('analista2')).itens.some((item) => item.id === terceiro.id)).toBe(false);
+    expect((await consultar('admin', 'grupo=DTC&aba=encaminhadas')).contagens.encaminhadas).toBe(0);
+    const dof = await prepararDofConferida();
+    const conferidas = await consultar('coordenador', 'grupo=DOF&aba=conferidas');
+    expect(conferidas.itens.find((item) => item.id === dof.documentoId)?.conferenciaDof).toMatchObject({
+      id: dof.documentoId, revisao: dof.revisao, fonteSelecionadaAlterada: false,
+    });
+    expect((await consultar('coordenador2', 'grupo=DOF&aba=conferidas')).itens.some((item) => item.id === dof.documentoId)).toBe(false);
+    const devolverDof = await requisitar({ metodo: 'POST', rota: `documentos/${dof.documentoId}/devolver-conferido`,
+      sessao: sessao('admin'), corpo: { revisao: dof.revisao, motivo: 'Revisão fictícia para teste das abas' } });
+    expect(devolverDof.status, devolverDof.corpo).toBe(201);
+    const rascunhoResposta = await requisitar({ metodo: 'GET', rota: `documentos/${dof.documentoId}`, sessao: sessao('analista') });
+    const rascunho = rascunhoDofSchema.parse(JSON.parse(rascunhoResposta.corpo));
+    const encaminhar = await requisitar({ metodo: 'POST', rota: `documentos/${dof.documentoId}/encaminhar`,
+      sessao: sessao('analista'), corpo: { revisao: rascunho.revisao, destinatarioId: idUsuario('coordenador') } });
+    expect(encaminhar.status, encaminhar.corpo).toBe(201);
+    expect((await consultar('analista', 'grupo=DOF&aba=encaminhadas')).itens.find((item) => item.id === dof.documentoId))
+      .toMatchObject({ somenteLeitura: false });
+    expect((await consultar('coordenador', 'grupo=DOF&aba=encaminhadas')).itens.find((item) => item.id === dof.documentoId))
+      .toMatchObject({ somenteLeitura: true });
+    expect((await consultar('coordenador2', 'grupo=DOF&aba=encaminhadas')).itens.some((item) => item.id === dof.documentoId)).toBe(false);
+    expect((await consultar('analista', 'grupo=DOF&aba=rascunhos')).itens.some((item) => item.id === dof.documentoId)).toBe(false);
+    const excluir = await requisitar({ metodo: 'POST', rota: `admin/documentos/${dof.documentoId}/excluir`,
+      sessao: sessao('admin'), corpo: { revisao: rascunhoDofSchema.parse(JSON.parse(encaminhar.corpo)).revisao,
+        motivo: 'Exclusão de documento inteiramente fictício', confirmacao: `EXCLUIR DOCUMENTO ${dof.documentoId}` } });
+    expect(excluir.status, excluir.corpo).toBe(200);
+    expect((await consultar('admin', 'grupo=DOF&aba=encaminhadas')).itens.some((item) => item.id === dof.documentoId)).toBe(false);
+    for (const parametros of ['grupo=DOF&tipo=DTC_INSS', 'grupo=DTC&limite=51', 'grupo=DOF&pagina=0',
+      'grupo=DTC&ordem=nome;DROP', 'grupo=DOF&aba=emitidas']) {
+      expect((await requisitar({ metodo: 'GET', rota: `documentos/lista?${parametros}`, sessao: sessao('admin') })).status).toBe(400);
+    }
+    expect((await requisitar({ metodo: 'GET', rota: 'documentos/lista?grupo=DOF' })).status).toBe(401);
+    for (const [antiga, nova] of [['rascunhos', 'rascunhos'], ['dofs-conferidas', 'conferidas'],
+      ['todos-os-encaminhados', 'encaminhadas'], ['retornos-para-ajustes', 'devolvidas']]) {
+      const redirecionada = await requisitar({ metodo: 'GET', rota: antiga, web: true });
+      expect(redirecionada.status).toBe(302);
+      expect(redirecionada.headers.location).toBe(`/#/dofs/${nova}`);
+    }
+  });
+
   it('consulta ficha e documentos por pessoa com contagens totais, paginação e visibilidade vigente', async () => {
     const fonte = await criarFonte('Pessoa da ficha fictícia');
     await banco().query(`

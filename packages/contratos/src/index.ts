@@ -16,6 +16,7 @@ export * from './sincronizacao';
 export * from './importacao';
 export * from './ajustes-cadastro';
 export * from './historico-servidor';
+export * from './lista-documentos';
 
 const porta = z.number().int().min(1).max(65535);
 const chave = z.string().regex(/^[A-Za-z0-9+/]{43}=$/);

@@ -1,5 +1,7 @@
 import {
   historicoEmissoesSchema,
+  listaDocumentosSchema,
+  type ConsultaListaDocumentos,
   resultadoCopiaEmitidoSchema,
   resultadoExclusaoDocumentoSchema,
   situacaoEmissaoSchema,
@@ -15,6 +17,14 @@ import {
 import { ErroApi, requisitar, validar } from './http';
 
 export const documentosApi = {
+  async listarDocumentos(consulta: ConsultaListaDocumentos) {
+    const parametros = new URLSearchParams({
+      grupo: consulta.grupo, aba: consulta.aba, ordem: consulta.ordem, direcao: consulta.direcao,
+      pagina: String(consulta.pagina), limite: String(consulta.limite),
+      ...(consulta.tipo ? { tipo: consulta.tipo } : {}),
+    });
+    return validar(listaDocumentosSchema, await requisitar(`documentos/lista?${parametros}`));
+  },
   /** Consulta estado do PDF e identificação de uma emissão existente. */
   async situacaoEmissao(id: string): Promise<SituacaoEmissao> {
     return validar(situacaoEmissaoSchema, await requisitar(`emissoes/${id}`));

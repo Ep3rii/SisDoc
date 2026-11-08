@@ -20,6 +20,18 @@ histórico; esta decisão as substitui somente nos pontos explicitados acima.
 
 ## Evidência e implantação
 
+### Organização das listas — 08/11/2026
+
+As novas abas DOFs/DTCs mostram apenas os rascunhos próprios ao analista;
+admin e coordenador mantêm a consulta de todos os rascunhos. Trata-se de
+escopo de listagem, não de revogação do acesso/edição compartilhados acima:
+os endpoints individuais continuam com suas autorizações vigentes.
+Rascunhos devolvidos sem ajuste e DOFs com encaminhamento ativo ficam em
+abas próprias, sem duplicação em Rascunhos. O autor também encontra suas
+DOFs encaminhadas e conserva o recolhimento; o destinatário autorizado
+mantém consulta/conferência/devolução. Nenhuma transição nova foi criada.
+Em DTC, Encaminhadas permanece vazia porque não há fluxo de encaminhamento.
+
 Testes devem cobrir acesso e edição entre perfis em rascunhos, rejeição de
 edição após mudança de estado e migração de contas/sessões antigas. A migração
 é obrigatória para iniciar o novo build. Antes de aplicá-la numa instalação,

@@ -25,9 +25,40 @@ Em 04/11/2026, publicação autorizada aplicou `025-historico-servidor`,
 após backup local cifrado/verificado. Serviços automáticos Running e HTTPS
 validado; detalhes e limites do backup em [Progresso](PROGRESSO.md).
 
+## Navegação e listas de documentos
+
+O menu principal reúne **Início**, **DOFs**, **DTCs**, **Histórico** e,
+somente para admin, **Administração**. Usuários, importação/exportação,
+sincronização e auditoria ficam nas seções internas de Administração.
+
+DOFs e DTCs têm abas **Rascunhos**, **Encaminhadas**, **Devolvidas** e
+**Conferidas**, com contagens totais autorizadas; DTCs permite filtrar por
+IPAM, Comissionado e INSS. A ordenação pelos cabeçalhos consulta o backend
+sobre todo o conjunto, antes de paginar; padrão é atualização mais recente.
+Clique em qualquer parte da linha para abrir, ou use Tab e Enter/Espaço no
+nome do servidor. Admin encontra **Excluir** no menu **⋯**, preservando
+motivo, revisão e confirmação textual antes da exclusão.
+
+As URLs canônicas são `/#/inicio`, `/#/dofs/rascunhos`,
+`/#/dtcs/rascunhos` (com `?tipo=DTC_IPAM`, `DTC_COMISSIONADO` ou
+`DTC_INSS` no hash), `/#/historico` e `/#/administracao/usuarios`.
+As quatro abas usam seus nomes em minúsculas na URL. Voltar/avançar do
+navegador preserva a confirmação de saída com edição pendente.
+Aliases `/rascunhos`, `/dofs-conferidas`, `/todos-os-encaminhados` e
+`/retornos-para-ajustes`, também em hash, levam às abas DOF correspondentes.
+O aplicativo anterior não tinha URLs próprias de tela; endpoints API antigos
+continuam intactos.
+
+O analista vê rascunhos próprios nestas listas; o acesso/edição compartilhados
+de documentos individuais permanece conforme a [decisão 030](decisoes/030-perfis-e-edicao-rascunhos.md).
+Devolvidas representa os retornos ainda sem ajuste. DTC não possui fluxo de
+encaminhamento: a aba correspondente fica vazia, sem inventar uma transição.
+Documentos emitidos e cancelados continuam em **Histórico**.
+
 ## Ficha do servidor
 
-Após entrar, todos os perfis abrem **Início**, com foco na busca central.
+Após login, todos os perfis abrem **Início**, com foco na busca central.
+Recarregar uma página com sessão ativa restaura a URL da seção atual.
 Digite uma matrícula conhecida e pressione Enter. Se todos os resultados
 pertencerem à mesma pessoa, a ficha abre automaticamente; matrículas
 ambíguas e buscas por nome mantêm os resultados para escolha explícita.
