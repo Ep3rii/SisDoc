@@ -227,9 +227,7 @@
     ],
     "primarios": 2
   },
-  "focosEncobertos": [
-    "DIV:AnoDias do períodoFaltasT/SP/FI/POutrosContribuiçã"
-  ],
+  "focosEncobertos": [],
   "erros": [],
   "rotasInesperadas": []
 }

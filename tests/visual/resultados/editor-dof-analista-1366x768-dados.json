@@ -173,9 +173,7 @@
     ],
     "primarios": 2
   },
-  "focosEncobertos": [
-    "INPUT:"
-  ],
+  "focosEncobertos": [],
   "erros": [],
   "rotasInesperadas": []
 }

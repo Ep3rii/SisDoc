@@ -18,9 +18,9 @@ export function PreviaDocumento({ html, titulo }: { html: string; titulo: string
     const rodape = document.querySelector('.barra-totais');
     const limite = !ampliada && rodape ? rodape.getBoundingClientRect().top : window.innerHeight - 24;
     setLargura(elemento.clientWidth);
-    setAltura(!ampliada && window.innerWidth <= 800
+    setAltura(!ampliada && window.innerWidth <= 1200
       ? Math.max(240, Math.floor(window.innerHeight * 0.65))
-      : Math.max(80, limite - elemento.getBoundingClientRect().top - 16));
+      : Math.max(240, limite - elemento.getBoundingClientRect().top - 16));
   }, [ampliada]);
   useLayoutEffect(atualizarDimensoes, [atualizarDimensoes, html]);
   useEffect(() => {

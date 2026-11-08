@@ -64,7 +64,6 @@
       "button.secundario:12px",
       "dt.:11.52px",
       "label.:12px",
-      "label.ajuste-paineis:12px",
       "li.:12.8px",
       "p.:12.48px",
       "p.:12.8px",
@@ -72,7 +71,7 @@
       "strong.:12.8px"
     ],
     "foco": "BODY",
-    "alturaPrevia": 496.4375,
+    "alturaPrevia": 499,
     "contrasteDesabilitados": [],
     "primarios": 0
   },

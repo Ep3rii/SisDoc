@@ -64,14 +64,13 @@
       "button.secundario:12.8px",
       "button.secundario:12px",
       "label.:12px",
-      "label.ajuste-paineis:12px",
       "p.:12.48px",
       "p.:12.8px",
       "span.:12px",
       "strong.:12.8px"
     ],
     "foco": "BUTTON",
-    "alturaPrevia": 477.71875,
+    "alturaPrevia": 499,
     "contrasteDesabilitados": [
       {
         "texto": "Salvar rascunho",

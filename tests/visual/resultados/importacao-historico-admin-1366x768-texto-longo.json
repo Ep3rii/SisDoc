@@ -52,7 +52,7 @@
           "impact": "serious",
           "html": "<div class=\"tabela\">",
           "target": [
-            "#_r_1_-painel-historico > .tabela"
+            "#_r_2_-painel-historico > .tabela"
           ],
           "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
         }

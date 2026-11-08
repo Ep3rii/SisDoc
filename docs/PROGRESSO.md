@@ -18,7 +18,12 @@ de problemas em [QA visual](qa-visual-relatorio.md).
 Nenhum dado real criado/editado/excluído pelos testes; sem mudança de serviços,
 schema, regras, autenticação ou auditoria. Três agentes de cenários acionados
 em paralelo retornaram vazios; implementação/calibração realizadas diretamente.
-Pendente: corrigir lotes, repetir suíte e conferir assets servidos.
+**Lote crítico:** reflow até 1.200 px CSS, prévia com mínimo de 240 px,
+scroll-padding/margin e espaço reservado para a barra fixa. Rodada completa
+106/107; a única falha (dois controles na aba Blocos) passou com a segunda
+correção e reteste em 24 combinações. Consolidado sem foco encoberto nem prévia
+insuficiente; tipos aprovados. Sem lote revertido. Pendente: importantes,
+refinamentos, rodada completa seguinte e conferência dos assets servidos.
 
 ## Cadastro de usuários em modal — 08/11/2026
 

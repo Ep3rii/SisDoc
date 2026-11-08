@@ -169,10 +169,7 @@
     ],
     "primarios": 1
   },
-  "focosEncobertos": [
-    "IFRAME:",
-    "BUTTON:Voltar aos rascunhos"
-  ],
+  "focosEncobertos": [],
   "erros": [],
   "rotasInesperadas": []
 }

@@ -173,10 +173,7 @@
     ],
     "primarios": 2
   },
-  "focosEncobertos": [
-    "SELECT:Escolha o tipo de blocoContratação ou nomeaçãoTran",
-    "BUTTON:Carregar eventos funcionais"
-  ],
+  "focosEncobertos": [],
   "erros": [],
   "rotasInesperadas": []
 }

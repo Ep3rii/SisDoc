@@ -18,7 +18,8 @@
       "button.secundario:12.8px",
       "p.:12.8px",
       "span.:12px",
-      "strong.:12.8px"
+      "strong.:12.8px",
+      "summary.:12.8px"
     ],
     "foco": "BODY",
     "alturaPrevia": null,

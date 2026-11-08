@@ -22,8 +22,13 @@
     ],
     "foco": "BODY",
     "alturaPrevia": null,
-    "contrasteDesabilitados": [],
-    "primarios": 0
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 1
   },
   "focosEncobertos": [],
   "erros": [],

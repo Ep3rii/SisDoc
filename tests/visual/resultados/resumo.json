@@ -1,63 +1,8 @@
 {
-  "fase": "baseline",
+  "fase": "verificacao",
   "navegador": "Chromium",
   "telasExecutadas": [
-    "login",
-    "troca-senha",
-    "inicio",
-    "ficha-servidor",
-    "documentos-servidor",
-    "historico-funcional",
-    "historico-financeiro",
-    "registro-historico",
-    "importar-historico",
-    "referencias-cadastro",
-    "cadastro-edicao",
-    "eventos-fonte",
-    "dofs-rascunhos",
-    "dofs-encaminhadas",
-    "dofs-devolvidas",
-    "dofs-conferidas",
-    "dtcs-rascunhos",
-    "dtcs-encaminhadas",
-    "dtcs-devolvidas",
-    "dtcs-conferidas",
-    "editor-dof",
-    "dof-periodo",
-    "dof-tabela",
-    "dof-blocos",
-    "dof-conferencia",
-    "dof-conferida",
-    "preview-ampliado",
-    "excluir-documento",
-    "emissao-lote",
-    "dtc_ipam-detalhe",
-    "dtc_ipam-editor-1",
-    "dtc_ipam-editor-2",
-    "dtc_ipam-editor-3",
-    "dtc_ipam-conferida",
-    "dtc_comissionado-detalhe",
-    "dtc_comissionado-editor-1",
-    "dtc_comissionado-editor-2",
-    "dtc_comissionado-editor-3",
-    "dtc_comissionado-editor-4",
-    "dtc_comissionado-conferida",
-    "dtc_inss-detalhe",
-    "dtc_inss-editor-1",
-    "dtc_inss-editor-2",
-    "dtc_inss-editor-3",
-    "dtc_inss-editor-4",
-    "dtc_inss-conferida",
-    "usuarios",
-    "novo-usuario",
-    "editar-usuario",
-    "auditoria",
-    "sincronizacao",
-    "importacao",
-    "legado",
-    "exportacao",
-    "importacao-historico",
-    "historico-emissoes"
+    "dof-blocos"
   ],
   "temaEscuro": "não suportado",
   "total": 1832,
@@ -799,8 +744,7 @@
       "axe": "resultados/dof-blocos-admin-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -904,8 +848,7 @@
       "axe": "resultados/dof-blocos-analista-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -1009,8 +952,7 @@
       "axe": "resultados/dof-blocos-coordenador-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -1114,8 +1056,7 @@
       "axe": "resultados/dof-conferencia-admin-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -1715,8 +1656,7 @@
       "axe": "resultados/dof-periodo-admin-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -1820,8 +1760,7 @@
       "axe": "resultados/dof-periodo-analista-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -1925,8 +1864,7 @@
       "axe": "resultados/dof-periodo-coordenador-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -1978,7 +1916,6 @@
       "axe": "resultados/dof-tabela-admin-1024x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -1992,7 +1929,6 @@
       "axe": "resultados/dof-tabela-admin-1024x768-texto-longo.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -2035,8 +1971,7 @@
       "problemas": [
         "axe:color-contrast",
         "axe:scrollable-region-focusable",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -2089,7 +2024,6 @@
       "axe": "resultados/dof-tabela-analista-1024x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -2103,7 +2037,6 @@
       "axe": "resultados/dof-tabela-analista-1024x768-texto-longo.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -2146,8 +2079,7 @@
       "problemas": [
         "axe:color-contrast",
         "axe:scrollable-region-focusable",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -2200,7 +2132,6 @@
       "axe": "resultados/dof-tabela-coordenador-1024x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -2214,7 +2145,6 @@
       "axe": "resultados/dof-tabela-coordenador-1024x768-texto-longo.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -2257,8 +2187,7 @@
       "problemas": [
         "axe:color-contrast",
         "axe:scrollable-region-focusable",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14339,8 +14268,7 @@
       "axe": "resultados/editor-dof-admin-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14353,8 +14281,7 @@
       "axe": "resultados/editor-dof-admin-1366x768-dados-zoom125.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "preview:altura-insuficiente"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14367,8 +14294,7 @@
       "axe": "resultados/editor-dof-admin-1366x768-dados-zoom150.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "preview:altura-insuficiente"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14472,8 +14398,7 @@
       "axe": "resultados/editor-dof-analista-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14486,8 +14411,7 @@
       "axe": "resultados/editor-dof-analista-1366x768-dados-zoom125.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "preview:altura-insuficiente"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14500,8 +14424,7 @@
       "axe": "resultados/editor-dof-analista-1366x768-dados-zoom150.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "preview:altura-insuficiente"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14605,8 +14528,7 @@
       "axe": "resultados/editor-dof-coordenador-1366x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "teclado:foco-encoberto"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14619,8 +14541,7 @@
       "axe": "resultados/editor-dof-coordenador-1366x768-dados-zoom125.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "preview:altura-insuficiente"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -14633,8 +14554,7 @@
       "axe": "resultados/editor-dof-coordenador-1366x768-dados-zoom150.json",
       "problemas": [
         "axe:color-contrast",
-        "conteudo:fonte-menor-13px",
-        "preview:altura-insuficiente"
+        "conteudo:fonte-menor-13px"
       ]
     },
     {
@@ -20679,7 +20599,6 @@
       "axe": "resultados/preview-ampliado-admin-1024x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -20693,7 +20612,6 @@
       "axe": "resultados/preview-ampliado-admin-1024x768-texto-longo.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -20789,7 +20707,6 @@
       "axe": "resultados/preview-ampliado-analista-1024x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -20803,7 +20720,6 @@
       "axe": "resultados/preview-ampliado-analista-1024x768-texto-longo.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -20899,7 +20815,6 @@
       "axe": "resultados/preview-ampliado-coordenador-1024x768-dados.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },
@@ -20913,7 +20828,6 @@
       "axe": "resultados/preview-ampliado-coordenador-1024x768-texto-longo.json",
       "problemas": [
         "axe:color-contrast",
-        "axe:scrollable-region-focusable",
         "conteudo:fonte-menor-13px"
       ]
     },

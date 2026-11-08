@@ -9,7 +9,9 @@ API inteiramente interceptada, sem acesso à base real. Axe-core acrescentado
 somente como devDependency; Playwright já existia. Build, tipos e 107 testes
 em seis arquivos aprovados. Baseline antes de qualquer correção de UI.
 Oito problemas agrupados no [relatório](../qa-visual-relatorio.md), incluindo
-foco encoberto e prévia de 80 px. Correções ainda pendentes; não declarar
+foco encoberto e prévia de 80 px. Lote crítico corrigiu reflow/altura e foco
+com rolagem reservada para a barra fixa. Rodada completa e reteste da única
+falha consolidaram zero ocorrências críticas; demais lotes pendentes. Não declarar
 conformidade WCAG completa ou igualdade visual integral preview/PDF.
 
 ## Cadastro de usuários em modal — 08/11/2026

@@ -98,6 +98,7 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
         page.on('pageerror', (erro) => erros.push(erro.message));
         // Toda rede de API é interceptada; nenhuma rota ausente pode cair na instalação real.
         const mock = await simular(page, config, cenario);
+        let evidencias: Record<string, unknown> = {};
         try {
           await page.goto(`${endereco}${cenario.rota}`);
           await cenario.preparar(page, config);
@@ -153,7 +154,8 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
                 if (!(el instanceof HTMLElement) || !barra || barra.contains(el) || !el.closest('main')) return null;
                 const rect = el.getBoundingClientRect();
                 const limite = barra.getBoundingClientRect().top;
-                return rect.bottom > limite && rect.top < innerHeight ? `${el.tagName}:${el.getAttribute('name') ?? el.textContent?.slice(0, 50)}` : null;
+                return rect.bottom > limite && rect.top < innerHeight
+                  ? `${el.tagName}:${el.getAttribute('name') ?? el.textContent?.slice(0, 50)} · top=${rect.top} bottom=${rect.bottom} limite=${limite}` : null;
               });
               if (problema && !focosEncobertos.includes(problema)) focosEncobertos.push(problema);
             }
@@ -164,21 +166,26 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
             ...(medidas.alturaPrevia !== null && medidas.alturaPrevia < 240 ? ['preview:altura-insuficiente'] : []),
             ...(medidas.contrasteDesabilitados.some((item) => item.razao < 4.5) ? ['contraste:botao-desabilitado'] : []),
             ...(focosEncobertos.length ? ['teclado:foco-encoberto'] : [])];
-          await fs.writeFile(path.join(raiz, registro.axe), JSON.stringify({
+          evidencias = {
             config, tela: cenario.id, axe: acessibilidade.violations, incompletos: acessibilidade.incomplete,
-            medidas, focosEncobertos, erros, rotasInesperadas: mock.inesperadas }, null, 2));
+            medidas, focosEncobertos, erros, rotasInesperadas: mock.inesperadas };
+          await fs.writeFile(path.join(raiz, registro.axe), JSON.stringify(evidencias, null, 2));
           if (fase !== 'baseline') {
             const antes = baseline.find((r) => r.tela === registro.tela && r.perfil === registro.perfil
               && r.estado === registro.estado && r.viewport === registro.viewport && r.zoom === registro.zoom);
             if (antes && !antes.erro) expect(registro.problemas.filter((p) => !antes.problemas.includes(p)),
               `Regressão em ${cenario.id} ${nome}`).toEqual([]);
+            expect(registro.problemas, `Critérios críticos em ${cenario.id} ${nome}`)
+              .not.toContain('teclado:foco-encoberto');
+            expect(registro.problemas, `Altura da prévia em ${cenario.id} ${nome}`)
+              .not.toContain('preview:altura-insuficiente');
           }
           expect(mock.inesperadas).toEqual([]);
           expect(erros).toEqual([]);
         } catch (erro) {
           registro.erro = erro instanceof Error ? erro.message : String(erro);
           falhas.push(`${nome}: ${registro.erro}`);
-          await fs.writeFile(path.join(raiz, registro.axe), JSON.stringify({ config, erro: registro.erro,
+          await fs.writeFile(path.join(raiz, registro.axe), JSON.stringify({ ...evidencias, config, erro: registro.erro,
             erros, rotasInesperadas: mock.inesperadas }, null, 2));
           if (!page.isClosed()) await page.screenshot({ path: path.join(pasta, `${nome}.png`), animations: 'disabled' });
         } finally {

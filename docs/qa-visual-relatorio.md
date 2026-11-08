@@ -104,8 +104,8 @@ Os commits e evidências depois serão registrados após cada rodada completa.
 
 | ID | Tela / configuração representativa | Problema e causa provável | Gravidade / regra | Arquivo da correção | Antes | Depois / commit |
 |---|---|---|---|---|---|---|
-| VIS-01 | Editor DOF · analista · 1366×768 · dados | Campo focado por Tab sob a barra fixa; espaço/rolagem não consideram o rodapé | Crítico · teclado, WCAG 2.4.7 | `estilos.css` | [captura](../tests/visual/evidencias/VIS-01-antes.png), [medida](../tests/visual/evidencias/VIS-01-antes.json) | Pendente |
-| VIS-02 | Editor DOF · analista · 1366×768 · zoom 150% | Prévia com apenas 80 px de altura CSS; editor e controles disputam largura/altura | Crítico · emissão, reflow | `previa-documento.tsx`, `estilos.css` | [captura](../tests/visual/evidencias/VIS-02-antes.png) | Pendente |
+| VIS-01 | Editor DOF · analista · 1366×768 · dados | Campo focado por Tab sob a barra fixa; espaço/rolagem não consideram o rodapé | Crítico · teclado, WCAG 2.4.7 | `estilos.css` | [captura](../tests/visual/evidencias/VIS-01-antes.png), [medida](../tests/visual/evidencias/VIS-01-antes.json) | [captura](../tests/visual/evidencias/VIS-01-depois.png), [medida](../tests/visual/evidencias/VIS-01-depois.json) · lote crítico |
+| VIS-02 | Editor DOF · analista · 1366×768 · zoom 150% | Prévia com apenas 80 px de altura CSS; editor e controles disputam largura/altura | Crítico · emissão, reflow | `previa-documento.tsx`, `estilos.css` | [captura](../tests/visual/evidencias/VIS-02-antes.png) | [captura](../tests/visual/evidencias/VIS-02-depois.png) · lote crítico |
 | VIS-03 | Auditoria · admin · 1024×768 · dados; tabela DOF, lotes e prévia ampliada | Regiões roláveis sem foco próprio; teclado não alcança conteúdo lateral | Importante · WCAG 2.1.1 | Tabelas e visualizador compartilhado | [captura](../tests/visual/evidencias/VIS-03-antes.png) | Pendente |
 | VIS-04 | Todas · login sem sessão · 1366×768 · dados | Regras CSS com fontes menores de 13 px, incluindo `small` | Importante · requisito de leitura do projeto | `estilos.css` | [captura](../tests/visual/evidencias/VIS-04-antes.png) | Pendente |
 | VIS-05 | Editor DOF · admin · 1366×768 · dados | Identificador da prévia: `#566a78` sobre `#dce1e5`, contraste 4,27:1 | Importante · WCAG 1.4.3 | `estilos.css` | [captura](../tests/visual/evidencias/VIS-05-antes.png) | Pendente |
@@ -113,4 +113,16 @@ Os commits e evidências depois serão registrados após cada rodada completa.
 | VIS-07 | Histórico funcional e editor DOF · admin · 1366×768 · dados | Datas civis apresentadas em ISO nos resumos e referências | Refinamento · português e datas | Apresentação dos históricos e DOF | [captura](../tests/visual/evidencias/VIS-07-antes.png) | Pendente |
 | VIS-08 | Ficha · analista · 1366×768 · dados | Múltiplos vínculos geram vários botões primários simultâneos | Refinamento · padrão visual do projeto | `detalhe.tsx` | [captura](../tests/visual/evidencias/VIS-08-antes.png) | Pendente |
 
-Arquivos de interface ainda não modificados. Nenhum lote revertido até aqui.
+### Lote crítico
+
+Reflow do editor/preview até 1.200 px CSS, altura de prévia mínima de 240 px
+e espaço de rolagem para a barra de totais, preservada fixa. `scroll-padding`
+sozinho não resolveu dois controles na aba Blocos; a segunda correção,
+`scroll-margin` nos alvos de foco, passou no reteste do cenário (24 combinações).
+Rodada completa: 106/107 testes passaram; única falha corrigida e retestada.
+Consolidado: 1.832 combinações sem erro, foco encoberto ou altura insuficiente.
+Build web e tipos aprovados. Um filtro inicialmente ancorado não selecionou
+testes e não foi contado como validação; execução efetiva feita em seguida.
+
+Nenhum lote revertido. Importantes/refinamentos ainda pendentes; a próxima
+rodada completa também revalida integralmente as correções críticas.

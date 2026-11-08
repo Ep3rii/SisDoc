@@ -147,7 +147,6 @@
       "button.secundario:12px",
       "dt.:10.4px",
       "label.:12px",
-      "label.ajuste-paineis:12px",
       "p.:12.48px",
       "p.:12.8px",
       "p.identificador-documento:12.48px",
@@ -156,7 +155,7 @@
       "summary.:12.8px"
     ],
     "foco": "BUTTON",
-    "alturaPrevia": 320.6875,
+    "alturaPrevia": 499,
     "contrasteDesabilitados": [
       {
         "texto": "Salvar processo",
