@@ -86,6 +86,14 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .grade-busca p, .grade-busca button { grid-column: 1 / -1; }
 .grade-busca button { justify-self: start; }
 .painel { min-width: 0; padding: clamp(.75rem, 1.4vw, 1.25rem); background: #fff; border: 1px solid #b8cbd5; border-radius: .5rem; }
+.ficha-cabecalho, .ficha-vinculo { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.ficha-cabecalho { margin-bottom: 1rem; }
+.ficha-cabecalho h2, .ficha-cabecalho h3, .ficha-vinculo h3 { margin: 0 0 .4rem; overflow-wrap: anywhere; }
+.ficha-cabecalho p, .ficha-vinculo p { margin: .25rem 0; overflow-wrap: anywhere; }
+.ficha-cabecalho > div, .ficha-vinculo > div { min-width: 0; flex: 1 1 22rem; }
+.ficha-vinculo { padding: 1rem; margin-bottom: .75rem; border: 1px solid #b8cbd5; border-radius: .4rem; background: #f7f9fc; }
+.ficha-vinculo.selecionado { border-color: #075768; box-shadow: inset 4px 0 #075768; }
+.ficha-vinculo > button { flex-shrink: 0; }
 .login { width: min(100%, 32rem); margin: 0 auto; }
 .sem-sessao { grid-template-columns: minmax(0, 1fr); }
 .sem-sessao main { min-height: calc(100dvh - 64px); }

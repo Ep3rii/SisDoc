@@ -1,16 +1,19 @@
 import {
-  type PaginaBuscaServidores
+  type PaginaBuscaServidores, type TipoDtc
 } from '@sisdoc/contratos';
 import { useEffect, useState } from 'react';
 import { api } from '../infraestrutura/api';
 import { Consulta, Props, ProtecaoEdicao } from './contexto';
 import { Detalhe } from './detalhe';
 import { BuscaGlobal } from './busca-global';
+import type { Servidor } from '../dtc/contexto';
 
 /** Lista vínculos locais por matrícula e abre a pessoa mantendo o vínculo selecionado. */
-export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onBuscar, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
+export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onBuscar, onTrocarServidor, onNovaDtc, onErro, onLimpar, onPendente, confirmarSaida }: Props & ProtecaoEdicao & {
   csrf: string; podeSalvar: boolean; podeEditarCadastro: boolean; consulta: Consulta | null;
   onBuscar: (consulta: Consulta) => void;
+  onTrocarServidor: () => void;
+  onNovaDtc: (tipo: TipoDtc, servidor: Servidor) => void;
 }) {
   const [pagina, setPagina] = useState<PaginaBuscaServidores | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
@@ -26,9 +29,27 @@ export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onB
     let ativa = true;
     setPagina(null);
     setFalhou(false);
-    api.buscarServidores(consulta?.q, consulta?.tipo, cursor).then((resultado) => {
-      if (ativa) setPagina(resultado);
-    }).catch((erro: unknown) => {
+    async function buscar() {
+      const resultado = await api.buscarServidores(consulta?.q, consulta?.tipo, cursor);
+      const primeiro = resultado.itens[0];
+      let unicaPessoa = !!primeiro && resultado.itens.every((item) => item.pessoaId === primeiro.pessoaId);
+      if (!cursor && consulta?.tipo === 'matricula') {
+        let proximo = resultado.proximoCursor;
+        while (ativa && unicaPessoa && proximo) {
+          const seguinte = await api.buscarServidores(consulta.q, consulta.tipo, proximo);
+          unicaPessoa = seguinte.itens.every((item) => item.pessoaId === primeiro.pessoaId);
+          proximo = seguinte.proximoCursor;
+        }
+      }
+      if (ativa) {
+        setPagina(resultado);
+        if (!cursor && consulta?.tipo === 'matricula' && primeiro && unicaPessoa) {
+          setPessoaId(primeiro.pessoaId);
+          setVinculoInicial(primeiro.vinculoId);
+        }
+      }
+    }
+    buscar().catch((erro: unknown) => {
       if (ativa) { setFalhou(true); onErro(erro); }
     });
     return () => { ativa = false; };
@@ -39,7 +60,7 @@ export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onB
       <h2 id="busca-titulo" className={pessoaId ? 'sr-only' : undefined}>Início</h2>
       {!pessoaId && <BuscaGlobal inicio onBuscar={onBuscar} onErro={onErro} />}
       {!pessoaId && <p>Os resultados são locais. Matrículas e sufixos são preservados; confira a origem quando houver duplicidade.</p>}
-      {!consulta && <p>Vínculos por matrícula em ordem natural crescente, 50 por página. Busque por nome ou matrícula no campo central ou no topo.</p>}
+      {!pessoaId && !consulta && <p>Vínculos por matrícula em ordem natural crescente, 50 por página. Busque por nome ou matrícula no campo central ou no topo.</p>}
       {!pessoaId && <p className="aviso">Dados pessoais completos para atividades autorizadas do setor. O acesso é auditado.</p>}
       {!pessoaId && <div className="acoes"><button type="button" className="secundario" onClick={() => setVersao((atual) => atual + 1)}>Atualizar resultados</button></div>}
       {!pessoaId && (falhou ? <button type="button" className="secundario" onClick={() => { onLimpar(); setVersao((atual) => atual + 1); }}>Tentar buscar novamente</button> : !pagina ? <p role="status">Buscando...</p> : pagina && (
@@ -70,7 +91,7 @@ export function Servidores({ csrf, podeSalvar, podeEditarCadastro, consulta, onB
       ))}
       {pessoaId && <Detalhe key={pessoaId} pessoaId={pessoaId} vinculoInicial={vinculoInicial} csrf={csrf} podeSalvar={podeSalvar}
         podeEditarCadastro={podeEditarCadastro} onCadastroAtualizado={() => setVersao((atual) => atual + 1)}
-        onFechar={() => setPessoaId(null)} onErro={onErro} onLimpar={onLimpar}
+        onFechar={onTrocarServidor} onNovaDtc={onNovaDtc} onErro={onErro} onLimpar={onLimpar}
         onPendente={onPendente} confirmarSaida={confirmarSaida} />}
     </section>
   );

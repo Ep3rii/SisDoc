@@ -165,7 +165,10 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
           proximoCursor: null,
         });
       }
-      if (caminho === `/api/v1/servidores/${pessoaId}`) {
+      if (caminho === `/api/v1/servidores/${pessoaId}/documentos`) {
+        return responder(rota, 200, { itens: [], proximoCursor: null });
+      }
+      if (caminho === `/api/v1/servidores/${pessoaId}` || caminho === `/api/v1/servidores/${pessoaId}/ficha`) {
         return responder(rota, 200, {
           pessoa: { id: pessoaId, nome, cpf: cpfSintetico() },
           vinculos: [{
@@ -175,6 +178,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
             desligamento: null, removidoNaFonte: false,
           }],
           proximoCursor: null,
+          ...(caminho.endsWith('/ficha') ? { totalVinculos: 1, totalHistoricoFuncional: 2 } : {}),
         });
       }
       if (caminho === `/api/v1/servidores/${pessoaId}/referencias` && metodo === 'GET') {
@@ -590,6 +594,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.goto(endereco);
     await pagina.getByRole('button', { name: 'Início', exact: true }).click();
     await pagina.getByRole('button', { name: /Ver vínculos/ }).click();
+    await pagina.getByRole('button', { name: /^Histórico funcional/ }).click();
     await pagina.getByRole('button', { name: 'Financeiro', exact: true }).click();
     await pagina.getByText('2 registros em todo o vínculo', { exact: false }).waitFor();
     await pagina.getByLabel('Competência inicial', { exact: true }).fill('2026-01');
@@ -1473,7 +1478,7 @@ describe('interface de rascunhos com API sintética', () => {
     pagina.once('dialog', (dialogo) => void dialogo.accept());
     estado.papel = 'admin';
     await pagina.reload();
-    await pagina.getByRole('heading', { name: 'Administração de usuários' }).waitFor();
+    await pagina.getByRole('heading', { name: 'Início', exact: true }).waitFor();
     expect(await pagina.getByRole('button', { name: 'Início', exact: true }).count()).toBe(1);
     await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
     await pagina.getByRole('heading', { name: 'Todos os rascunhos de DOF' }).waitFor();

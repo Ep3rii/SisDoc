@@ -1,4 +1,5 @@
 import path from 'node:path';
+import os from 'node:os';
 import { documentoDtcSchema, ROTULOS_DTC, OBSERVACAO_PADRAO_INSS, type ConteudoDtc, type TipoDtc } from '@sisdoc/contratos';
 import { chromium, type Browser, type Page } from 'playwright';
 import { preview, type PreviewServer } from 'vite';
@@ -96,8 +97,9 @@ describe('Editor DTC', () => {
         resposta = { configurada: false, ultimaSincronizacaoEm: null, horasDesdeUltima: null,
           limiteHoras: 24, avisoAtraso: false, disjuntorAberto: false };
       } else if (url.pathname === '/api/v1/servidores') {
-        resposta = { itens: [{ pessoaId, vinculoId, nome, matricula: '15-1', cpf: cpfSintetico(920000011),
-          orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false }], proximoCursor: null };
+        resposta = { itens: [pessoaId, '99999999-9999-4999-8999-999999999999'].map((id) => ({
+          pessoaId: id, vinculoId: id === pessoaId ? vinculoId : id, nome, matricula: '15-1', cpf: cpfSintetico(920000011),
+          orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false })), proximoCursor: null };
       } else if (url.pathname === '/api/v1/dtc') {
         resposta = { itens: [] };
       } else {
@@ -142,7 +144,7 @@ describe('Editor DTC', () => {
       await topo.fill('15-1');
       await topo.press('Enter');
       expect(new URL((await resposta).url()).searchParams.get('tipo')).toBe('matricula');
-      await pagina.getByRole('button', { name: /^Selecionar Pessoa/ }).waitFor();
+      await pagina.getByRole('button', { name: /^Selecionar Pessoa/ }).first().waitFor();
       expect(await pagina.getByRole('heading', { name: 'Selecionar servidor', exact: true }).count()).toBe(1);
       await pagina.getByRole('button', { name: 'Início', exact: true }).click();
       await central.waitFor();
@@ -156,6 +158,135 @@ describe('Editor DTC', () => {
     } finally {
       await pagina.close();
     }
+  });
+
+  it('abre a ficha em três interações, pré-seleciona DTC e mantém histórico recolhido nas três larguras', async () => {
+    const pagina = await navegador.newPage();
+    const erros: string[] = [];
+    const leituras: string[] = [];
+    let papel: 'analista' | 'admin' = 'analista';
+    let paginaExtra = false;
+    let ambigua = false;
+    pagina.on('pageerror', (erro) => erros.push(erro.message));
+    const vinculo = {
+      id: vinculoId, matricula: '15-1', sistemaOrigem: 'fixture', matriculaAnteriorId: null,
+      regimeJuridico: 'Estatutário', cargo: 'Cargo fictício', classe: 'A', nivel: '1', referencia: 'PNS-A',
+      setor: 'Setor fictício', orgao: 'Órgão fictício', admissao: '2020-01-01', desligamento: null, removidoNaFonte: false,
+    };
+    const segundo = { ...vinculo, id: '66666666-6666-4666-8666-666666666666', matricula: '15-2', admissao: null };
+    await pagina.route('**/api/v1/**', async (rota) => {
+      const url = new URL(rota.request().url());
+      leituras.push(url.pathname);
+      let resposta: unknown;
+      if (url.pathname === '/api/v1/auth/me') {
+        resposta = { usuario: { id: usuarioId, matricula: 'ANALISTA-FICTICIO', nome: 'Analista fictício',
+          papel, trocaSenhaObrigatoria: false }, csrf };
+      } else if (url.pathname === '/api/v1/notificacoes/declaracoes') {
+        resposta = { encaminhados: 0, retornos: 0 };
+      } else if (url.pathname === '/api/v1/sincronizacao/situacao') {
+        resposta = { configurada: false, ultimaSincronizacaoEm: null, horasDesdeUltima: null,
+          limiteHoras: 24, avisoAtraso: false, disjuntorAberto: false };
+      } else if (url.pathname === '/api/v1/servidores') {
+        const segundaPagina = url.searchParams.has('cursor');
+        resposta = { itens: [{ pessoaId: segundaPagina && ambigua ? segundo.id : pessoaId, vinculoId, nome,
+          matricula: '15-1', cpf: cpfSintetico(920000011), orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false }],
+          proximoCursor: paginaExtra && url.searchParams.has('q') && !segundaPagina ? segundo.id : null };
+      } else if (url.pathname === `/api/v1/servidores/${pessoaId}/ficha`) {
+        resposta = { pessoa: { id: pessoaId, nome, cpf: cpfSintetico(920000011) }, vinculos: [vinculo],
+          proximoCursor: segundo.id, totalVinculos: 2, totalHistoricoFuncional: 73 };
+      } else if (url.pathname === `/api/v1/servidores/${pessoaId}`) {
+        resposta = { pessoa: { id: pessoaId, nome, cpf: cpfSintetico(920000011) }, vinculos: [segundo], proximoCursor: null };
+      } else if (url.pathname === `/api/v1/servidores/${pessoaId}/documentos`) {
+        resposta = { itens: ['rascunho', 'emitido'].map((situacao, i) => ({
+          id: i ? segundo.id : documentoId, vinculoId, matricula: '15-1', tipo: 'DOF', situacao,
+          atualizadoEm: '2026-10-31T12:00:00.000Z', numero: i ? 'DOF/2026/1' : null, emissaoId: i ? segundo.id : null,
+        })), proximoCursor: null };
+      } else if (url.pathname === `/api/v1/servidores/${pessoaId}/historico`) {
+        resposta = { itens: [], proximoCursor: null, totais: { registros: 73, proventosPagos: '0.00',
+          descontosPagos: '0.00', proventosEstornados: '0.00', descontosEstornados: '0.00' } };
+      } else if (url.pathname === `/api/v1/servidores/${pessoaId}/referencias`) {
+        resposta = {
+          pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1', removidoNaFonte: false,
+          cadastro: {
+            nome, cpf: cpfSintetico(920000011), nascimento: null, nomeMae: null, nomePai: null,
+            pisPasep: null, rgNumero: null, rgOrgao: null, rgExpedicao: null, tituloEleitor: null, endereco: null,
+            matricula: '15-1', regimeJuridico: null, cargo: null, classe: null, nivel: null, referencia: null,
+            setor: null, orgaoCodigo: null, orgao: null, admissao: '2020-01-01', desligamento: null,
+          },
+          pessoa: { nome }, registros: [], proximoCursor: null,
+        };
+      } else {
+        erros.push(`${rota.request().method()} ${url.pathname}`);
+        return rota.fulfill({ status: 404, body: '{"detail":"Rota inesperada"}', contentType: 'application/json' });
+      }
+      return rota.fulfill({ status: 200, body: JSON.stringify(resposta), contentType: 'application/json' });
+    });
+    try {
+      for (const largura of [1366, 768, 390]) {
+        await pagina.setViewportSize({ width: largura, height: 900 });
+        await pagina.goto(endereco);
+        const busca = pagina.getByRole('textbox', { name: 'Buscar servidor no Início', exact: true });
+        await busca.waitFor();
+        expect(await busca.evaluate((campo) => campo === document.activeElement)).toBe(true);
+        // As únicas três interações após o login: digitar, Enter e calcular.
+        await busca.fill('15-1');
+        await busca.press('Enter');
+        const calcular = pagina.getByRole('button', { name: 'Calcular DOF da matrícula 15-1', exact: true });
+        await calcular.waitFor();
+        expect(await pagina.getByRole('button', { name: 'Calcular DOF da matrícula 15-2', exact: true }).isDisabled()).toBe(true);
+        await pagina.getByRole('cell', { name: 'DOF/2026/1', exact: true }).waitFor();
+        expect(await pagina.getByText('01/01/2020', { exact: false }).count()).toBeGreaterThan(0);
+        expect(await pagina.getByRole('button', { name: 'Histórico funcional (73 registros)' }).getAttribute('aria-expanded')).toBe('false');
+        expect(await pagina.locator('body').evaluate((el) => el.scrollWidth <= window.innerWidth)).toBe(true);
+        const captura = path.join(process.env.SISDOC_TEST_TEMP ?? os.tmpdir(), `sisdoc-ficha-${largura}-${process.pid}.png`);
+        await pagina.screenshot({ path: captura, fullPage: true });
+        process.stdout.write(`Ficha fictícia em ${largura}px: ${captura}\n`);
+        await calcular.click();
+        await pagina.getByRole('heading', { name: `DOF — ${nome}`, exact: true }).waitFor();
+        expect(await pagina.getByLabel('Início do período', { exact: true }).inputValue()).toBe('2020-01-01');
+      }
+      await pagina.setViewportSize({ width: 1366, height: 900 });
+      await pagina.getByRole('button', { name: 'Início', exact: true }).click();
+      const busca = pagina.getByRole('textbox', { name: 'Buscar servidor no Início', exact: true });
+      await busca.fill('15-1'); await busca.press('Enter');
+      await pagina.getByRole('button', { name: 'Histórico funcional (73 registros)' }).waitFor();
+      expect(leituras.filter((rota) => rota.endsWith('/historico'))).toHaveLength(0);
+      await pagina.getByRole('button', { name: 'Histórico funcional (73 registros)' }).click();
+      await pagina.getByText('73 registros em todo o vínculo', { exact: false }).waitFor();
+      for (const tipo of ['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'] as const) {
+        if (tipo !== 'DTC_IPAM') {
+          await pagina.getByRole('button', { name: 'Início', exact: true }).click();
+          await busca.fill('15-1'); await busca.press('Enter');
+        }
+        await pagina.getByRole('button', { name: tipo === 'DTC_IPAM' ? 'Nova DTC IPAM' : ROTULOS_DTC[tipo], exact: true }).click();
+        await pagina.getByRole('heading', { name: `${ROTULOS_DTC[tipo]} — ${nome}`, exact: true }).waitFor();
+        expect(await pagina.getByRole('heading', { name: 'Selecionar servidor', exact: true }).count()).toBe(0);
+        expect(await pagina.getByLabel('Matrícula', { exact: true }).inputValue()).toBe('15-1');
+      }
+      paginaExtra = true; ambigua = true;
+      await pagina.getByRole('button', { name: 'Início', exact: true }).click();
+      await busca.fill('15-1');
+      const segundaPagina = pagina.waitForResponse((r) => new URL(r.url()).pathname === '/api/v1/servidores'
+        && new URL(r.url()).searchParams.has('cursor'));
+      await busca.press('Enter'); await segundaPagina;
+      await pagina.getByRole('heading', { name: 'Resultados', exact: true }).waitFor();
+      expect(await pagina.getByRole('heading', { name: 'Ficha do servidor' }).count()).toBe(0);
+      ambigua = false;
+      await pagina.getByRole('button', { name: 'Início', exact: true }).click();
+      await busca.fill('15-1'); await busca.press('Enter');
+      await pagina.getByRole('heading', { name: 'Ficha do servidor' }).waitFor();
+      await pagina.getByRole('button', { name: 'Trocar servidor', exact: true }).click();
+      await busca.waitFor();
+      expect(await busca.evaluate((campo) => campo === document.activeElement)).toBe(true);
+      papel = 'admin';
+      await pagina.reload();
+      await busca.waitFor();
+      expect(await busca.evaluate((campo) => campo === document.activeElement)).toBe(true);
+      await busca.fill('15-1'); await busca.press('Enter');
+      await pagina.getByRole('heading', { name: 'Ficha do servidor' }).waitFor();
+      expect(await pagina.getByRole('button', { name: 'Nova DTC IPAM', exact: true }).count()).toBe(0);
+      expect(erros).toEqual([]);
+    } finally { await pagina.close(); }
   });
 
   it.each(['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'] as const)(

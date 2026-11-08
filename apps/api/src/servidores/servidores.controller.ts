@@ -47,6 +47,20 @@ export class ServidoresController {
   }
 
   @ExigirAcao('consultar_pessoa')
+  @Get(':id/ficha')
+  ficha(@Param('id') id: string, @Req() req: RequisicaoAutenticada) {
+    return this.servidores.ficha(exigirSessao(req), ipRequisicao(req), pessoaId(id));
+  }
+
+  @ExigirAcao('consultar_documentos')
+  @Get(':id/documentos')
+  documentos(@Param('id') id: string, @Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
+    const dados = paginaUuidQuerySchema.safeParse(consulta);
+    if (!dados.success) throw new BadRequestException('Paginação inválida; o limite máximo é 50.');
+    return this.servidores.documentos(exigirSessao(req), ipRequisicao(req), pessoaId(id), dados.data.limite, dados.data.cursor);
+  }
+
+  @ExigirAcao('consultar_pessoa')
   @Get(':id')
   detalhar(@Param('id') id: string, @Query() consulta: unknown, @Req() req: RequisicaoAutenticada) {
     const dados = paginaUuidQuerySchema.safeParse(consulta);

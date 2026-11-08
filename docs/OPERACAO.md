@@ -25,6 +25,32 @@ Em 04/11/2026, publicação autorizada aplicou `025-historico-servidor`,
 após backup local cifrado/verificado. Serviços automáticos Running e HTTPS
 validado; detalhes e limites do backup em [Progresso](PROGRESSO.md).
 
+## Ficha do servidor
+
+Após entrar, todos os perfis abrem **Início**, com foco na busca central.
+Digite uma matrícula conhecida e pressione Enter. Se todos os resultados
+pertencerem à mesma pessoa, a ficha abre automaticamente; matrículas
+ambíguas e buscas por nome mantêm os resultados para escolha explícita.
+
+A ficha mostra nome, matrícula, total de vínculos e **Trocar servidor**.
+Cada cartão informa cargo/referência, órgão/setor e datas; **Calcular DOF**
+abre o cálculo desse vínculo sem nova seleção. Admissão ausente mantém o
+cálculo indisponível. O fluxo após login é digitar matrícula → Enter →
+Calcular DOF, sem clicar primeiro em Ver vínculos.
+
+Em **Emitir outro documento**, escolha DTC IPAM, Comissionado ou INSS.
+O vínculo pesquisado vem selecionado; quando necessário, escolha outro
+vínculo da mesma pessoa sem pesquisar novamente. O administrador mantém
+consulta/cálculo e operação de documentos existentes, sem criação de DOF/DTC.
+Preparar uma DTC não emite PDF nem dispensa conferência/aprovação do modelo.
+
+**Documentos deste servidor** apresenta os documentos visíveis ao perfil,
+com situação e paginação por pessoa. **Histórico funcional** começa recolhido
+e mostra a contagem total dos registros funcionais do Núcleo; ao abrir,
+a consulta/edição ocorre por vínculo. Eventos da fonte, referências e
+cadastro local ficam acessíveis abaixo, com auditoria e permissões existentes.
+O histórico ainda não importado não é inferido nem contado como registro.
+
 ## Novos modelos de saída — versão 2
 
 Os formulários seguem as referências locais em

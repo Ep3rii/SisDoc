@@ -3,6 +3,7 @@ import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, ty
 import { Login, TrocaSenha } from '../autenticacao/acesso';
 import { BuscaGlobal } from '../cadastro/busca-global';
 import type { Consulta } from '../cadastro/contexto';
+import type { Servidor } from '../dtc/contexto';
 import '../compartilhado/estilos.css';
 import { api, ErroApi, requisitar, validar } from '../infraestrutura/api';
 import { AvisoSincronizacao, EstadoSincronizacao, SincronizacaoAdmin } from '../transferencia/sincronizacao';
@@ -41,6 +42,7 @@ export function App() {
     | 'DTC_IPAM' | 'DTC_COMISSIONADO' | 'DTC_INSS' | 'sincronizacao' | 'importacao'>('busca');
   const [chaveTela, setChaveTela] = useState(0);
   const [consulta, setConsulta] = useState<Consulta | null>(null);
+  const [servidorDtc, setServidorDtc] = useState<Servidor | undefined>();
   const [menuAberto, setMenuAberto] = useState(false);
   const [alteracoesPendentes, setAlteracoesPendentes] = useState(false);
   const [notificacoes, setNotificacoes] = useState<NotificacoesDeclaracoes | null>(null);
@@ -132,7 +134,7 @@ export function App() {
     api.sessao().then((resultado) => {
       if (ativa) {
         setSessao(resultado);
-        setTela(resultado.usuario.papel === 'admin' ? 'usuarios' : 'busca');
+        setTela('busca');
       }
     }).catch((problema: unknown) => {
       if (ativa && (!(problema instanceof ErroApi) || problema.status !== 401)) tratarErro(problema);
@@ -161,7 +163,8 @@ export function App() {
     setSessao(resultado);
     setErro('');
     setMensagem('');
-    setTela(resultado.usuario.papel === 'admin' ? 'usuarios' : 'busca');
+    setServidorDtc(undefined);
+    setTela('busca');
   };
   const encerrarLocal = (texto: string) => {
     setSessao(null);
@@ -184,6 +187,7 @@ export function App() {
     setChaveTela((atual) => atual + 1);
     setTela(destino);
     setConsulta(busca);
+    setServidorDtc(undefined);
     setMenuAberto(false);
   };
   const buscarServidor = (busca: Consulta) => {
@@ -299,7 +303,11 @@ export function App() {
             {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf}
               podeSalvar={podeSalvar && sessao.usuario.papel !== 'admin'}
               podeEditarCadastro={sessao.usuario.papel === 'admin'}
-              consulta={consulta} onBuscar={buscarServidor}
+              consulta={consulta} onBuscar={buscarServidor} onTrocarServidor={() => navegar('busca')}
+              onNovaDtc={(tipo, servidor) => {
+                if (sessao.usuario.papel === 'admin' || !confirmarSaida()) return;
+                navegar(tipo); setServidorDtc(servidor);
+              }}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf} administrador={sessao.usuario.papel === 'admin'}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida}
@@ -316,7 +324,7 @@ export function App() {
             )}
             {podeSalvar && (tela === 'DTC_IPAM' || tela === 'DTC_COMISSIONADO' || tela === 'DTC_INSS') && (
               <TelaDtc key={`dtc-${tela}-${chaveTela}`} tipo={tela} csrf={sessao.csrf} papel={sessao.usuario.papel}
-                onRegistrarBusca={registrarBusca}
+                onRegistrarBusca={registrarBusca} servidorInicial={servidorDtc}
                 onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
             )}
             {tela === 'historico' && (

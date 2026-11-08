@@ -11,15 +11,17 @@ import { ExclusaoDocumento } from '../documentos/exclusao-documento';
 import { EmissaoEmLote, type DocumentoElegivelLote } from '../documentos/emissao-em-lote';
 import { api } from '../infraestrutura/api';
 import { BuscaServidor } from './busca-servidor';
-import { conteudoInicial, DESCRICOES, Modo, Props } from './contexto';
+import { conteudoInicial, DESCRICOES, Modo, Props, type Servidor } from './contexto';
 import { Documento } from './documento';
 import { Editor } from './editor';
 
 /** Alterna lista, seleção, editor e documento DTC preservando a confirmação de saída. */
-export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confirmarSaida, onRegistrarBusca }: Props & {
+export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confirmarSaida, onRegistrarBusca, servidorInicial }: Props & {
   onRegistrarBusca: (buscar: ((consulta: Consulta) => void) | null) => void;
+  servidorInicial?: Servidor;
 }) {
-  const [modo, setModo] = useState<Modo>({ tela: 'lista' });
+  const [modo, setModo] = useState<Modo>(() => servidorInicial && papel !== 'admin'
+    ? { tela: 'novo', servidor: servidorInicial } : { tela: 'lista' });
   const [estado, setEstado] = useState<'rascunho' | 'conferido'>('rascunho');
   const [pagina, setPagina] = useState<PaginaDtc | null>(null);
   const [versao, setVersao] = useState(0);

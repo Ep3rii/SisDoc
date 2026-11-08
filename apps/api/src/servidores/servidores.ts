@@ -1,6 +1,10 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import {
   cpfSchema,
+  fichaServidorSchema,
+  documentosServidorSchema,
+  type FichaServidor,
+  type DocumentosServidor,
   normalizarMatricula,
   normalizarNomeBusca,
   type AtualizarServidor,
@@ -18,7 +22,7 @@ import { randomUUID } from 'node:crypto';
 import { transacao } from '../banco';
 import { auditarConsultaFuncional } from '../seguranca/auditoria-funcional';
 import type { SessaoAutenticada } from '../seguranca/autenticacao';
-import { papeisPermitidos } from '../seguranca/permissoes';
+import { papeisPermitidos, perfilPermiteAcao } from '../seguranca/permissoes';
 import { decifrarTexto, ProtetorDados } from '../seguranca/protecao-dados';
 import { confirmarSessao } from '../seguranca/sessao-transacao';
 
@@ -436,6 +440,68 @@ export class ServidoresService {
         })),
         proximoCursor: resultado.rows.length > limite ? resultado.rows[limite - 1].id : null,
       };
+    });
+  }
+
+  async ficha(sessao: SessaoAutenticada, ip: string, pessoaId: string): Promise<FichaServidor> {
+    const detalhe = await this.detalhar(sessao, ip, pessoaId, 50);
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_pessoa'));
+      const contagens = await cliente.query<{ vinculos: number; historico: number }>(`
+        SELECT
+          (SELECT count(*)::int FROM nucleo.vinculo WHERE pessoa_id = $1) AS vinculos,
+          (SELECT count(*)::int FROM nucleo.historico_servidor WHERE pessoa_id = $1 AND grupo = 'funcional') AS historico
+      `, [pessoaId]);
+      await auditarConsultaFuncional(cliente, sessao, 'ficha_servidor_consultada', 'pessoa', pessoaId, pessoaId, ip);
+      return fichaServidorSchema.parse({
+        ...detalhe, totalVinculos: contagens.rows[0].vinculos, totalHistoricoFuncional: contagens.rows[0].historico,
+      });
+    });
+  }
+
+  async documentos(sessao: SessaoAutenticada, ip: string, pessoaId: string, limite: number, cursor?: string): Promise<DocumentosServidor> {
+    return transacao(this.banco, async (cliente) => {
+      await confirmarSessao(cliente, sessao, papeisPermitidos('consultar_documentos'));
+      const pessoa = await cliente.query('SELECT id FROM nucleo.pessoa WHERE id = $1', [pessoaId]);
+      if (!pessoa.rowCount) throw new NotFoundException('Pessoa não encontrada.');
+      const consulta = await cliente.query<{
+        id: string; vinculo_id: string; matricula: string; tipo: DocumentosServidor['itens'][number]['tipo'];
+        situacao: DocumentosServidor['itens'][number]['situacao']; atualizado_em: Date; numero: string | null; emissao_id: string | null;
+      }>(`
+        SELECT d.id, d.vinculo_id, v.matricula, d.tipo, d.atualizado_em,
+          CASE WHEN d.status = 'rascunho' AND EXISTS (
+            SELECT 1 FROM documentos.encaminhamento_dof x WHERE x.documento_id = d.id AND x.recolhido_em IS NULL
+          ) THEN 'encaminhado' ELSE d.status END AS situacao,
+          e.numero_formatado AS numero, e.id AS emissao_id
+        FROM documentos.documento d
+        JOIN nucleo.vinculo v ON v.id = d.vinculo_id AND v.pessoa_id = d.pessoa_id
+        LEFT JOIN documentos.emissao e ON e.documento_id = d.id
+        WHERE d.pessoa_id = $1 AND ($2::uuid IS NULL OR d.id > $2)
+          AND NOT EXISTS (SELECT 1 FROM documentos.exclusao_documento x WHERE x.documento_id = d.id AND x.status = 'pendente')
+          AND (
+            d.status = 'rascunho'
+            OR (d.status = 'conferido' AND (d.criado_por = $3 OR $4::boolean
+              OR (d.tipo <> 'DOF' AND $5::boolean)
+              OR EXISTS (SELECT 1 FROM documentos.encaminhamento_dof x
+                JOIN seguranca.usuario u ON u.id = x.destinatario_id
+                WHERE x.documento_id = d.id AND x.destinatario_id = $3 AND x.recolhido_em IS NULL
+                  AND u.ativo AND u.papel IN ('coordenador', 'admin'))))
+            OR (d.status IN ('emitido', 'cancelado') AND e.id IS NOT NULL
+              AND EXISTS (SELECT 1 FROM documentos.emissao_aprovacao a WHERE a.emissao_id = e.id)
+              AND (d.criado_por = $3 OR e.emitido_por = $3 OR $5::boolean))
+          )
+        ORDER BY d.id LIMIT $6
+      `, [pessoaId, cursor ?? null, sessao.usuario.id, sessao.usuario.papel === 'admin',
+        perfilPermiteAcao(sessao.usuario.papel, 'historico_terceiros'), limite + 1]);
+      await auditarConsultaFuncional(cliente, sessao, 'documentos_servidor_consultados', 'pessoa', pessoaId, pessoaId, ip);
+      return documentosServidorSchema.parse({
+        itens: consulta.rows.slice(0, limite).map((linha) => ({
+          id: linha.id, vinculoId: linha.vinculo_id, matricula: linha.matricula, tipo: linha.tipo,
+          situacao: linha.situacao, atualizadoEm: linha.atualizado_em.toISOString(),
+          numero: linha.numero, emissaoId: linha.emissao_id,
+        })),
+        proximoCursor: consulta.rows.length > limite ? consulta.rows[limite - 1].id : null,
+      });
     });
   }
 

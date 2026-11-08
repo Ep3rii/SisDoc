@@ -74,6 +74,28 @@ export const detalheServidorSchema = z.strictObject({
   proximoCursor: z.uuid().nullable(),
 });
 
+export const fichaServidorSchema = detalheServidorSchema.extend({
+  totalVinculos: z.number().int().nonnegative(),
+  totalHistoricoFuncional: z.number().int().nonnegative(),
+});
+
+export const documentosServidorSchema = z.strictObject({
+  itens: z.array(z.strictObject({
+    id: z.uuid(),
+    vinculoId: z.uuid(),
+    matricula: z.string(),
+    tipo: z.enum(['DOF', 'DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS']),
+    situacao: z.enum(['rascunho', 'encaminhado', 'conferido', 'emitido', 'cancelado']),
+    atualizadoEm: z.iso.datetime(),
+    numero: z.string().nullable(),
+    emissaoId: z.uuid().nullable(),
+  })),
+  proximoCursor: z.uuid().nullable(),
+});
+
+export type FichaServidor = z.infer<typeof fichaServidorSchema>;
+export type DocumentosServidor = z.infer<typeof documentosServidorSchema>;
+
 export const paginaEventosServidorSchema = z.strictObject({
   itens: z.array(z.strictObject({
     id: z.uuid(),

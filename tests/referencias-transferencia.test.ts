@@ -113,12 +113,14 @@ async function simular(page: Page, papel: 'admin' | 'analista') {
     else if (endpoint === 'admin/importacoes/legado') dados = [];
     else if (endpoint === 'servidores') dados = { itens: [{ pessoaId, vinculoId, nome: 'Pessoa fictícia', cpf: cpfSintetico(), matricula: 'F-1',
       orgao: 'Setor fictício', sistemaOrigem: 'planilha', removidoNaFonte: false }], proximoCursor: null };
-    else if (endpoint === `servidores/${pessoaId}`) dados = { pessoa: { id: pessoaId, nome: 'Pessoa fictícia', cpf: cpfSintetico() },
+    else if (endpoint === `servidores/${pessoaId}/documentos`) dados = { itens: [], proximoCursor: null };
+    else if (endpoint === `servidores/${pessoaId}` || endpoint === `servidores/${pessoaId}/ficha`) dados = { pessoa: { id: pessoaId, nome: 'Pessoa fictícia', cpf: cpfSintetico() },
       vinculos: [{ id: vinculoId, matricula: 'F-1', sistemaOrigem: 'planilha', matriculaAnteriorId: null, regimeJuridico: 'ESTATUTARIO',
         cargo: 'Cargo fictício', classe: null, nivel: null, referencia: 'A-1', setor: null, orgao: null, admissao: '2000-01-01',
-        desligamento: null, removidoNaFonte: false }], proximoCursor: null };
+        desligamento: null, removidoNaFonte: false }], proximoCursor: null,
+        ...(endpoint.endsWith('/ficha') ? { totalVinculos: 1, totalHistoricoFuncional: 0 } : {}) };
     else if (endpoint === `servidores/${pessoaId}/referencias`) dados = {
-      pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1',
+      pessoaId, vinculoId, revisaoPessoa: '1', revisaoVinculo: '1', removidoNaFonte: false,
       cadastro: {
         nome: 'Pessoa fictícia', cpf: '52998224725', nascimento: null, nomeMae: null, nomePai: null,
         pisPasep: null, rgNumero: null, rgOrgao: null, rgExpedicao: null, tituloEleitor: null, endereco: null,
@@ -304,9 +306,10 @@ it('permite ao Cadastro consultar os dados completos e alternar as referências'
     await page.getByRole('textbox', { name: 'Termo de busca' }).fill('Pessoa');
     await page.locator('.cabecalho').getByRole('button', { name: 'Buscar', exact: true }).click();
     await page.getByRole('button', { name: /^Ver vínculos/ }).click();
+    await page.getByLabel('Dados de referência do vínculo').selectOption(vinculoId);
     expect(await page.getByLabel('Dados de referência do vínculo').inputValue()).toBe(vinculoId);
     await page.getByText('CPF fictício completo', { exact: true }).waitFor();
-    await page.getByLabel('Referências').selectOption('incorporacoes');
+    await page.getByRole('combobox', { name: /^Referências/ }).selectOption('incorporacoes');
     await page.getByText('incorporacoes', { exact: true }).waitFor();
     expect(await page.getByRole('button', { name: /^Sincronização/ }).count()).toBe(0);
   } finally { await page.close(); }

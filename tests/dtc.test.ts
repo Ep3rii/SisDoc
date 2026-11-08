@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { pg_ctl } from '@embedded-postgres/windows-x64';
 import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import type { IncomingHttpHeaders } from 'node:http';
 import https from 'node:https';
@@ -7,6 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   dadosFontePreviaDofSchema,
+  fichaServidorSchema,
+  documentosServidorSchema,
   documentoDtcSchema,
   historicoEmissoesSchema,
   OBSERVACAO_PADRAO_INSS,
@@ -51,6 +55,12 @@ const senhaAplicativo = 'AplicativoDtcFicticio!12345';
 const senhaAdmin = 'AdministradorDtcFicticio!12345';
 const senhaUsuarios = 'UsuarioDtcFicticio!12345';
 const nomeTls = 'sisdoc.local';
+
+function controlarPostgres(argumentos: string[]): void {
+  const resultado = spawnSync(pg_ctl, argumentos, { stdio: 'ignore', windowsHide: true, timeout: 35000 });
+  if (resultado.error) throw resultado.error;
+  if (resultado.status !== 0) throw new Error(`pg_ctl falhou com código ${resultado.status}.`);
+}
 
 type Sessao = { cookie: string; csrf: string };
 type Resposta = { status: number | undefined; corpo: string; bruto: Buffer; headers: IncomingHttpHeaders };
@@ -449,7 +459,9 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
       onLog: () => {},
     });
     await postgres.initialise();
-    await postgres.start();
+    // pg_ctl reduz o token administrativo no Windows; postgres direto o recusa.
+    controlarPostgres(['-D', path.join(temporario, 'postgres'), '-w', '-t', '30',
+      '-l', path.join(temporario, 'postgres.log'), '-o', `-p ${portaBanco} -c listen_addresses=127.0.0.1`, 'start']);
     iniciado = true;
     administradorBanco = postgres.getPgClient();
     await administradorBanco.connect();
@@ -501,7 +513,7 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     if (poolAplicativo && !poolAplicativo.ended) await poolAplicativo.end();
     if (migrador) await migrador.end();
     if (administradorBanco) await administradorBanco.end();
-    if (iniciado && postgres) await postgres.stop();
+    if (iniciado) controlarPostgres(['-D', path.join(temporario, 'postgres'), '-m', 'fast', '-w', 'stop']);
     if (raiz && path.basename(raiz).startsWith('SisDocVerificacao-')) {
       await rm(raiz, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     }
@@ -1236,5 +1248,95 @@ describe('DTC IPAM, Comissionado e INSS de ponta a ponta', () => {
     expect(repetir).toMatchObject({ inseridos: 0, inalterados: 1 });
     const outraFonte = await criarFonte('Outra pessoa sintética do histórico');
     expect((await requisitar({ metodo: 'GET', rota: `servidores/${outraFonte.pessoaId}/historico/${item.id}/revisoes`, sessao: sessao('admin') })).status).toBe(404);
+  });
+  it('consulta ficha e documentos por pessoa com contagens totais, paginação e visibilidade vigente', async () => {
+    const fonte = await criarFonte('Pessoa da ficha fictícia');
+    await banco().query(`
+      INSERT INTO nucleo.vinculo (id, pessoa_id, matricula, matricula_norm, sistema_origem, id_origem)
+      SELECT gen_random_uuid(), $1, 'FICHA-' || n, 'FICHA-' || n, 'fixture-ficha', n::text
+      FROM generate_series(1, 51) n
+    `, [fonte.pessoaId]);
+    const funcional = registroHistoricoSchema.parse({
+      grupo: 'funcional', tipo: 'outro', situacao: 'informado', descricao: 'Registro da ficha fictício',
+      inicio: null, fim: null, aquisitivoInicio: null, aquisitivoFim: null, diasInformados: null, especieLicenca: null,
+      ato: null, efeitoTempo: 'nao_informado', efeitoRemuneracao: 'nao_informado', competencia: null, competenciaOrigem: null,
+      pagamento: null, rubrica: null, natureza: null, valor: null, folha: null, origem: 'fixture', idOrigem: null,
+      eventoId: null, relacionadoId: null,
+    });
+    for (let i = 0; i < 3; i += 1) {
+      const id = randomUUID();
+      await banco().query(`
+        INSERT INTO nucleo.historico_servidor (id, pessoa_id, vinculo_id, grupo, origem, revisao, conteudo_cifrado, criado_por, atualizado_por)
+        VALUES ($1, $2, $3, 'funcional', 'fixture', 1, $4, $5, $5)
+      `, [id, fonte.pessoaId, fonte.vinculoId, protetor.cifrar(Buffer.from(JSON.stringify(funcional)), {
+        schema: 'nucleo', tabela: 'historico_servidor', registroId: id, campo: 'conteudo_cifrado',
+      }), idUsuario('admin')]);
+    }
+    for (const quem of ['analista', 'coordenador', 'admin']) {
+      const resposta = await requisitar({ metodo: 'GET', rota: `servidores/${fonte.pessoaId}/ficha`, sessao: sessao(quem) });
+      expect(resposta.status, resposta.corpo).toBe(200);
+      const ficha = fichaServidorSchema.parse(JSON.parse(resposta.corpo));
+      expect(ficha).toMatchObject({ totalVinculos: 52, totalHistoricoFuncional: 3 });
+      expect(ficha.vinculos).toHaveLength(50);
+      expect(ficha.proximoCursor).not.toBeNull();
+    }
+    const criar = async (quem: string) => {
+      const resposta = await requisitar({ metodo: 'POST', rota: 'dtc', sessao: sessao(quem), corpo: corpoDtc('DTC_IPAM', fonte, 1) });
+      expect(resposta.status, resposta.corpo).toBe(201);
+      return documentoDtcSchema.parse(JSON.parse(resposta.corpo));
+    };
+    const rascunho = await criar('analista2');
+    const propria = await criar('analista');
+    const terceira = await criar('analista2');
+    await conferir(propria.id); await conferir(terceira.id);
+    const emitida = await criar('analista2');
+    await conferir(emitida.id);
+    await registrarAprovacaoModelo(banco(), { tipo: 'DTC_IPAM', aprovadoPor: 'Responsável fictício', referenciaDecisao: 'Ficha fictícia' });
+    const emissao = await emitirDtc(emitida.id);
+    expect(emissao.status, emissao.corpo).toBe(200);
+    const consultar = async (quem: string, query = '') => {
+      const resposta = await requisitar({ metodo: 'GET', rota: `servidores/${fonte.pessoaId}/documentos${query}`, sessao: sessao(quem) });
+      expect(resposta.status, resposta.corpo).toBe(200);
+      return documentosServidorSchema.parse(JSON.parse(resposta.corpo));
+    };
+    const analista = await consultar('analista');
+    expect(analista.itens.map((item) => item.id).sort()).toEqual([rascunho.id, propria.id].sort());
+    for (const quem of ['coordenador', 'admin']) {
+      const pagina = await consultar(quem);
+      expect(pagina.itens).toHaveLength(4);
+      expect(pagina.itens.find((item) => item.id === emitida.id)).toMatchObject({ situacao: 'emitido', emissaoId: JSON.parse(emissao.corpo).emissaoId });
+      const vistos: string[] = [];
+      let cursor: string | null = null;
+      do {
+        const parte = await consultar(quem, `?limite=1${cursor ? `&cursor=${cursor}` : ''}`);
+        expect(parte.itens).toHaveLength(1);
+        vistos.push(parte.itens[0].id); cursor = parte.proximoCursor;
+      } while (cursor);
+      expect(new Set(vistos).size).toBe(4);
+    }
+    const outra = await criarFonte('Outra pessoa da ficha fictícia');
+    const vazio = await requisitar({ metodo: 'GET', rota: `servidores/${outra.pessoaId}/documentos`, sessao: sessao('admin') });
+    expect(documentosServidorSchema.parse(JSON.parse(vazio.corpo)).itens).toEqual([]);
+    for (const sufixo of ['ficha', 'documentos']) {
+      expect((await requisitar({ metodo: 'GET', rota: `servidores/${fonte.pessoaId}/${sufixo}` })).status).toBe(401);
+      expect((await requisitar({ metodo: 'GET', rota: `servidores/invalido/${sufixo}`, sessao: sessao('admin') })).status).toBe(400);
+      expect((await requisitar({ metodo: 'GET', rota: `servidores/${randomUUID()}/${sufixo}`, sessao: sessao('admin') })).status).toBe(404);
+    }
+    expect((await requisitar({ metodo: 'GET', rota: `servidores/${fonte.pessoaId}/documentos?limite=51`, sessao: sessao('admin') })).status).toBe(400);
+    expect(await auditorias('ficha_servidor_consultada', fonte.pessoaId)).toBe(3);
+    expect(await auditorias('documentos_servidor_consultados', fonte.pessoaId)).toBeGreaterThan(0);
+    const cancelado = await requisitar({ metodo: 'POST', rota: `documentos/${emitida.id}/cancelar`, sessao: sessao('admin'),
+      corpo: { motivo: 'Cancelamento da ficha fictícia', confirmar: true } });
+    expect(cancelado.status, cancelado.corpo).toBe(200);
+    expect((await consultar('admin')).itens.find((item) => item.id === emitida.id)?.situacao).toBe('cancelado');
+    expect((await consultar('analista')).itens.some((item) => item.id === emitida.id)).toBe(false);
+    const dof = await prepararDofConferida();
+    const pessoaDof = await banco().query<{ pessoa_id: string }>('SELECT pessoa_id FROM documentos.documento WHERE id = $1', [dof.documentoId]);
+    for (const quem of ['analista', 'coordenador', 'coordenador2', 'admin']) {
+      const resposta = await requisitar({ metodo: 'GET', rota: `servidores/${pessoaDof.rows[0].pessoa_id}/documentos`, sessao: sessao(quem) });
+      expect(resposta.status, resposta.corpo).toBe(200);
+      const documentos = documentosServidorSchema.parse(JSON.parse(resposta.corpo));
+      expect(documentos.itens.map((item) => item.id)).toEqual(quem === 'coordenador2' ? [] : [dof.documentoId]);
+    }
   });
 });

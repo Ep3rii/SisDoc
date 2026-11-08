@@ -1,5 +1,24 @@
 # Pontos de memória do projeto
 
+## Ficha do servidor — 08/11/2026
+
+Início é a entrada de todos os perfis. Busca por matrícula abre diretamente
+a ficha quando há uma única pessoa em todas as páginas; ambiguidades
+permanecem na lista. Cartões por vínculo levam ao cálculo DOF; DTCs recebem
+o servidor/vínculo sem nova busca. Admin consulta, mas não cria documentos.
+Documentos por pessoa preservam visibilidade e paginação na API; histórico
+funcional do Núcleo tem contagem total e abre sob demanda. Referências e
+edição cadastral continuam disponíveis, sem mudança do motor de cálculo.
+GET `servidores/:id/ficha` e `servidores/:id/documentos`, sem migração.
+
+Typecheck/build e 30 testes focados passaram, incluindo integração real
+descartável com 52 vínculos e aceite de três interações no navegador.
+Ficha observada em 1366/768/390 px com dados fictícios. Instalação única
+reiniciada, serviços ativos; HTTPS validado sem ignorar certificados:
+health `200`, novas rotas sem sessão `401`, Caddy `200`, seis assets e
+index iguais ao build. Base real não recebeu dados de teste.
+Detalhes e limites em [Progresso](../PROGRESSO.md).
+
 Entrada curta para agentes retomarem o trabalho sem reler todo o histórico.
 Atualizada em **05/11/2026**, com a decisão de manter uma instalação editável
 única chamada Produção.

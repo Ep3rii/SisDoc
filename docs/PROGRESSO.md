@@ -1,5 +1,39 @@
 # Progresso da construção
 
+## Ficha do servidor — 08/11/2026
+
+**Implementado:** Início após login/restauração para todos os perfis; matrícula
+inequívoca abre a ficha sem clique intermediário, consultando também páginas
+adicionais antes de decidir unicidade. Cabeçalho com matrícula/total de
+vínculos e Trocar servidor; cartões com cálculo DOF na linha; DTC IPAM,
+Comissionado e INSS recebem pessoa/vínculo selecionados. Documentos são
+consultados por pessoa com paginação real e visibilidade vigente. Histórico
+funcional do Núcleo aparece recolhido com contagem total; referências,
+eventos da fonte e edição cadastral continuam acessíveis separadamente.
+Novos GET `/servidores/:id/ficha` e `/servidores/:id/documentos`, contratos
+Zod, confirmação de sessão e auditoria. Sem migração ou alteração de cálculo.
+
+**Testado:** typecheck e build passaram; 30 testes focados aprovados após
+retentar apenas as falhas corrigidas. API com PostgreSQL descartável validou
+52 vínculos, contagens, paginação, DOF/DTC, emissões/cancelamentos e limites
+por perfil. Fixture DTC usa `pg_ctl` para iniciar sem token administrativo
+e encerrar o PostgreSQL temporário. Navegador com API inteiramente fictícia
+validou digitar matrícula → Enter → Calcular DOF, três DTCs pré-selecionadas,
+ambiguidade entre páginas, perfil admin, referências e histórico sob demanda.
+Capturas observadas em 1366, 768 e 390 px, sem overflow da página.
+
+**Instalado:** serviço SisDoc reiniciado respeitando a dependência do Caddy;
+ambos ativos. HTTPS com validação de cadeia/hostname: API health `200`,
+ambas as novas rotas sem sessão `401`, proxy `200`; index e seis assets
+servidos iguais ao build. O proxy usa sua própria CA, distinta da API.
+Sem autenticar manualmente nem gravar fixtures na base real.
+
+**Limites:** não foi executada a suíte completa. Testes legados de texto
+vazio de encaminhados, categorias antigas do menu e destino antigo de
+importação seguem desatualizados; o teste de referências foi adaptado e passou.
+Contagem funcional refere-se aos registros do Núcleo, não soma eventos da
+fonte nem inventa o histórico que ainda será importado.
+
 ## Busca de servidor unificada — 08/11/2026
 
 **Implementado:** componente compartilhado no topo e no centro do Início;

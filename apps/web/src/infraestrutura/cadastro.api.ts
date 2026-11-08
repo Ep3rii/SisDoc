@@ -1,5 +1,7 @@
 import {
   detalheServidorSchema,
+  fichaServidorSchema,
+  documentosServidorSchema,
   paginaBuscaServidoresSchema,
   paginaEventosServidorSchema,
   resultadoEdicaoServidorSchema,
@@ -13,6 +15,12 @@ import {
 import { parametros, requisitar, validar } from './http';
 
 export const cadastroApi = {
+  async fichaServidor(id: string) {
+    return validar(fichaServidorSchema, await requisitar(`servidores/${id}/ficha`));
+  },
+  async documentosServidor(id: string, cursor?: string) {
+    return validar(documentosServidorSchema, await requisitar(`servidores/${id}/documentos?${parametros(cursor)}`));
+  },
   /** Pesquisa no banco local em páginas de 50; ausência de termo usa ordem natural da matrícula. */
   async buscarServidores(q?: string, tipo?: TipoBuscaServidor, cursor?: string): Promise<PaginaBuscaServidores> {
     const consulta = new URLSearchParams({ limite: '50' });
