@@ -96,6 +96,19 @@ importação seguem desatualizados; o teste de referências foi adaptado e passo
 Contagem funcional refere-se aos registros do Núcleo, não soma eventos da
 fonte nem inventa o histórico que ainda será importado.
 
+## Revisão dos invariantes — 08/11/2026
+
+**Implementado:** `docs/ia/INVARIANTES.md` organizado por temas e
+identificadores, preservando as regras anteriores e explicitando a
+instalação única em Produção. Esclarecidas manutenção com commit/backup,
+recursos de teste descartáveis, cancelamento/exclusão, ajustes documentais,
+edição cadastral, auditoria e distribuição da CA pública sem chaves privadas.
+Decisões e testes representativos estão vinculados; isso não declara
+conformidade funcional nem execução desses testes.
+
+**Escopo:** somente documentação, sem build, publicação, reinício ou
+alteração de banco. A revisão não autoriza operações administrativas.
+
 ## Busca de servidor unificada — 08/11/2026
 
 **Implementado:** componente compartilhado no topo e no centro do Início;

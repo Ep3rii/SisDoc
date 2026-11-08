@@ -55,6 +55,13 @@ Atualizada em **05/11/2026**, com a decisão de manter uma instalação editáve
 
 ## Habilidades locais do Copilot — 08/11/2026
 
+O [documento de invariantes](INVARIANTES.md) foi reorganizado por tema com
+identificadores estáveis. Explicita Produção como único ambiente, recursos
+descartáveis de teste sem duplicação operacional, salvaguardas de manutenção,
+cancelamento versus exclusão e ajustes documentais versus edição cadastral.
+Referências de testes são orientações de cobertura, não provas de conformidade.
+Esta revisão é documental; não altera comportamento, serviços ou banco.
+
 Instaladas em `.github/skills`: `sisdoc-inspecao-visual`,
 `sisdoc-testes-depuracao` e `sisdoc-api-dados`. Consulte o catálogo em
 `.github/copilot-instructions.md`. São fluxos locais adaptados ao ambiente

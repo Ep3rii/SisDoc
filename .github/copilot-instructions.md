@@ -10,6 +10,20 @@ Produção é usada só pelo dev, sem usuários externos. Fluxo do analista: loc
 - Leia [Recapitulação](../docs/ia/RECAPITULACAO.md) e consulte só o que a tarefa exigir.
 - Antes de mudar comportamento, confira [Invariantes](../docs/ia/INVARIANTES.md) e a decisão aplicável em [Decisões](../docs/decisoes/).
 
+## Habilidades do projeto
+
+Disponíveis em `.github/skills` para o Copilot no VS Code:
+
+- `/sisdoc-inspecao-visual`: navegador, responsividade e acessibilidade.
+- `/sisdoc-testes-depuracao`: reprodução de bugs e testes focados isolados.
+- `/sisdoc-api-dados`: contratos, API, cálculos e persistência segura.
+
+Abra **Chat: Open Customizations → Skills** ou digite `/` em uma nova
+conversa para conferir a descoberta. As habilidades são instruções locais,
+não instalam ferramentas nem autorizam operações na base real. A inspeção
+visual exige ferramentas de navegador disponíveis no agente; não amplia
+permissões automaticamente.
+
 ## Código e produção
 
 - Editar direto na fonte, em passos pequenos, sem camadas, flags ou ambientes extras.
