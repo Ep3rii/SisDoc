@@ -1,0 +1,31 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "estado": "carregando",
+    "zoom": 100
+  },
+  "tela": "dtcs-devolvidas",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1280,
+    "scrollWidth": 1280,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

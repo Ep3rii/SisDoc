@@ -1,0 +1,40 @@
+{
+  "config": {
+    "perfil": "analista",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "estado": "vazio",
+    "zoom": 100
+  },
+  "tela": "inicio",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1920,
+    "scrollWidth": 1920,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "INPUT",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Primeira página de resultados",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página de resultados",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 1
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

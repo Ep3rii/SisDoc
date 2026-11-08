@@ -1,0 +1,94 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "estado": "texto-longo",
+    "zoom": 100
+  },
+  "tela": "importacao-historico",
+  "axe": [
+    {
+      "id": "scrollable-region-focusable",
+      "impact": "serious",
+      "tags": [
+        "cat.keyboard",
+        "wcag2a",
+        "wcag211",
+        "wcag213",
+        "TTv5",
+        "TT4.a",
+        "EN-301-549",
+        "EN-9.2.1.1",
+        "EN-9.2.1.3",
+        "RGAAv4",
+        "RGAA-7.3.2"
+      ],
+      "description": "Ensure elements that have scrollable content are accessible by keyboard",
+      "help": "Scrollable region must have keyboard access",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/scrollable-region-focusable?application=axeAPI",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "focusable-content",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element should have focusable content"
+            },
+            {
+              "id": "focusable-element",
+              "data": null,
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element should be focusable"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<div class=\"tabela\">",
+          "target": [
+            "#_r_1_-painel-historico > .tabela"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+        }
+      ]
+    }
+  ],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1366,
+    "scrollWidth": 1366,
+    "fontesPequenas": [
+      "button.:12.8px",
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Primeira página",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

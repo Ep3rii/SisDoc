@@ -1,0 +1,40 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "estado": "texto-longo",
+    "zoom": 100
+  },
+  "tela": "dtcs-encaminhadas",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1280,
+    "scrollWidth": 1280,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Anterior",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

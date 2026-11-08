@@ -1,0 +1,175 @@
+{
+  "config": {
+    "perfil": "analista",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "estado": "texto-longo",
+    "zoom": 100
+  },
+  "tela": "dof-conferencia",
+  "axe": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "fgColor": "#566a78",
+                "bgColor": "#dce1e5",
+                "contrastRatio": 4.27,
+                "fontSize": "9.4pt (12.48px)",
+                "fontWeight": "normal",
+                "messageKey": null,
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<aside class=\"painel-previa\" aria-label=\"Prévia do documento\">",
+                  "target": [
+                    ".painel-previa"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element has insufficient color contrast of 4.27 (foreground color: #566a78, background color: #dce1e5, font size: 9.4pt (12.48px), font weight: normal). Expected contrast ratio of 4.5:1"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<p class=\"identificador-documento\">Prévia do documento · sem validade oficial</p>",
+          "target": [
+            ".painel-previa > .identificador-documento"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.27 (foreground color: #566a78, background color: #dce1e5, font size: 9.4pt (12.48px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ]
+    }
+  ],
+  "incompletos": [
+    {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-7.1.1"
+      ],
+      "description": "Ensure ARIA attributes are not prohibited for an element's role",
+      "help": "Elements must only use permitted ARIA attributes",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/aria-prohibited-attr?application=axeAPI",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
+                "nodeName": "div",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on a div with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<div class=\"acoes controles-previa\" aria-label=\"Exibição da prévia\">",
+          "target": [
+            ".controles-previa"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on a div with no valid role attribute."
+        },
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
+                "nodeName": "footer",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on a footer with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<footer class=\"barra-totais\" aria-label=\"Totais calculados da DOF\">",
+          "target": [
+            "footer"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on a footer with no valid role attribute."
+        }
+      ]
+    }
+  ],
+  "medidas": {
+    "largura": 1366,
+    "scrollWidth": 1366,
+    "fontesPequenas": [
+      "button.:12.8px",
+      "button.secundario:12.8px",
+      "button.secundario:12px",
+      "dt.:10.4px",
+      "label.:12px",
+      "label.ajuste-paineis:12px",
+      "p.:12.48px",
+      "p.:12.8px",
+      "p.identificador-documento:12.48px",
+      "span.:12px",
+      "strong.:12.8px",
+      "summary.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "alturaPrevia": 386.75,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Salvar alterações",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Emitir PDF · após conferir",
+        "razao": 7.299514841322216
+      }
+    ],
+    "primarios": 1
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

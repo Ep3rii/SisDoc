@@ -1,0 +1,88 @@
+{
+  "config": {
+    "perfil": "coordenador",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "dofs-conferidas",
+  "axe": [],
+  "incompletos": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span aria-hidden=\"true\"> ↓</span>",
+          "target": [
+            ".ordenar-coluna.secundario[type=\"button\"] > span[aria-hidden=\"true\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        }
+      ]
+    }
+  ],
+  "medidas": {
+    "largura": 1024,
+    "scrollWidth": 1024,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px",
+      "summary.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Emitir 0 documento(s) selecionado(s)",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Anterior",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 2
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

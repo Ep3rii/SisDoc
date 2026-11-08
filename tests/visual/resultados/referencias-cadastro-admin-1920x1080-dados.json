@@ -1,0 +1,65 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "referencias-cadastro",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1920,
+    "scrollWidth": 1920,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "dt.:11.52px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Primeira página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Primeira página de sugestões",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Próxima página de sugestões",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Primeira página de referências",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Próxima página de referências",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Primeira página de histórico",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Próxima página de histórico",
+        "razao": 7.299514841322216
+      }
+    ],
+    "primarios": 9
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

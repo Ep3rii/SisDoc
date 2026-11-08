@@ -1,0 +1,45 @@
+{
+  "config": {
+    "perfil": "coordenador",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "estado": "lista-longa",
+    "zoom": 100
+  },
+  "tela": "historico-financeiro",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1024,
+    "scrollWidth": 1024,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "dt.:11.52px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Primeira página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Primeira página de histórico",
+        "razao": 7.299514841322216
+      }
+    ],
+    "primarios": 53
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

@@ -1,0 +1,42 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "importacao",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1024,
+    "scrollWidth": 1024,
+    "fontesPequenas": [
+      "button.:12.8px",
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "span.numero-etapa:11.52px",
+      "strong.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Validar arquivo",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Guardar lote e revisar mapeamento",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 1
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

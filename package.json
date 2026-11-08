@@ -20,6 +20,8 @@
     "aprovar-modelo": "node apps/api/dist/setup/aprovar-modelo.cli.js",
     "importacao": "node apps/api/dist/importacao/importacao.cli.js",
     "importacao:conferir": "node apps/api/dist/importacao/conferir.cli.js",
+    "test:visual": "npm run build && node scripts/executar-testes.cjs tests/visual/auditoria.test.ts tests/modelos-oficiais.test.ts tests/nome-pdf.test.ts tests/interface-usuarios.test.ts tests/interface-rascunhos.test.ts tests/interface-dtc.test.ts",
+    "test:visual:report": "powershell -NoProfile -Command \"Start-Process tests\\visual\\relatorio.html\"",
     "test": "npm run build && node scripts/executar-testes.cjs"
   },
   "devDependencies": {
@@ -27,6 +29,7 @@
     "@types/node": "24.10.0",
     "@types/node-forge": "1.3.14",
     "@types/pg": "8.23.1",
+    "axe-core": "4.11.0",
     "embedded-postgres": "16.15.0-beta.19",
     "fast-check": "4.10.2",
     "node-forge": "1.4.2",

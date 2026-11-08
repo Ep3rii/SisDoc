@@ -1,0 +1,336 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "estado": "lista-longa",
+    "zoom": 100
+  },
+  "tela": "historico-emissoes",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1280,
+    "scrollWidth": 1280,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/2",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/4",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/6",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/8",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/10",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/12",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/14",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/16",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/18",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/20",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/22",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/24",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/26",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/28",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/30",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/32",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/34",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/36",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/38",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/40",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/42",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/44",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/46",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/48",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      },
+      {
+        "texto": "Baixar PDF da emissão DOF/2026/50",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Confirmar exclusão física",
+        "razao": 10.463765917745874
+      }
+    ],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

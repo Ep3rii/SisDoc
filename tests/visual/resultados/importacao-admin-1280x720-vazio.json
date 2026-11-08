@@ -1,0 +1,30 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "estado": "vazio",
+    "zoom": 100
+  },
+  "tela": "importacao",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1280,
+    "scrollWidth": 1280,
+    "fontesPequenas": [
+      "button.:12.8px",
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "span.numero-etapa:11.52px",
+      "strong.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "primarios": 1
+  },
+  "erros": [],
+  "rotasInesperadas": []
+}

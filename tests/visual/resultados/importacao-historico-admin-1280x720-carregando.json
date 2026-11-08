@@ -1,0 +1,37 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "estado": "carregando",
+    "zoom": 100
+  },
+  "tela": "importacao-historico",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1280,
+    "scrollWidth": 1280,
+    "fontesPequenas": [
+      "button.:12.8px",
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

@@ -1,0 +1,26 @@
+{
+  "config": {
+    "perfil": "sem-login",
+    "estado": "dados",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "zoom": 150
+  },
+  "tela": "login",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 911,
+    "scrollWidth": 911,
+    "fontesPequenas": [],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [],
+    "primarios": 1
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

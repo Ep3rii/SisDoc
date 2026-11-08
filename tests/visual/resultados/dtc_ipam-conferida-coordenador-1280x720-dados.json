@@ -1,0 +1,141 @@
+{
+  "config": {
+    "perfil": "coordenador",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "dtc_ipam-conferida",
+  "axe": [],
+  "incompletos": [
+    {
+      "id": "aria-prohibited-attr",
+      "impact": "serious",
+      "tags": [
+        "cat.aria",
+        "wcag2a",
+        "wcag412",
+        "EN-301-549",
+        "EN-9.4.1.2",
+        "RGAAv4",
+        "RGAA-7.1.1"
+      ],
+      "description": "Ensure ARIA attributes are not prohibited for an element's role",
+      "help": "Elements must only use permitted ARIA attributes",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/aria-prohibited-attr?application=axeAPI",
+      "nodes": [
+        {
+          "any": [],
+          "all": [],
+          "none": [
+            {
+              "id": "aria-prohibited-attr",
+              "data": {
+                "role": null,
+                "nodeName": "div",
+                "messageKey": "noRoleSingular",
+                "prohibited": [
+                  "aria-label"
+                ]
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "aria-label attribute is not well supported on a div with no valid role attribute."
+            }
+          ],
+          "impact": "serious",
+          "html": "<div class=\"acoes controles-previa\" aria-label=\"Exibição da prévia\">",
+          "target": [
+            ".controles-previa"
+          ],
+          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on a div with no valid role attribute."
+        }
+      ]
+    },
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "contrastRatio": 0,
+                "fontSize": "12.0pt (16px)",
+                "fontWeight": "normal",
+                "messageKey": "elmPartiallyObscured",
+                "expectedContrastRatio": "4.5:1"
+              },
+              "relatedNodes": [
+                {
+                  "html": "<textarea maxlength=\"2000\" style=\"\"></textarea>",
+                  "target": [
+                    "textarea"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Element's background color could not be determined because it's partially obscured by another element"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<textarea maxlength=\"2000\" style=\"\"></textarea>",
+          "target": [
+            "textarea"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
+        }
+      ]
+    }
+  ],
+  "medidas": {
+    "largura": 1280,
+    "scrollWidth": 1280,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "button.secundario:12px",
+      "dt.:11.52px",
+      "label.:12px",
+      "label.ajuste-paineis:12px",
+      "li.:12.8px",
+      "p.:12.48px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px",
+      "summary.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": 460.203125,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Devolver para rascunho",
+        "razao": 10.463765917745874
+      }
+    ],
+    "primarios": 1
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

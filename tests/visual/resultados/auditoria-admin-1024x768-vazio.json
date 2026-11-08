@@ -1,0 +1,93 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "estado": "vazio",
+    "zoom": 100
+  },
+  "tela": "auditoria",
+  "axe": [],
+  "incompletos": [
+    {
+      "id": "th-has-data-cells",
+      "impact": "serious",
+      "tags": [
+        "cat.tables",
+        "wcag2a",
+        "wcag131",
+        "section508",
+        "section508.22.g",
+        "TTv5",
+        "TT14.b",
+        "EN-301-549",
+        "EN-9.1.3.1",
+        "RGAAv4",
+        "RGAA-5.7.1"
+      ],
+      "description": "Ensure that <th> elements and elements with role=columnheader/rowheader have data cells they describe",
+      "help": "Table headers in a data table must refer to data cells",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/th-has-data-cells?application=axeAPI",
+      "nodes": [
+        {
+          "any": [],
+          "all": [
+            {
+              "id": "th-has-data-cells",
+              "data": null,
+              "relatedNodes": [
+                {
+                  "html": "<th scope=\"col\">Identificador do usuário</th>",
+                  "target": [
+                    "th:nth-child(5)"
+                  ]
+                }
+              ],
+              "impact": "serious",
+              "message": "Table data cells are missing or empty"
+            }
+          ],
+          "none": [],
+          "impact": "serious",
+          "html": "<table><thead><tr><th scope=\"col\">Data e hora</th><th scope=\"col\">Ação</th><th scope=\"col\">Entidade</th><th scope=\"col\">Alvo administrativo</th><th scope=\"col\">Identificador do usuário</th></tr></thead><tbody></tbody></table>",
+          "target": [
+            "table"
+          ],
+          "failureSummary": "Fix all of the following:\n  Table data cells are missing or empty"
+        }
+      ]
+    }
+  ],
+  "medidas": {
+    "largura": 1024,
+    "scrollWidth": 1024,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Primeira página",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

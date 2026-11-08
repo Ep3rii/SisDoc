@@ -1,5 +1,17 @@
 # Pontos de memória do projeto
 
+## Auditoria visual — baseline validada — 08/11/2026
+
+Inventário autorizado e checkpoints seguintes dispensados. Suíte em
+`tests/visual`: 56 cenários, 1.832 combinações Chromium, quatro resoluções,
+perfis e estados fictícios; zoom emulado nas seis telas prioritárias.
+API inteiramente interceptada, sem acesso à base real. Axe-core acrescentado
+somente como devDependency; Playwright já existia. Build, tipos e 107 testes
+em seis arquivos aprovados. Baseline antes de qualquer correção de UI.
+Oito problemas agrupados no [relatório](../qa-visual-relatorio.md), incluindo
+foco encoberto e prévia de 80 px. Correções ainda pendentes; não declarar
+conformidade WCAG completa ou igualdade visual integral preview/PDF.
+
 ## Cadastro de usuários em modal — 08/11/2026
 
 Administração → Usuários mostra a lista primeiro. Novo usuário abre dialog

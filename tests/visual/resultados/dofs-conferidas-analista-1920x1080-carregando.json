@@ -1,0 +1,31 @@
+{
+  "config": {
+    "perfil": "analista",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "estado": "carregando",
+    "zoom": 100
+  },
+  "tela": "dofs-conferidas",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1920,
+    "scrollWidth": 1920,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [],
+    "primarios": 1
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

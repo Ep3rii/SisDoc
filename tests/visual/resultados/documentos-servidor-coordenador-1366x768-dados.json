@@ -1,0 +1,40 @@
+{
+  "config": {
+    "perfil": "coordenador",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "documentos-servidor",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1366,
+    "scrollWidth": 1366,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Primeira página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página de documentos",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 2
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

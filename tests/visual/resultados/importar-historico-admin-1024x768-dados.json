@@ -1,0 +1,57 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "importar-historico",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1024,
+    "scrollWidth": 1024,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "dt.:11.52px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Primeira página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Validar Histórico Funcional",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Confirmar importação",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Primeira página de histórico",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Próxima página de histórico",
+        "razao": 7.299514841322216
+      }
+    ],
+    "primarios": 7
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

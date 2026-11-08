@@ -1,0 +1,1130 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "estado": "lista-longa",
+    "zoom": 100
+  },
+  "tela": "dtcs-rascunhos",
+  "axe": [],
+  "incompletos": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "tags": [
+        "cat.color",
+        "wcag2aa",
+        "wcag143",
+        "TTv5",
+        "TT13.c",
+        "EN-301-549",
+        "EN-9.1.4.3",
+        "ACT",
+        "RGAAv4",
+        "RGAA-3.2.1"
+      ],
+      "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+      "help": "Elements must meet minimum color contrast ratio thresholds",
+      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/color-contrast?application=axeAPI",
+      "nodes": [
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<span aria-hidden=\"true\"> ↓</span>",
+          "target": [
+            ".ordenar-coluna.secundario[type=\"button\"] > span[aria-hidden=\"true\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-33333333-3333-4333-8333-333333333333\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(1) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000002\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(2) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000003\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(3) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000004\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(4) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000005\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(5) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000006\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(6) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000007\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(7) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000008\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(8) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000009\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(9) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000010\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(10) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000011\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(11) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000012\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(12) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000013\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(13) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000014\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(14) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000015\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(15) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000016\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(16) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000017\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(17) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000018\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(18) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000019\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(19) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000020\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(20) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000021\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(21) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000022\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(22) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000023\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(23) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000024\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(24) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000025\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(25) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000026\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(26) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000027\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(27) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000028\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(28) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000029\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(29) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000030\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(30) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000031\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(31) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000032\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(32) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000033\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(33) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000034\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(34) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000035\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(35) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000036\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(36) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000037\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(37) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000038\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(38) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000039\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(39) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000040\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(40) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000041\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(41) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000042\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(42) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000043\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(43) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000044\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(44) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000045\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(45) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000046\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(46) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000047\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(47) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000048\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(48) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000049\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(49) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        },
+        {
+          "any": [
+            {
+              "id": "color-contrast",
+              "data": {
+                "messageKey": "nonBmp"
+              },
+              "relatedNodes": [],
+              "impact": "serious",
+              "message": "Element content contains only non-text characters"
+            }
+          ],
+          "all": [],
+          "none": [],
+          "impact": "serious",
+          "html": "<button type=\"button\" class=\"secundario\" aria-label=\"Ações de Servidor fictício visual\" aria-expanded=\"false\" aria-controls=\"acoes-aaaaaaaa-aaaa-4aaa-8aaa-000000000050\">⋯</button>",
+          "target": [
+            ".linha-documento:nth-child(50) > .menu-acoes-documento > .secundario[type=\"button\"]"
+          ],
+          "failureSummary": "Fix any of the following:\n  Element content contains only non-text characters"
+        }
+      ]
+    }
+  ],
+  "medidas": {
+    "largura": 1024,
+    "scrollWidth": 1024,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "small.:10.8333px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Anterior",
+        "razao": 9.410012735368888
+      }
+    ],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

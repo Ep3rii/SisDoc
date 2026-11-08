@@ -1,5 +1,25 @@
 # Progresso da construção
 
+## Auditoria visual — baseline inicial — 08/11/2026
+
+**Implementado:** executor Playwright/axe com 56 cenários e respostas de API
+inteiramente fictícias. `npm run test:visual` compila e executa auditoria,
+modelos/PDFs, nomes e regressões DOF/DTC/usuários; `test:visual:report` abre
+relatório local. Axe-core é a única dependência nova, apenas de teste.
+
+**Testado:** 1.832 combinações Chromium; quatro resoluções, perfis e estados
+aplicáveis, zoom 125%/150% em seis telas prioritárias. 107 testes em seis
+arquivos, build e tipos aprovados; 747 segundos. Nenhuma chamada de API
+inesperada/runtime. Fontes pequenas, contraste 4,27:1, regiões sem foco,
+campos encobertos e prévia com 80 px reproduzidos. Evidências e oito grupos
+de problemas em [QA visual](qa-visual-relatorio.md).
+
+**Servido:** build atual recompilado, mas interface ainda sem correções.
+Nenhum dado real criado/editado/excluído pelos testes; sem mudança de serviços,
+schema, regras, autenticação ou auditoria. Três agentes de cenários acionados
+em paralelo retornaram vazios; implementação/calibração realizadas diretamente.
+Pendente: corrigir lotes, repetir suíte e conferir assets servidos.
+
 ## Cadastro de usuários em modal — 08/11/2026
 
 **Implementado:** Usuários cadastrados primeiro, Novo usuário abre dialog

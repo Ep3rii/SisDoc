@@ -1,0 +1,48 @@
+{
+  "config": {
+    "perfil": "analista",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "estado": "vazio",
+    "zoom": 100
+  },
+  "tela": "historico-funcional",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1280,
+    "scrollWidth": 1280,
+    "fontesPequenas": [
+      "button.secundario:12.8px",
+      "p.:12.8px",
+      "span.:12px",
+      "strong.:12.8px"
+    ],
+    "foco": "BUTTON",
+    "alturaPrevia": null,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Primeira página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página de documentos",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Primeira página de histórico",
+        "razao": 7.299514841322216
+      },
+      {
+        "texto": "Próxima página de histórico",
+        "razao": 7.299514841322216
+      }
+    ],
+    "primarios": 5
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}
