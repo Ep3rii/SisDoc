@@ -25,6 +25,15 @@ correção e reteste em 24 combinações. Consolidado sem foco encoberto nem pr�
 insuficiente; tipos aprovados. Sem lote revertido. Pendente: importantes,
 refinamentos, rodada completa seguinte e conferência dos assets servidos.
 
+**Diagnóstico ampliado:** lote de fontes/acessibilidade `bff4808` revertido
+por `9b99d06`; tentativa isolada de foco `bbb4f15` revertida por `e42a030`.
+60 Tabs expuseram causa comum: preview crescia junto com a rolagem e deslocava
+o retorno. Altura normal agora limitada ao viewport (65%, mínimo 240 px).
+Sete cenários DOF/preview e diagnóstico fictício passaram; documento estabiliza
+em 1.146 px em vez de crescer 250 px a cada rolagem. Evidências VIS-10 no QA.
+Código experimental de foco não permanece. Importantes ainda a reaplicar
+depois dessa correção de causa; sem alteração de motor/API/base real.
+
 ## Cadastro de usuários em modal — 08/11/2026
 
 **Implementado:** Usuários cadastrados primeiro, Novo usuário abre dialog

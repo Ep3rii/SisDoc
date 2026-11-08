@@ -1,0 +1,21 @@
+{
+  "tela": "dof-periodo",
+  "perfil": "admin",
+  "viewport": "1366x768",
+  "estado": "dados",
+  "primeiraMedicao": {
+    "scrollY": 266,
+    "alturaDocumento": 1146,
+    "focoTop": 564.875,
+    "focoBottom": 608.46875,
+    "rodapeTop": 702.625
+  },
+  "aposScrollIntoView": {
+    "scrollY": 378,
+    "alturaDocumento": 1146,
+    "focoTop": 452.875,
+    "focoBottom": 496.46875,
+    "rodapeTop": 702.625
+  },
+  "resultado": "Altura estabilizada; retorno acessivel acima da barra fixa"
+}

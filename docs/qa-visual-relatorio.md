@@ -112,6 +112,8 @@ Os commits e evidências depois serão registrados após cada rodada completa.
 | VIS-06 | Histórico de importação · admin · 1920×1080 · erro | Falha de listagem mantém “Carregando lotes...” | Importante · comunicação de estado | `importacao.tsx` | [captura](../tests/visual/evidencias/VIS-06-antes.png) | Pendente |
 | VIS-07 | Histórico funcional e editor DOF · admin · 1366×768 · dados | Datas civis apresentadas em ISO nos resumos e referências | Refinamento · português e datas | Apresentação dos históricos e DOF | [captura](../tests/visual/evidencias/VIS-07-antes.png) | Pendente |
 | VIS-08 | Ficha · analista · 1366×768 · dados | Múltiplos vínculos geram vários botões primários simultâneos | Refinamento · padrão visual do projeto | `detalhe.tsx` | [captura](../tests/visual/evidencias/VIS-08-antes.png) | Pendente |
+| VIS-09 | Usuários · admin · 1024×768 · texto longo | `min-width: max-content` impede quebra de nome e empurra ações para fora da área visível | Importante · leitura e texto longo | `estilos.css` | [captura](../tests/visual/evidencias/VIS-09-antes.png) | Pendente |
+| VIS-10 | Período DOF · admin · 1366×768 · dados | Altura da prévia cresce com a rolagem, deslocando continuamente o retorno aos rascunhos | Crítico · navegação, WCAG 2.1.1 | `previa-documento.tsx` | [medição](../tests/visual/evidencias/VIS-10-antes.json) | [medição](../tests/visual/evidencias/VIS-10-depois.json), [captura](../tests/visual/evidencias/VIS-10-depois.png) · lote de altura limitada |
 
 ### Lote crítico
 
@@ -124,5 +126,36 @@ Consolidado: 1.832 combinações sem erro, foco encoberto ou altura insuficiente
 Build web e tipos aprovados. Um filtro inicialmente ancorado não selecionou
 testes e não foi contado como validação; execução efetiva feita em seguida.
 
-Nenhum lote revertido. Importantes/refinamentos ainda pendentes; a próxima
-rodada completa também revalida integralmente as correções críticas.
+Lote inicial sem reversão. Os lotes seguintes e suas reversões estão abaixo;
+a próxima rodada completa revalida integralmente as correções críticas.
+
+### Lote de acessibilidade — reversão necessária
+
+Fontes, contraste, regiões com foco e erro de importação passaram nas
+1.832 combinações, mas os novos alvos de Tab expuseram foco ainda encoberto
+no visualizador e no retorno aos rascunhos. Primeira rodada: 105/107 passaram.
+Segunda tentativa ampliou a reserva de rolagem e estabilizou a medição por
+dois frames; Blocos/Usuários passaram, mas Período continuou falhando.
+Conforme a regra de duas tentativas, este lote é registrado e revertido.
+É necessário corrigir a proteção de foco da barra fixa antes de reaplicar
+os importantes; não considerar estas melhorias entregues por enquanto.
+
+Revertido `bff4808` por `9b99d06`. Uma tentativa isolada de proteger foco
+com evento e espaço adicional também falhou após duas tentativas:
+`bbb4f15`, revertido por `e42a030`. Não há alteração de autenticação ou
+tratamento de foco desse lote no estado final.
+
+### Causa isolada: altura do preview
+
+Aumentar a cobertura para 60 Tabs e dois frames de estabilização reproduziu
+o problema mesmo após reverter as fontes. Medição direta: rolar 250 px
+aumentava a altura do documento de 1.268 para 1.518 px; o retorno permanecia
+no mesmo ponto encoberto. O cálculo de altura usava a posição da prévia sem
+limite superior e criava esse crescimento.
+
+Correção no próprio visualizador: altura normal limitada a 65% do viewport,
+com mínimo de 240 px e ampliação preservada. A altura do documento estabilizou
+em 1.146 px e o retorno ficou acima do rodapé. Sete cenários DOF/preview e
+um diagnóstico passaram; tipos aprovados. Diagnóstico temporário removido,
+medidas e captura fictícia preservadas. A suíte permanente verifica mínimo,
+máximo e 60 passos de Tab. Este lote não altera cálculo documental ou dados.

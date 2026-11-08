@@ -1,0 +1,22 @@
+{
+  "tela": "dof-periodo",
+  "perfil": "admin",
+  "viewport": "1366x768",
+  "estado": "dados",
+  "contexto": "Diagnostico com API ficticia durante o lote de foco posteriormente revertido",
+  "primeiraMedicao": {
+    "scrollY": 250,
+    "alturaDocumento": 1268,
+    "focoTop": 718.625,
+    "focoBottom": 762.21875,
+    "rodapeTop": 702.625
+  },
+  "aposScrollIntoView": {
+    "scrollY": 500,
+    "alturaDocumento": 1518,
+    "focoTop": 718.625,
+    "focoBottom": 762.21875,
+    "rodapeTop": 702.625
+  },
+  "problema": "A altura do documento cresce junto com a rolagem e mantem o retorno sob a barra fixa"
+}

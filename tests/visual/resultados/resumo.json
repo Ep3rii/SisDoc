@@ -2,7 +2,13 @@
   "fase": "verificacao",
   "navegador": "Chromium",
   "telasExecutadas": [
-    "dof-blocos"
+    "editor-dof",
+    "dof-tabela",
+    "dof-periodo",
+    "dof-conferencia",
+    "dof-blocos",
+    "dof-conferida",
+    "preview-ampliado"
   ],
   "temaEscuro": "não suportado",
   "total": 1832,

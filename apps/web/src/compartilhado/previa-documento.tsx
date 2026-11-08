@@ -20,7 +20,8 @@ export function PreviaDocumento({ html, titulo }: { html: string; titulo: string
     setLargura(elemento.clientWidth);
     setAltura(!ampliada && window.innerWidth <= 1200
       ? Math.max(240, Math.floor(window.innerHeight * 0.65))
-      : Math.max(240, limite - elemento.getBoundingClientRect().top - 16));
+      : Math.max(240, Math.min(!ampliada ? Math.floor(window.innerHeight * 0.65) : window.innerHeight,
+        limite - elemento.getBoundingClientRect().top - 16)));
   }, [ampliada]);
   useLayoutEffect(atualizarDimensoes, [atualizarDimensoes, html]);
   useEffect(() => {

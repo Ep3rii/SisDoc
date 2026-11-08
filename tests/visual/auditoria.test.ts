@@ -140,14 +140,17 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
             return { largura: innerWidth, scrollWidth: document.documentElement.scrollWidth,
               fontesPequenas: [...pequenos].sort(), foco: document.activeElement?.tagName,
               alturaPrevia: document.querySelector('.janela-previa')?.getBoundingClientRect().height ?? null,
+              limiteAlturaPrevia: document.querySelector('dialog[open]') ? innerHeight : Math.max(240, Math.floor(innerHeight * 0.65)),
               contrasteDesabilitados,
               primarios: [...document.querySelectorAll('main button:not(.secundario):not(.perigo)')]
                 .filter((el) => el.getClientRects().length && !el.closest('[role="tablist"],nav')).length };
           });
           const focosEncobertos: string[] = [];
           if (config.estado === 'dados' && config.viewport.width === 1366 && config.zoom === 100) {
-            for (let i = 0; i < 30; i++) {
+            for (let i = 0; i < 60; i++) {
               await page.keyboard.press('Tab');
+              await page.evaluate(() => new Promise<void>((resolve) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
               const problema = await page.evaluate(() => {
                 const el = document.activeElement;
                 const barra = document.querySelector('.barra-totais');
@@ -164,6 +167,8 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
             ...(medidas.scrollWidth > medidas.largura + 1 ? ['layout:overflow-horizontal'] : []),
             ...(medidas.fontesPequenas.length ? ['conteudo:fonte-menor-13px'] : []),
             ...(medidas.alturaPrevia !== null && medidas.alturaPrevia < 240 ? ['preview:altura-insuficiente'] : []),
+            ...(medidas.alturaPrevia !== null && medidas.alturaPrevia > medidas.limiteAlturaPrevia + 1
+              ? ['preview:altura-sem-limite'] : []),
             ...(medidas.contrasteDesabilitados.some((item) => item.razao < 4.5) ? ['contraste:botao-desabilitado'] : []),
             ...(focosEncobertos.length ? ['teclado:foco-encoberto'] : [])];
           evidencias = {
@@ -179,6 +184,7 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
               .not.toContain('teclado:foco-encoberto');
             expect(registro.problemas, `Altura da prévia em ${cenario.id} ${nome}`)
               .not.toContain('preview:altura-insuficiente');
+            expect(registro.problemas).not.toContain('preview:altura-sem-limite');
           }
           expect(mock.inesperadas).toEqual([]);
           expect(erros).toEqual([]);
