@@ -14,6 +14,7 @@ import {
 } from '@sisdoc/contratos';
 import { useEffect, useRef, useState } from 'react';
 import { Abas } from '../compartilhado/abas';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { ErroApi, requisitar, validar } from '../infraestrutura/api';
 import { PromocaoLegado } from './promocao-legado';
@@ -127,7 +128,7 @@ const nomesOcorrencia: Record<RelatorioImportacao['ocorrencias'][number]['tipo']
 };
 
 function dataHora(valor: string | null): string {
-  return valor ? new Date(valor).toLocaleString('pt-BR') : '—';
+  return dataTabela(valor);
 }
 
 async function enviarArquivo(csrf: string, tipo: TipoImportacao, origem: string, modo: 'validar' | 'gravar', arquivo: File, destino: 'nucleo' | 'legado', aba?: string): Promise<RelatorioImportacao | RelatorioPlanilhaLegado> {

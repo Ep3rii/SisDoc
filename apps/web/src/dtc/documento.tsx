@@ -6,6 +6,7 @@ import {
 } from '@sisdoc/contratos';
 import { renderizarPreviaDtc } from '@sisdoc/templates';
 import { useEffect, useRef, useState } from 'react';
+import { AvisoAprovacaoModelo } from '../compartilhado/aviso-aprovacao-modelo';
 import { PainelEmissao } from '../documentos/emissao';
 import { api, ErroApi } from '../infraestrutura/api';
 import { dataBr, Papel } from './contexto';
@@ -99,13 +100,15 @@ export function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, o
             })}>Conferir</button></div>
         </>}
         {documento.status === 'conferido' && podeEmitir && <>
-          <div className="acoes"><button type="button" disabled={ocupado} onClick={() => void executar(async () => {
+          <div className="acoes">
+            <AvisoAprovacaoModelo />
+            <button type="button" disabled={ocupado} onClick={() => void executar(async () => {
             if (!window.confirm(`Emitir a ${ROTULOS_DTC[tipo]} de ${documento.nome}? Um número oficial será reservado.`)) return;
             if (chave.current?.revisao !== documento.revisao) chave.current = { revisao: documento.revisao, valor: crypto.randomUUID() };
             const resultado = await api.emitirDtc(csrf, id, chave.current.valor, { revisao: documento.revisao, provaFonte: fonte.provaFonte });
             if (resultado.documentoId !== id) throw new ErroApi(0, 'Não foi possível confirmar a emissão. Consulte o Histórico.');
             setEmissao(resultado);
-          })}>Emitir</button></div>
+          })}>Emitir PDF</button></div>
           <section className="zona-perigo"><h3>Devolução para ajustes</h3>
           <label>Motivo da devolução<textarea maxLength={2000} value={motivo} onChange={(evento) => {
             setMotivo(evento.target.value);

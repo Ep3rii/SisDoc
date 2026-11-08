@@ -1,6 +1,7 @@
 import type { PaginaConferidosDof, PreviaConferidaDof, SituacaoEmissao } from '@sisdoc/contratos';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { AvisoAprovacaoModelo } from '../compartilhado/aviso-aprovacao-modelo';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { PreviaDocumento } from '../compartilhado/previa-documento';
 import { PainelEmissao } from '../documentos/emissao';
@@ -156,7 +157,6 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
         <p>{selecionado.nome} — matrícula {selecionado.matricula}. Revisão {selecionado.revisao},
           conferida por {selecionado.conferidoPorNome} em{' '}
           {new Date(selecionado.conferidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}.</p>
-        <p>A conferência não aprova regras nem modelo. A emissão só é liberada depois da aprovação formal da regra e do modelo.</p>
         {(selecionado.fonteSelecionadaAlterada || previa?.fonteSelecionadaAlterada) && (
           <p className="aviso erro">A pessoa ou o vínculo mudou após a conferência. Devolva para revisão antes de emitir.</p>
         )}
@@ -171,6 +171,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
         {podeEmitir && (
           <div className="separado">
             <h3>Emitir DOF</h3>
+            <AvisoAprovacaoModelo />
             <p>A emissão reserva o número oficial, grava um snapshot imutável e gera o PDF. Depois de emitida, a DOF não pode ser editada; apenas cancelada.</p>
             <label className="marcador"><input type="checkbox" checked={revisado} disabled={ocupado}
               onChange={(evento) => setRevisado(evento.target.checked)} />
@@ -207,7 +208,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
       <h2 id="conferidos-titulo">DOFs conferidas</h2>
       <FiltrosLista filtro={filtro} antesAlterar={confirmarSaida} onAtualizar={() => setVersao((atual) => atual + 1)} />
       <p>{administrador ? 'Todas as DOFs conferidas são exibidas. O administrador pode emitir ou devolver documentos de qualquer autoria.'
-        : 'Somente suas DOFs e as encaminhadas a você são exibidas. A emissão é feita pelo coordenador.'} A emissão depende da aprovação formal da regra e do modelo.</p>
+        : 'Somente suas DOFs e as encaminhadas a você são exibidas. A emissão é feita pelo coordenador.'}</p>
       {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
       {podeEmitir && <EmissaoEmLote
         documentos={filtro.itens.filter((item) => !item.fonteSelecionadaAlterada)

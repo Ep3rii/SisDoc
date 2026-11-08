@@ -10,6 +10,26 @@ salvaguardas do banco permanecem separados do código. Ver
 [Ambiente único — Produção](AMBIENTE_PRODUCAO.md) e
 [decisão 035](decisoes/035-versoes-e-ambientes.md).
 
+## Ajustes de interface — 05/11/2026
+
+**Implementado:** datas de tabelas em `dd/mm/aaaa` (com hora mantida para
+registros de data/hora); contador de encaminhados azul; aviso de aprovação
+restrito aos controles de emissão PDF; login centralizado sem sidebar, com
+ícone acessível para mostrar/ocultar senha e sem preenchimento de usuário;
+menu da sidebar com rolagem própria e rodapé fixo; títulos de seção com 13 px
+ou mais; contrastes revisados; estilos primário/secundário/destrutivo
+uniformizados; estados vazios com ação quando há próximo passo; status da
+sincronização reduzido a ponto com tooltip.
+
+**Testado e instalado na versão única:** `npm run typecheck` e `npm run build`
+passaram. O navegador mostrou login responsivo em 390, 768 e 1366 px, sem
+sidebar e sem aviso de emissão no topo; health HTTPS `200`, rota privada sem
+sessão `401` e página Caddy `200`. Contrastes conferidos: textos pequenos
+cinza e estados desabilitados ajustados acima de 4,5:1. Serviços foram
+reiniciados e seguem ativos. Nenhuma sessão autenticada ou operação de banco
+foi usada; telas autenticadas compilam, mas não foram navegadas manualmente
+nesta rodada. Lógica de negócio não foi alterada.
+
 **Implementado e validado diretamente na instalação única:** o serviço
 Windows SisDoc usa `C:\SisDoc`; as cópias `v0.1.0`,
 `v0.1.0-candidate` e `v0.0.0-rollback` foram removidas após a troca. O

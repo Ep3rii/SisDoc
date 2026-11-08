@@ -123,7 +123,7 @@ export function DevolverRascunhoDof({
               onPendente(evento.target.value.length > 0);
             }} />
           </label>
-          <button type="submit">{ocupado ? 'Devolvendo...' : 'Devolver rascunho'}</button>
+          <button type="submit" className="perigo">{ocupado ? 'Devolvendo...' : 'Devolver rascunho'}</button>
         </fieldset>
       </form>
     </section>

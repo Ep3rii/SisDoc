@@ -1,5 +1,6 @@
 import { ROTULOS_DTC, type GrupoHistorico, type HistoricoEmissoes, type ItemHistorico } from '@sisdoc/contratos';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { api, ErroApi } from '../infraestrutura/api';
 import { baixarPdfEmissao, rotuloPdf } from './emissao';
@@ -30,7 +31,7 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, confirm
   const [confirmado, setConfirmado] = useState(false);
   const ativa = useRef(true);
   const filtro = useFiltroLista(dados?.itens ?? [], (item) =>
-    `${item.tipo} ${item.numero} ${item.nome ?? ''} ${item.matricula ?? ''} ${item.emitidoPorNome} ${item.status === 'cancelado' ? 'Cancelada' : 'Emitida'} ${new Date(item.emitidoEm).toLocaleString('pt-BR')}`);
+    `${item.tipo} ${item.numero} ${item.nome ?? ''} ${item.matricula ?? ''} ${item.emitidoPorNome} ${item.status === 'cancelado' ? 'Cancelada' : 'Emitida'} ${dataTabela(item.emitidoEm)}`);
 
   useEffect(() => {
     ativa.current = true;
@@ -176,7 +177,7 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, confirm
           <tbody>{filtro.itens.map((item) => (
             <tr key={item.emissaoId}>
               <td>{item.tipo === 'DOF' ? 'DOF' : ROTULOS_DTC[item.tipo]}</td><td>{item.numero}</td><td>{item.nome ?? '—'}</td><td>{item.matricula ?? '—'}</td>
-              <td>{new Date(item.emitidoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
+              <td>{dataTabela(item.emitidoEm)}</td>
               <td>{item.emitidoPorNome}</td>
               <td>{item.status === 'cancelado' ? 'Cancelada' : 'Emitida'}</td>
               <td>{rotuloPdf(item)}</td>

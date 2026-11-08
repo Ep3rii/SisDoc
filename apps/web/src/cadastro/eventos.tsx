@@ -2,6 +2,7 @@ import {
   type PaginaEventosServidor
 } from '@sisdoc/contratos';
 import { useEffect, useState } from 'react';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { api } from '../infraestrutura/api';
 import type { Props } from './contexto';
 
@@ -32,9 +33,9 @@ export function Eventos({ pessoaId, vinculoId, onErro, onLimpar }: Props & { pes
               <thead><tr><th scope="col">Tipo</th><th scope="col">Data</th><th scope="col">Ato</th><th scope="col">Publicação</th><th scope="col">Fonte</th></tr></thead>
               <tbody>{pagina.itens.map((evento) => (
                 <tr key={evento.id}>
-                  <td>{evento.tipo}</td><td>{evento.dataEvento ?? 'Não informada'}</td>
+                  <td>{evento.tipo}</td><td>{evento.dataEvento ? dataTabela(evento.dataEvento) : 'Não informada'}</td>
                   <td>{[evento.atoTipo, evento.atoNumero].filter(Boolean).join(' ') || 'Não informado'}</td>
-                  <td>{evento.dataPublicacao ?? 'Não informada'}</td>
+                  <td>{evento.dataPublicacao ? dataTabela(evento.dataPublicacao) : 'Não informada'}</td>
                   <td>{evento.fonte}{evento.removidoNaFonte ? ' — removido na fonte' : ''}</td>
                 </tr>
               ))}</tbody>

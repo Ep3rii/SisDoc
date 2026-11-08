@@ -292,7 +292,7 @@ export function BlocosDof({
                 <div className="acoes">
                   <button type="button" className="secundario" disabled={indice === 0} onClick={() => mover(indice, indice - 1)}>Subir bloco {indice + 1}</button>
                   <button type="button" className="secundario" disabled={indice === blocos.length - 1} onClick={() => mover(indice, indice + 1)}>Descer bloco {indice + 1}</button>
-                  {!salvos.has(bloco.id) && <button type="button" className="secundario"
+                  {!salvos.has(bloco.id) && <button type="button" className="perigo"
                     onClick={() => alterar(blocos.filter((atual) => atual.id !== bloco.id))}>Remover bloco novo {indice + 1}</button>}
                 </div>
               </section>

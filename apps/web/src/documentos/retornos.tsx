@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { retornosDeclaracoesSchema, type RascunhoDof, type TipoDtc } from '@sisdoc/contratos';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { api, requisitar, validar } from '../infraestrutura/api';
 import { CalculoDof } from '../dof/calculo-dof';
 import { Documento } from '../dtc/documento';
@@ -35,7 +36,7 @@ export function Retornos({ csrf, papel, onErro, onLimpar, onPendente, confirmarS
         {!pagina.itens.length && <p>Nenhum retorno pendente.</p>}
         <div className="tabela"><table><thead><tr><th>Tipo</th><th>Servidor</th><th>Matrícula</th><th>Devolução</th><th>Ação</th></tr></thead>
           <tbody>{pagina.itens.map((item) => <tr key={item.id}><td>{item.tipo}</td><td>{item.nome}</td><td>{item.matricula}</td>
-            <td>{new Date(item.devolvidoEm).toLocaleString('pt-BR')}</td><td><button type="button" onClick={() => {
+            <td>{dataTabela(item.devolvidoEm)}</td><td><button type="button" onClick={() => {
               if (item.tipo !== 'DOF') { setDtc({ id: item.id, tipo: item.tipo }); return; }
               api.obterRascunhoDof(item.id).then(setDof).catch(onErro);
             }}>Abrir para ajustes</button></td></tr>)}</tbody></table></div>

@@ -4,6 +4,7 @@ import {
 } from '@sisdoc/contratos';
 import { renderizarPreviaDtc } from '@sisdoc/templates';
 import { useCallback, useEffect, useState } from 'react';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { ExclusaoDocumento } from '../documentos/exclusao-documento';
 import { EmissaoEmLote, type DocumentoElegivelLote } from '../documentos/emissao-em-lote';
@@ -21,7 +22,7 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
   const [versao, setVersao] = useState(0);
   const [mensagem, setMensagem] = useState('');
   const filtro = useFiltroLista(pagina?.itens ?? [], (item) =>
-    `${item.nome} ${item.matricula} ${item.autorNome} ${item.revisao} ${item.status} ${new Date(item.atualizadoEm).toLocaleString('pt-BR')}`);
+    `${item.nome} ${item.matricula} ${item.autorNome} ${item.revisao} ${item.status} ${dataTabela(item.atualizadoEm)}`);
   const voltar = useCallback(() => {
     if (!confirmarSaida()) return;
     onPendente(false);
@@ -85,14 +86,21 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
           revisao: documento.revisao, provaFonte,
         })}
         onConcluido={() => setVersao((atual) => atual + 1)} onErro={onErro} onLimpar={onLimpar} onPendente={onPendente} />}
-      {!pagina ? <p role="status">Carregando...</p> : pagina.itens.length === 0 ? <p>Nenhum documento nesta situação.</p> : (
+      {!pagina ? <p role="status">Carregando...</p> : pagina.itens.length === 0 ? (
+        <div className="estado-vazio">
+          <p>{estado === 'rascunho' ? `Nenhum rascunho de ${ROTULOS_DTC[tipo]}.` : `Nenhuma ${ROTULOS_DTC[tipo]} conferida.`}</p>
+          {estado === 'rascunho' && papel !== 'admin' && <button type="button" onClick={() => {
+            onLimpar(); setModo({ tela: 'busca' });
+          }}>Criar nova {ROTULOS_DTC[tipo]}</button>}
+        </div>
+      ) : (
         <>
         <div className="tabela"><table>
           <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th><th scope="col">Revisão</th>
             <th scope="col">Atualizado em</th><th scope="col">Autor</th><th scope="col">Ações</th></tr></thead>
           <tbody>{filtro.itens.map((item) => (
             <tr key={item.id}><td>{item.nome}</td><td>{item.matricula}</td><td>{item.revisao}</td>
-              <td>{new Date(item.atualizadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td><td>{item.autorNome}</td>
+              <td>{dataTabela(item.atualizadoEm)}</td><td>{item.autorNome}</td>
               <td><div className="acoes">
                 <button type="button" className="secundario" onClick={() => { onLimpar(); setModo({ tela: 'documento', id: item.id }); }}>
                   Abrir <span className="sr-only">{item.nome}</span></button>

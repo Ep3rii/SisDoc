@@ -176,8 +176,8 @@ export function App() {
     : sessao?.usuario.papel === 'analista' ? ['proprio'] : ['todos'];
 
   return (
-    <div className="pagina">
-      <aside className={`barra-lateral${menuAberto ? ' aberta' : ''}`} aria-label="Menu principal">
+    <div className={`pagina${sessao ? '' : ' sem-sessao'}`}>
+      {sessao && <aside className={`barra-lateral${menuAberto ? ' aberta' : ''}`} aria-label="Menu principal">
         <div className="identidade"><span className="marca">SisDOC</span><span>SEMAD · Declarações funcionais</span></div>
         {sessao && !sessao.usuario.trocaSenhaObrigatoria && (
           <>
@@ -237,23 +237,24 @@ export function App() {
         )}
         {sessao && <div className="usuario-local">
           <p>Conectado como <strong>{sessao.usuario.nome}</strong> — {nomesPerfis[sessao.usuario.papel]}.</p>
-          <button type="button" className="cabecalho-botao" onClick={sair}>Sair</button>
+          <button type="button" className="secundario" onClick={sair}>Sair</button>
         </div>}
-      </aside>
+      </aside>}
       <div className="area-principal">
       <header className="cabecalho">
         {funcional && !sessao.usuario.trocaSenhaObrigatoria
           ? <BuscaGlobal onBuscar={(busca) => navegar('busca', busca)} onErro={tratarErro} />
           : <span>Declarações funcionais e de tempo de contribuição</span>}
-        {funcional && !sessao.usuario.trocaSenhaObrigatoria ? <EstadoSincronizacao key={`estado-${chaveTela}`} /> : <span className="estado-fonte">Consulta local</span>}
+        {funcional && !sessao.usuario.trocaSenhaObrigatoria ? <EstadoSincronizacao key={`estado-${chaveTela}`} /> : (
+          <span className="estado-fonte" role="status" tabIndex={0} title="Acesse o SisDoc para verificar a situação da sincronização."
+            aria-label="Acesse o SisDoc para verificar a situação da sincronização.">
+            <span className="ponto-status atencao" aria-hidden="true" />
+          </span>
+        )}
       </header>
       <main>
       <div className="conteudo">
         <h1 className="sr-only">DOF e DTC</h1>
-        <details className="situacao-implantacao">
-          <summary>Emissão oficial depende de aprovação do modelo · orientações</summary>
-          <p>Consulta, cálculo, rascunhos, prévia e conferência da DOF e das DTCs (IPAM, Comissionado e INSS) estão liberados. A emissão com número e PDF só é liberada, por tipo, depois que a regra e o modelo forem aprovados formalmente pelo administrador com npm run aprovar-modelo. Até lá, as regras e a prévia seguem identificadas como provisórias. Os totais da DTC Comissionado são inferidos e o modelo da DTC INSS é provisório (textos oficiais pendentes).</p>
-        </details>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}
         {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
@@ -277,7 +278,8 @@ export function App() {
               consulta={consulta}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf} administrador={sessao.usuario.papel === 'admin'}
-              onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
+              onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida}
+              onBuscarServidor={() => navegar('busca')} />}
             {podeSalvar && tela === 'retornos' && <Retornos key={chaveTela} csrf={sessao.csrf} papel={sessao.usuario.papel}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'conferidos' && <ConferidosDof key={chaveTela} csrf={sessao.csrf}

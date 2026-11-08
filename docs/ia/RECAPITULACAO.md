@@ -21,6 +21,20 @@ e seis assets servidos iguais ao build do checkout. As cópias de projeto nos
 diretórios de release foram removidas. Nenhuma gravação ou migração de banco
 foi executada.
 
+### Ajustes de interface — 05/11/2026
+
+Foram alinhadas datas em tabelas, badges, avisos de aprovação junto à emissão
+PDF, login (sem sidebar, centralizado e com ícone de senha), rolagem/rodapé da
+sidebar, títulos de seção, contraste, estilos de botões, estados vazios com
+ação contextual e indicador de sincronização por ponto com tooltip. A
+formatação compartilhada preserva datas civis sem deslocamento de fuso. Não
+houve mudança de lógica de negócio.
+
+Typecheck/build passaram e a aplicação foi reiniciada. Login foi verificado no
+navegador em 390, 768 e 1366 px; health `200`, rota privada sem sessão `401`
+e proxy `200`. Telas autenticadas não foram navegadas manualmente; nenhuma
+autenticação ou escrita no banco foi realizada.
+
 ### Histórico da primeira publicação — 05/11/2026
 
 Em 05/11/2026 foi publicado o release local `v0.1.0`, commit `22f38b3`, no

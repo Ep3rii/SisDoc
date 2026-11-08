@@ -2,6 +2,7 @@ import {
   type DetalheServidor
 } from '@sisdoc/contratos';
 import { useEffect, useState } from 'react';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { CalculoDof } from '../dof/calculo-dof';
 import { api } from '../infraestrutura/api';
 import type { Props, ProtecaoEdicao } from './contexto';
@@ -83,7 +84,7 @@ export function Detalhe({ pessoaId, vinculoInicial, csrf, podeSalvar, podeEditar
                   <td>{[vinculo.cargo, vinculo.referencia].filter(Boolean).join(' / ') || 'Não informado'}</td>
                   <td>{[vinculo.classe, vinculo.nivel].filter(Boolean).join(' / ') || 'Não informado'}</td>
                   <td>{[vinculo.orgao, vinculo.setor].filter(Boolean).join(' / ') || 'Não informado'}</td>
-                  <td>{vinculo.admissao ?? 'Não informada'} / {vinculo.desligamento ?? 'Não informado'}</td>
+                  <td>{vinculo.admissao ? dataTabela(vinculo.admissao) : 'Não informada'} / {vinculo.desligamento ? dataTabela(vinculo.desligamento) : 'Não informado'}</td>
                   <td>{anterior?.matricula ?? (vinculo.matriculaAnteriorId ? 'Vínculo não visível nesta página' : '—')}</td>
                   <td><button type="button" className="secundario" onClick={() => trocarContexto(() => {
                     onLimpar(); setVinculoCalculo(null); setVinculoId(vinculo.id);

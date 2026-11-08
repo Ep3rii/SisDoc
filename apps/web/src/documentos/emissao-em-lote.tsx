@@ -1,5 +1,6 @@
 import type { SituacaoEmissao } from '@sisdoc/contratos';
 import { useState } from 'react';
+import { AvisoAprovacaoModelo } from '../compartilhado/aviso-aprovacao-modelo';
 import { PainelEmissao } from './emissao';
 import { PreviaDocumento } from '../compartilhado/previa-documento';
 import { ErroApi } from '../infraestrutura/api';
@@ -118,6 +119,7 @@ export function EmissaoEmLote({ documentos, carregar, emitir, onConcluido, onErr
   const resultados = Object.values(itens).filter((item) => item.situacao || item.erroEmissao);
   return <details className="emissao-lote">
     <summary>Emitir em lote · {documentos.length} documento(s) elegível(is) carregado(s)</summary>
+    <AvisoAprovacaoModelo />
     <p>Selecione documentos conferidos, revise cada prévia e confirme individualmente. As emissões são sequenciais, mantêm números e auditoria próprios; uma falha não desfaz as anteriores.</p>
     {documentos.length === 0 ? <p>Nenhum documento elegível carregado.</p> : <fieldset disabled={ocupado}>
       <legend>Documentos conferidos carregados</legend>

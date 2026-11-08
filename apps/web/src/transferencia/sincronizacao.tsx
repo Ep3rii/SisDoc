@@ -1,5 +1,6 @@
 import type { LoteSincronizacao, PaginaSincronizacoes, SituacaoSincronizacao } from '@sisdoc/contratos';
 import { useEffect, useState } from 'react';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { api } from '../infraestrutura/api';
 
 const nomesStatus: Record<LoteSincronizacao['status'], string> = {
@@ -15,7 +16,7 @@ const nomesTipo: Record<LoteSincronizacao['tipo'], string> = {
 };
 
 function dataHora(valor: string | null): string {
-  return valor ? new Date(valor).toLocaleString('pt-BR') : '—';
+  return dataTabela(valor);
 }
 
 function useSituacaoSincronizacao(): SituacaoSincronizacao | null {
@@ -39,11 +40,21 @@ function textoUltima(situacao: SituacaoSincronizacao): string {
 // Estado discreto no cabeçalho, sem ocupar espaço na área de trabalho.
 export function EstadoSincronizacao() {
   const situacao = useSituacaoSincronizacao();
-  let texto = 'Consulta local';
-  if (situacao && !situacao.configurada) texto = 'Consulta local · sincronização não configurada';
-  else if (situacao?.ultimaSincronizacaoEm) texto = `Consulta local · sincronizado em ${dataHora(situacao.ultimaSincronizacaoEm)}`;
-  else if (situacao) texto = 'Consulta local · sem sincronização concluída';
-  return <span className="estado-fonte">{texto}</span>;
+  let texto = 'Consulta local; estado da sincronização desconhecido.';
+  let emAtencao = true;
+  if (situacao && !situacao.configurada) {
+    texto = 'Consulta local; sincronização não configurada.';
+    emAtencao = true;
+  } else if (situacao?.ultimaSincronizacaoEm) {
+    texto = `Consulta local; última sincronização em ${dataHora(situacao.ultimaSincronizacaoEm)}.`;
+    emAtencao = situacao.avisoAtraso || situacao.disjuntorAberto;
+  } else if (situacao) {
+    texto = 'Consulta local; nenhuma sincronização concluída.';
+    emAtencao = true;
+  }
+  return <span className="estado-fonte" role="status" tabIndex={0} title={texto} aria-label={texto}>
+    <span className={`ponto-status${emAtencao ? ' atencao' : ''}`} aria-hidden="true" />
+  </span>;
 }
 
 // Aviso informativo, exibido só após o limite ou com o disjuntor aberto; nunca bloqueia busca, cálculo, prévia ou emissão.

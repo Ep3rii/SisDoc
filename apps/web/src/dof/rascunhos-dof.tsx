@@ -1,5 +1,6 @@
 import type { PaginaEncaminhamentosDof, PaginaRascunhosDof, RascunhoDof } from '@sisdoc/contratos';
 import { useEffect, useRef, useState } from 'react';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { ExclusaoDocumento } from '../documentos/exclusao-documento';
 import { api } from '../infraestrutura/api';
@@ -13,9 +14,10 @@ type Props = {
   onLimpar: () => void;
   onPendente: (valor: boolean) => void;
   confirmarSaida: () => boolean;
+  onBuscarServidor?: () => void;
 };
 
-export function RascunhosDof({ csrf, recebidos = false, administrador = false, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
+export function RascunhosDof({ csrf, recebidos = false, administrador = false, onErro, onLimpar, onPendente, confirmarSaida, onBuscarServidor }: Props) {
   const [pagina, setPagina] = useState<PaginaRascunhosDof | PaginaEncaminhamentosDof | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [rascunho, setRascunho] = useState<RascunhoDof | null>(null);
@@ -25,7 +27,7 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
   const [versao, setVersao] = useState(0);
   const ativa = useRef(true);
   const filtro = useFiltroLista<PaginaRascunhosDof['itens'][number] | PaginaEncaminhamentosDof['itens'][number]>(pagina?.itens ?? [], (item) =>
-    `${item.nome} ${item.matricula} ${'autorNome' in item ? item.autorNome : ''} ${item.revisao} ${new Date(item.atualizadoEm).toLocaleString('pt-BR')}`);
+    `${item.nome} ${item.matricula} ${'autorNome' in item ? item.autorNome : ''} ${item.revisao} ${dataTabela(item.atualizadoEm)}`);
 
   useEffect(() => {
     ativa.current = true;
@@ -87,7 +89,12 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
         </button>
       ) : !pagina ? <p role="status">Carregando rascunhos...</p> : (
         <>
-          {pagina.itens.length === 0 ? <p>Nenhum rascunho encontrado.</p> : (
+          {pagina.itens.length === 0 ? (
+            <div className="estado-vazio">
+              <p>{recebidos ? 'Nenhum documento encaminhado para conferência.' : 'Nenhum rascunho encontrado.'}</p>
+              {!recebidos && !administrador && onBuscarServidor && <button type="button" onClick={onBuscarServidor}>Buscar servidor para criar uma DOF</button>}
+            </div>
+          ) : (
             <div className="tabela"><table>
               <thead><tr><th scope="col">Nome</th><th scope="col">Matrícula</th>{recebidos && <th scope="col">Autor</th>}<th scope="col">Revisão</th><th scope="col">Atualizado</th><th scope="col">Ações</th></tr></thead>
               <tbody>{filtro.itens.map((item) => {
@@ -96,7 +103,7 @@ export function RascunhosDof({ csrf, recebidos = false, administrador = false, o
                 <tr key={item.id}>
                   <td>{item.nome}</td><td>{item.matricula}</td>
                   {recebidos && <td>{'autorNome' in item ? item.autorNome : null}</td>}<td>{item.revisao}</td>
-                  <td>{new Date(item.atualizadoEm).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</td>
+                  <td>{dataTabela(item.atualizadoEm)}</td>
                   <td><div className="acoes">
                     <button type="button" className="secundario" disabled={Boolean(abrindo)} onClick={() => void abrir(item.id)}>
                       {abrindo === item.id ? 'Abrindo...' : 'Abrir'} <span className="sr-only">rascunho de {item.nome}, matrícula {item.matricula}</span>

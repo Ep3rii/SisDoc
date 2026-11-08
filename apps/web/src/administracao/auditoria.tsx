@@ -1,5 +1,6 @@
 import type { PaginaAuditoria } from '@sisdoc/contratos';
 import { useEffect, useState } from 'react';
+import { dataTabela } from '../compartilhado/datas-tabela';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { api } from '../infraestrutura/api';
 
@@ -9,7 +10,7 @@ export function Auditoria({ onErro }: { onErro: (erro: unknown) => void }) {
   const [versao, setVersao] = useState(0);
   const [falhou, setFalhou] = useState(false);
   const filtro = useFiltroLista(pagina?.itens ?? [], (item) =>
-    `${new Date(item.em).toLocaleString('pt-BR')} ${item.acao} ${item.entidade} ${item.entidadeId ?? ''} ${item.usuarioId ?? ''}`);
+    `${dataTabela(item.em)} ${item.acao} ${item.entidade} ${item.entidadeId ?? ''} ${item.usuarioId ?? ''}`);
   useEffect(() => {
     let ativa = true;
     setPagina(null);
@@ -37,7 +38,7 @@ export function Auditoria({ onErro }: { onErro: (erro: unknown) => void }) {
               <tbody>
                 {filtro.itens.map((evento) => (
                   <tr key={evento.id}>
-                    <td>{new Date(evento.em).toLocaleString('pt-BR')}</td><td>{evento.acao}</td><td>{evento.entidade}</td><td>{evento.entidadeId ?? '—'}</td>
+                    <td>{dataTabela(evento.em)}</td><td>{evento.acao}</td><td>{evento.entidade}</td><td>{evento.entidadeId ?? '—'}</td>
                     <td>{evento.usuarioId ?? 'Não identificado'}</td>
                   </tr>
                 ))}
