@@ -68,7 +68,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .estado-fonte:focus-visible { outline: 3px solid #d78300; outline-offset: 3px; border-radius: 999px; }
 .ponto-status { width: .65rem; height: .65rem; border-radius: 50%; background: #167447; box-shadow: 0 0 0 2px #eaf7ed; }
 .ponto-status.atencao { background: #8a5700; box-shadow: 0 0 0 2px #fff3d4; }
-.busca-global { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) auto; gap: .4rem; width: min(100%, 32rem); }
+.busca-global { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .4rem; width: min(100%, 32rem); }
+.busca-inicio { width: min(100%, 44rem); margin: 1.5rem auto; }
 .busca-global label { min-width: 0; }
 .busca-global input, .busca-global select { width: 100%; min-width: 0; padding: .5rem; border: 1px solid #ccd7df; border-radius: .3rem; background: #f7f9fc; }
 .conteudo { width: 100%; max-width: 1920px; margin-inline: auto; padding: clamp(.75rem, 1.5vw, 1.5rem) clamp(.75rem, 1.75vw, 2rem) 2rem; }
@@ -247,7 +248,7 @@ th { background: #e7eef2; }
   .usuario-local strong { display: inline; }
   .usuario-local button { margin-top: .4rem; }
   .cabecalho { padding: .6rem; min-height: 58px; }
-  .busca-global { grid-template-columns: 5rem minmax(0, 1fr) auto; font-size: .8rem; }
+  .busca-global { font-size: .8rem; }
   .area-dof { grid-template-columns: 1fr; }
   .conteudo { padding: 1rem; }
   .painel { padding: 1rem; }

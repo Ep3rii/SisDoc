@@ -4,6 +4,7 @@ import {
 } from '@sisdoc/contratos';
 import { renderizarPreviaDtc } from '@sisdoc/templates';
 import { useCallback, useEffect, useState } from 'react';
+import type { Consulta } from '../cadastro/contexto';
 import { dataTabela } from '../compartilhado/datas-tabela';
 import { FiltrosLista, useFiltroLista } from '../compartilhado/filtros-lista';
 import { ExclusaoDocumento } from '../documentos/exclusao-documento';
@@ -15,7 +16,9 @@ import { Documento } from './documento';
 import { Editor } from './editor';
 
 /** Alterna lista, seleção, editor e documento DTC preservando a confirmação de saída. */
-export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confirmarSaida }: Props) {
+export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confirmarSaida, onRegistrarBusca }: Props & {
+  onRegistrarBusca: (buscar: ((consulta: Consulta) => void) | null) => void;
+}) {
   const [modo, setModo] = useState<Modo>({ tela: 'lista' });
   const [estado, setEstado] = useState<'rascunho' | 'conferido'>('rascunho');
   const [pagina, setPagina] = useState<PaginaDtc | null>(null);
@@ -43,8 +46,8 @@ export function TelaDtc({ tipo, csrf, papel, onErro, onLimpar, onPendente, confi
   }, [modo.tela, estado, tipo, versao, onErro]);
 
   if (modo.tela === 'busca') {
-    return <BuscaServidor onSelecionar={(servidor) => setModo({ tela: 'novo', servidor })} onCancelar={voltar}
-      onErro={onErro} onLimpar={onLimpar} />;
+    return <BuscaServidor onSelecionar={(servidor) => setModo({ tela: 'novo', servidor })} onRegistrarBusca={onRegistrarBusca}
+      onErro={onErro} />;
   }
   if (modo.tela === 'novo') {
     return <div className="estudio-dof"><Editor tipo={tipo} inicial={conteudoInicial(tipo)} documento={null} servidor={modo.servidor} csrf={csrf}

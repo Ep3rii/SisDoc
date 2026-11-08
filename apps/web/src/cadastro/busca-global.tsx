@@ -1,35 +1,37 @@
 import {
   buscarServidoresQuerySchema
 } from '@sisdoc/contratos';
-import { type FormEvent } from 'react';
+import { useId, type FormEvent } from 'react';
 import { ErroApi } from '../infraestrutura/api';
 import type { Consulta } from './contexto';
 
 /** Valida critério e termo antes de solicitar navegação para a busca local. */
-export function BuscaGlobal({ onBuscar, onErro }: {
+export function BuscaGlobal({ onBuscar, onErro, inicio = false }: {
   onBuscar: (consulta: Consulta) => void; onErro: (erro: unknown) => void;
+  inicio?: boolean;
 }) {
-  /** Rejeita termos insuficientes ou CPF inválido sem disparar uma consulta ambígua. */
+  const orientacaoId = useId();
   function buscar(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     const valores = new FormData(evento.currentTarget);
-    const resultado = buscarServidoresQuerySchema.safeParse({ q: valores.get('q'), tipo: valores.get('tipo') });
+    const termo = valores.get('q');
+    const q = typeof termo === 'string' ? termo.trim() : '';
+    const tipo = /^\d+(?:-\d+)*$/.test(q) ? 'matricula' : 'nome';
+    const resultado = buscarServidoresQuerySchema.safeParse({ q, tipo });
     if (!resultado.success || !resultado.data.tipo || !resultado.data.q) {
-      onErro(new ErroApi(400, 'Informe nome com ao menos três caracteres, CPF válido ou matrícula exata.'));
+      onErro(new ErroApi(400, 'Informe nome com ao menos três caracteres ou matrícula exata, como 15-1.'));
       return;
     }
     onBuscar({ q: resultado.data.q, tipo: resultado.data.tipo });
   }
   return (
-    <form className="busca-global" onSubmit={buscar} aria-label="Busca de servidores">
-      <label><span className="sr-only">Tipo de busca</span>
-        <select name="tipo" defaultValue="nome"><option value="nome">Nome</option><option value="cpf">CPF</option><option value="matricula">Matrícula</option></select>
-      </label>
-      <label><span className="sr-only">Termo de busca</span>
-        <input name="q" maxLength={200} required autoComplete="off" placeholder="Buscar servidor" aria-describedby="orientacao-busca" />
+    <form className={`busca-global${inicio ? ' busca-inicio' : ''}`} onSubmit={buscar} aria-label={inicio ? 'Busca de servidores no Início' : 'Busca de servidores no topo'}>
+      <label><span className="sr-only">{inicio ? 'Buscar servidor no Início' : 'Termo de busca'}</span>
+        <input name="q" maxLength={200} required autoComplete="off" autoFocus={inicio}
+          placeholder="Nome ou matrícula do servidor" aria-describedby={orientacaoId} aria-keyshortcuts="/" />
       </label>
       <button type="submit">Buscar</button>
-      <span className="sr-only" id="orientacao-busca">Nome: mínimo de três caracteres. CPF: com ou sem máscara. Matrícula: informe o valor exato.</span>
+      <span className="sr-only" id={orientacaoId}>Nome: mínimo de três caracteres. Números ou matrícula com sufixo, como 15-1: matrícula exata. Enter busca; barra foca a busca.</span>
     </form>
   );
 }

@@ -46,6 +46,10 @@ export function App() {
   const [notificacoes, setNotificacoes] = useState<NotificacoesDeclaracoes | null>(null);
   const [erroNotificacoes, setErroNotificacoes] = useState(false);
   const pendencias = useRef(false);
+  const buscaSelecionarServidor = useRef<((consulta: Consulta) => void) | null>(null);
+  const registrarBusca = useCallback((buscar: ((consulta: Consulta) => void) | null) => {
+    buscaSelecionarServidor.current = buscar;
+  }, []);
   const registrarPendencia = useCallback((valor: boolean) => {
     pendencias.current = valor;
     setAlteracoesPendentes(valor);
@@ -97,6 +101,19 @@ export function App() {
       document.removeEventListener('visibilitychange', atualizar);
     };
   }, [sessao, tratarErro]);
+
+  useEffect(() => {
+    function focarBusca(evento: KeyboardEvent) {
+      if (evento.key !== '/' || evento.ctrlKey || evento.altKey || evento.metaKey || evento.isComposing) return;
+      const alvo = evento.target;
+      if (alvo instanceof HTMLElement && (alvo.closest('input, textarea, select') || alvo.isContentEditable)) return;
+      const campo = document.querySelector<HTMLInputElement>('.busca-inicio input[name="q"]')
+        ?? document.querySelector<HTMLInputElement>('.cabecalho input[name="q"]');
+      if (campo) { evento.preventDefault(); campo.focus(); }
+    }
+    window.addEventListener('keydown', focarBusca);
+    return () => window.removeEventListener('keydown', focarBusca);
+  }, []);
 
   useEffect(() => {
     /** Solicita confirmação nativa ao fechar a página enquanto houver edição pendente. */
@@ -169,6 +186,13 @@ export function App() {
     setConsulta(busca);
     setMenuAberto(false);
   };
+  const buscarServidor = (busca: Consulta) => {
+    if (buscaSelecionarServidor.current) {
+      limparMensagens();
+      buscaSelecionarServidor.current(busca);
+    }
+    else navegar('busca', busca);
+  };
   const funcional = sessao;
   const podeSalvar = sessao?.usuario.papel === 'analista' || sessao?.usuario.papel === 'coordenador' || sessao?.usuario.papel === 'admin';
   const podeEmitir = sessao?.usuario.papel === 'coordenador' || sessao?.usuario.papel === 'admin';
@@ -198,8 +222,8 @@ export function App() {
               </>}
               {funcional && <>
                 <details className="categoria-menu" open><summary>Cadastro de pessoas</summary>
-                <button type="button" aria-label="Buscar servidores" aria-current={tela === 'busca' ? 'page' : undefined}
-                  onClick={() => navegar('busca')}>Buscar servidores<span>Dados de referência · DOF e DTC</span></button>
+                <button type="button" aria-label="Início" aria-current={tela === 'busca' ? 'page' : undefined}
+                  onClick={() => navegar('busca')}>Início<span>Buscar servidores · DOF e DTC</span></button>
                 </details>
                 <details className="categoria-menu" open><summary>DOFs</summary>
                 {podeSalvar && <>
@@ -243,7 +267,7 @@ export function App() {
       <div className="area-principal">
       <header className="cabecalho">
         {funcional && !sessao.usuario.trocaSenhaObrigatoria
-          ? <BuscaGlobal onBuscar={(busca) => navegar('busca', busca)} onErro={tratarErro} />
+          ? <BuscaGlobal onBuscar={buscarServidor} onErro={tratarErro} />
           : <span>Declarações funcionais e de tempo de contribuição</span>}
         {funcional && !sessao.usuario.trocaSenhaObrigatoria ? <EstadoSincronizacao key={`estado-${chaveTela}`} /> : (
           <span className="estado-fonte" role="status" tabIndex={0} title="Acesse o SisDoc para verificar a situação da sincronização."
@@ -275,7 +299,7 @@ export function App() {
             {funcional && tela === 'busca' && <Servidores key={chaveTela} csrf={sessao.csrf}
               podeSalvar={podeSalvar && sessao.usuario.papel !== 'admin'}
               podeEditarCadastro={sessao.usuario.papel === 'admin'}
-              consulta={consulta}
+              consulta={consulta} onBuscar={buscarServidor}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />}
             {podeSalvar && tela === 'rascunhos' && <RascunhosDof key={chaveTela} csrf={sessao.csrf} administrador={sessao.usuario.papel === 'admin'}
               onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida}
@@ -292,6 +316,7 @@ export function App() {
             )}
             {podeSalvar && (tela === 'DTC_IPAM' || tela === 'DTC_COMISSIONADO' || tela === 'DTC_INSS') && (
               <TelaDtc key={`dtc-${tela}-${chaveTela}`} tipo={tela} csrf={sessao.csrf} papel={sessao.usuario.papel}
+                onRegistrarBusca={registrarBusca}
                 onErro={tratarErro} onLimpar={limparMensagens} onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
             )}
             {tela === 'historico' && (

@@ -80,6 +80,84 @@ describe('Editor DTC', () => {
     ]);
   });
 
+  it('unifica a busca por Enter, infere matrícula e nome e mantém a seleção da DTC no topo', async () => {
+    const pagina = await navegador.newPage();
+    const erros: string[] = [];
+    pagina.on('pageerror', (erro) => erros.push(erro.message));
+    await pagina.route('**/api/v1/**', async (rota) => {
+      const url = new URL(rota.request().url());
+      let resposta: unknown;
+      if (url.pathname === '/api/v1/auth/me') {
+        resposta = { usuario: { id: usuarioId, matricula: 'ANALISTA-FICTICIO', nome: 'Analista fictício',
+          papel: 'analista', trocaSenhaObrigatoria: false }, csrf };
+      } else if (url.pathname === '/api/v1/notificacoes/declaracoes') {
+        resposta = { encaminhados: 0, retornos: 0 };
+      } else if (url.pathname === '/api/v1/sincronizacao/situacao') {
+        resposta = { configurada: false, ultimaSincronizacaoEm: null, horasDesdeUltima: null,
+          limiteHoras: 24, avisoAtraso: false, disjuntorAberto: false };
+      } else if (url.pathname === '/api/v1/servidores') {
+        resposta = { itens: [{ pessoaId, vinculoId, nome, matricula: '15-1', cpf: cpfSintetico(920000011),
+          orgao: 'Órgão fictício', sistemaOrigem: 'fixture', removidoNaFonte: false }], proximoCursor: null };
+      } else if (url.pathname === '/api/v1/dtc') {
+        resposta = { itens: [] };
+      } else {
+        erros.push(`${rota.request().method()} ${url.pathname}`);
+        return rota.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Rota inesperada"}' });
+      }
+      return rota.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(resposta) });
+    });
+    try {
+      await pagina.goto(endereco);
+      const central = pagina.getByRole('textbox', { name: 'Buscar servidor no Início', exact: true });
+      const topo = pagina.getByRole('textbox', { name: 'Termo de busca', exact: true });
+      await central.waitFor();
+      expect(await central.evaluate((campo) => campo === document.activeElement)).toBe(true);
+      expect(await pagina.locator('select[name="tipo"]').count()).toBe(0);
+      expect(await pagina.getByLabel('Filtrar lista carregada').count()).toBe(0);
+      for (const [termo, tipo] of [[' 15-1 ', 'matricula'], ['123', 'matricula'], ['Pessoa fictícia', 'nome']]) {
+        await central.fill(termo);
+        const resposta = pagina.waitForResponse((r) => {
+          const url = new URL(r.url());
+          return url.pathname === '/api/v1/servidores' && url.searchParams.get('q') === termo.trim();
+        });
+        await central.press('Enter');
+        const url = new URL((await resposta).url());
+        expect(url.searchParams.get('tipo')).toBe(tipo);
+        await central.waitFor();
+      }
+      await pagina.getByRole('button', { name: /^DTC IPAM/ }).click();
+      await pagina.getByRole('button', { name: 'Nova DTC IPAM', exact: true }).waitFor();
+      await pagina.getByRole('button', { name: 'Nova DTC IPAM', exact: true }).focus();
+      await pagina.keyboard.press('/');
+      expect(await topo.evaluate((campo) => campo === document.activeElement)).toBe(true);
+      await topo.fill('Pessoa');
+      await topo.press('/');
+      expect(await topo.inputValue()).toBe('Pessoa/');
+      await pagina.getByRole('button', { name: 'Nova DTC IPAM', exact: true }).click();
+      await pagina.getByRole('heading', { name: 'Selecionar servidor', exact: true }).waitFor();
+      expect(await pagina.getByRole('button', { name: 'Voltar à lista', exact: true }).count()).toBe(0);
+      expect(await pagina.getByRole('textbox').count()).toBe(1);
+      expect(await topo.evaluate((campo) => campo === document.activeElement)).toBe(true);
+      const resposta = pagina.waitForResponse((r) => new URL(r.url()).searchParams.get('q') === '15-1');
+      await topo.fill('15-1');
+      await topo.press('Enter');
+      expect(new URL((await resposta).url()).searchParams.get('tipo')).toBe('matricula');
+      await pagina.getByRole('button', { name: /^Selecionar Pessoa/ }).waitFor();
+      expect(await pagina.getByRole('heading', { name: 'Selecionar servidor', exact: true }).count()).toBe(1);
+      await pagina.getByRole('button', { name: 'Início', exact: true }).click();
+      await central.waitFor();
+      expect(await central.evaluate((campo) => campo === document.activeElement)).toBe(true);
+      await topo.fill('Pessoa');
+      const buscaInicio = pagina.waitForResponse((r) => new URL(r.url()).searchParams.get('q') === 'Pessoa');
+      await topo.press('Enter');
+      await buscaInicio;
+      await pagina.getByRole('heading', { name: 'Início', exact: true }).waitFor();
+      expect(erros).toEqual([]);
+    } finally {
+      await pagina.close();
+    }
+  });
+
   it.each(['DTC_IPAM', 'DTC_COMISSIONADO', 'DTC_INSS'] as const)(
     'admin edita %s existente, preserva valores ao mudar datas e salva incorporações',
     async (tipo) => {

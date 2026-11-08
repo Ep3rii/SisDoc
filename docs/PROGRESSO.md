@@ -1,5 +1,43 @@
 # Progresso da construção
 
+## Busca de servidor unificada — 08/11/2026
+
+**Implementado:** componente compartilhado no topo e no centro do Início;
+critério inferido (números/sufixo numérico → matrícula exata; demais termos →
+nome); Enter envia; `/` foca a busca fora de campos de texto; foco automático
+no Início. O campo do topo atende a seleção da DTC sem navegar para o cadastro.
+Formulário duplicado e Voltar à lista removidos da seleção; filtro da lista
+carregada removido do Início para não competir com a consulta paginada.
+API, permissões e lógica de documentos permanecem inalteradas.
+
+**Testado:** typecheck/build aprovados. Testes de navegador com API sintética
+validaram inferência, Enter, foco, `/`, contexto DTC e paginação: 7 testes
+direcionados passaram. Na rodada ampliada inicial, 29 testes passaram; depois
+do ajuste do teste que ainda esperava o filtro removido, a paginação passou.
+Quatro falhas preexistentes não foram corrigidas: texto vazio de encaminhados,
+categorias antigas do menu, rótulo antigo de destino de importação e exibição
+antiga de referência cadastral. Fixtures não acessam a base operacional.
+
+**Instalado:** build servido no checkout único e serviços SisDoc/SisDocCaddy
+reiniciados, ambos ativos. Smoke somente leitura: health API `200`, rota
+privada sem sessão `401` e página pelo Caddy `200`. Nenhuma alteração de
+schema, escrita de teste ou importação na base real.
+
+## Habilidades locais do Copilot — 08/11/2026
+
+**Implementado:** três habilidades em `.github/skills`, com catálogo nas
+instruções do Copilot: inspeção visual de React/DOF/DTC, testes e depuração
+com o executor isolado existente, e manutenção de contratos/API/dados.
+Os fluxos respeitam a instalação única e não adicionam bibliotecas, MCPs
+ou autorização para gravar dados reais. Nenhum serviço foi alterado.
+
+**Verificado:** frontmatter, nomes de diretório e 14 referências locais das
+três habilidades passaram na verificação estrutural; o diff dos documentos
+passou em `git diff --check`. Configurações existentes do VS Code foram
+preservadas. Não há alteração executável que exija build ou suite.
+**Pendente:** confirmar descoberta e uso em uma nova conversa do Copilot
+no VS Code. Habilidades não disponibilizam ferramentas de navegador por si.
+
 ## Instalação única editável — 05/11/2026
 
 A diretriz atual é manter uma única versão editável, chamada Produção, no

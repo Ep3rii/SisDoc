@@ -487,7 +487,7 @@ async function simularApi(pagina: Page): Promise<Simulacao> {
 
 async function iniciarCalculo(pagina: Page) {
   await pagina.getByLabel('Termo de busca').fill('Pessoa');
-  await pagina.getByRole('button', { name: 'Buscar', exact: true }).click();
+  await pagina.locator('.cabecalho').getByRole('button', { name: 'Buscar', exact: true }).click();
   await pagina.getByRole('button', { name: /Ver vínculos/ }).click();
   await pagina.getByRole('button', { name: /Calcular DOF da matrícula/ }).click();
   await pagina.getByLabel('Fim do período').fill('2024-12-31');
@@ -559,7 +559,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Auditoria', exact: true }).click();
     await pagina.getByRole('alert').getByText('Não foi possível abrir esta tela.').waitFor();
     expect(await pagina.getByRole('button', { name: 'Recarregar aplicação' }).isVisible()).toBe(true);
-    await pagina.getByRole('button', { name: 'Buscar servidores', exact: true }).click();
+    await pagina.getByRole('button', { name: 'Início', exact: true }).click();
     await pagina.getByRole('button', { name: /Ver vínculos/ }).waitFor();
   });
 
@@ -588,7 +588,7 @@ describe('interface de rascunhos com API sintética', () => {
           proventosEstornados: '0.00', descontosEstornados: '0.00' } });
     });
     await pagina.goto(endereco);
-    await pagina.getByRole('button', { name: 'Buscar servidores', exact: true }).click();
+    await pagina.getByRole('button', { name: 'Início', exact: true }).click();
     await pagina.getByRole('button', { name: /Ver vínculos/ }).click();
     await pagina.getByRole('button', { name: 'Financeiro', exact: true }).click();
     await pagina.getByText('2 registros em todo o vínculo', { exact: false }).waitFor();
@@ -667,7 +667,7 @@ describe('interface de rascunhos com API sintética', () => {
     expect(celula.height).toBeLessThanOrEqual(36);
     await pagina.getByLabel('Termo de busca').fill('Outra pessoa');
     pagina.once('dialog', (dialogo) => void dialogo.dismiss());
-    await pagina.getByRole('button', { name: 'Buscar', exact: true }).click();
+    await pagina.locator('.cabecalho').getByRole('button', { name: 'Buscar', exact: true }).click();
     expect(await pagina.getByLabel('Faltas em 1980').inputValue()).toBe('1');
     expect(await pagina.getByText('Há alterações não salvas.', { exact: true }).isVisible()).toBe(true);
     await selecionarAba(pagina, 'Dados do servidor');
@@ -1474,7 +1474,7 @@ describe('interface de rascunhos com API sintética', () => {
     estado.papel = 'admin';
     await pagina.reload();
     await pagina.getByRole('heading', { name: 'Administração de usuários' }).waitFor();
-    expect(await pagina.getByRole('button', { name: 'Buscar servidores' }).count()).toBe(1);
+    expect(await pagina.getByRole('button', { name: 'Início', exact: true }).count()).toBe(1);
     await pagina.getByRole('button', { name: 'Rascunhos', exact: true }).click();
     await pagina.getByRole('heading', { name: 'Todos os rascunhos de DOF' }).waitFor();
 

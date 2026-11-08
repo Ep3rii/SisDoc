@@ -304,9 +304,21 @@ configuração explícita e testes de origem e proxies confiáveis, ainda ausent
 
 ## Consulta de servidores
 
-Todos os perfis autenticados podem buscar por nome, CPF válido
-ou matrícula exata, incluindo seu sufixo. Nome exige pelo menos três
-caracteres. Resultados, vínculos e eventos são paginados; matrículas
+Todos os perfis autenticados usam a busca do topo ou a busca central no
+**Início**. Não há seletor de critério: números e matrículas com sufixo
+numérico, como `15-1`, procuram matrícula exata; os demais termos procuram
+nome, com pelo menos três caracteres. Pressione **Enter** para buscar.
+A tecla **/** foca a busca central no Início ou a busca do topo nas demais
+telas, sem interceptar a digitação em campos de texto. Ao abrir Início, o
+campo central recebe foco automaticamente.
+
+Na tela **Selecionar servidor** da DTC, use apenas o campo do topo; seus
+resultados permanecem nessa tela para selecionar o vínculo. Não há formulário
+duplicado nem botão Voltar à lista; o menu permite navegar para outra tarefa.
+A API continua suportando consulta por CPF para os consumidores existentes,
+mas esse critério não é oferecido nesta interface.
+
+Resultados, vínculos e eventos são paginados; matrículas
 duplicadas são apresentadas com sua origem, sem escolha automática. A busca
 a partir da decisão 028 mostra CPF completo; não aplique o comportamento
 antigo de máscaras aos dados de trabalho. Para consultar

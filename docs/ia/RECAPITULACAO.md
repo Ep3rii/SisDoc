@@ -5,6 +5,17 @@ Atualizada em **05/11/2026**, com a decisão de manter uma instalação editáve
 única chamada Produção.
 É um índice derivado: código, testes e decisões prevalecem em caso de conflito.
 
+## Habilidades locais do Copilot — 08/11/2026
+
+Instaladas em `.github/skills`: `sisdoc-inspecao-visual`,
+`sisdoc-testes-depuracao` e `sisdoc-api-dados`. Consulte o catálogo em
+`.github/copilot-instructions.md`. São fluxos locais adaptados ao ambiente
+único, aos testes descartáveis e à proteção de dados reais; não adicionam
+dependências, MCPs, permissões ou instalações operacionais.
+Formato, nomes e referências locais foram conferidos no checkout; descoberta e
+invocação efetiva no VS Code exigem uma nova conversa no harness pretendido.
+Nenhum build, reinício, publicação ou alteração de banco faz parte desta etapa.
+
 ## Foco atual da retomada — ambiente único
 
 O checkout `C:\SisDoc` é a única versão editável e deve também servir a
@@ -34,6 +45,20 @@ Typecheck/build passaram e a aplicação foi reiniciada. Login foi verificado no
 navegador em 390, 768 e 1366 px; health `200`, rota privada sem sessão `401`
 e proxy `200`. Telas autenticadas não foram navegadas manualmente; nenhuma
 autenticação ou escrita no banco foi realizada.
+
+### Busca unificada — 08/11/2026
+
+Busca compartilhada no topo e no centro do Início, sem seletor de critério.
+Números e matrículas com sufixos numéricos buscam matrícula exata; demais
+termos buscam nome. Enter envia; `/` foca a busca fora de campos de texto;
+Início recebe foco automático. A seleção de DTC registra temporariamente seu
+destino para receber a busca do topo e cancela o registro ao sair; não há
+campo duplicado nem Voltar à lista. O filtro local do Início foi removido.
+API/permissões/documentos não mudaram. Typecheck/build e 7 testes direcionados
+de navegador/paginação passaram. Quatro testes antigos ainda esperam UI
+anterior; detalhes em [Progresso](../PROGRESSO.md).
+Build instalado na versão única, serviços ativos após reinício e smoke HTTPS
+`200/401/200` confirmado, sem gravação de dados de teste na base real.
 
 ### Histórico da primeira publicação — 05/11/2026
 

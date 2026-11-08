@@ -220,7 +220,7 @@ it('separa sincronização de importação/exportação e baixa dados mediante c
     const categorias = await page.locator('aside .grupo-menu').allTextContents();
     expect(categorias).toEqual(['Administração', 'Cadastro de pessoas', 'DOFs', 'DTCs', 'Documentos emitidos']);
     const menu = await page.locator('aside nav button').allTextContents();
-    expect(menu.findIndex((texto) => texto === 'Usuários')).toBeLessThan(menu.findIndex((texto) => texto.includes('Buscar servidores')));
+    expect(menu.findIndex((texto) => texto === 'Usuários')).toBeLessThan(menu.findIndex((texto) => texto.includes('Início')));
     expect(menu.filter((texto) => texto === 'Importação e exportação')).toHaveLength(1);
     await page.getByRole('button', { name: /^Sincronização/ }).click();
     await page.getByRole('heading', { name: 'Sincronização', exact: true }).waitFor();
@@ -302,7 +302,7 @@ it('permite ao Cadastro consultar os dados completos e alternar as referências'
     await simular(page, 'analista');
     await page.goto(origem);
     await page.getByRole('textbox', { name: 'Termo de busca' }).fill('Pessoa');
-    await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+    await page.locator('.cabecalho').getByRole('button', { name: 'Buscar', exact: true }).click();
     await page.getByRole('button', { name: /^Ver vínculos/ }).click();
     expect(await page.getByLabel('Dados de referência do vínculo').inputValue()).toBe(vinculoId);
     await page.getByText('CPF fictício completo', { exact: true }).waitFor();
@@ -336,10 +336,8 @@ it('lista vínculos previamente e solicita páginas de 50 sem ordenar somente na
     await page.goto(origem);
     await page.getByRole('button', { name: /^Ver vínculos/ }).first().waitFor();
     expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(50);
-    await page.getByRole('searchbox', { name: 'Filtrar lista carregada' }).fill('Pessoa ficticia 12');
-    expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(1);
-    await page.getByRole('button', { name: 'Limpar filtro', exact: true }).click();
-    expect(await page.getByRole('button', { name: /^Ver vínculos/ }).count()).toBe(50);
+    expect(await page.getByRole('searchbox', { name: 'Filtrar lista carregada' }).count()).toBe(0);
+    expect(await page.getByRole('textbox', { name: 'Buscar servidor no Início', exact: true }).count()).toBe(1);
     expect(await page.locator('tbody tr').nth(2).locator('td').nth(2).innerText()).toBe('002');
     expect(await page.locator('tbody tr').first().locator('td').nth(1).innerText()).toBe(itens[0].cpf);
     await page.getByRole('button', { name: 'Próxima página de resultados' }).click();
