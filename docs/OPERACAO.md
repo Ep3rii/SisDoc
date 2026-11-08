@@ -51,6 +51,15 @@ a consulta/edição ocorre por vínculo. Eventos da fonte, referências e
 cadastro local ficam acessíveis abaixo, com auditoria e permissões existentes.
 O histórico ainda não importado não é inferido nem contado como registro.
 
+No histórico do vínculo há um único formulário **Filtrar histórico**, com
+período, competência e rubrica. **Aplicar filtro** (ou Enter) consulta o
+backend sobre todos os registros do vínculo; paginação e totais mantêm os
+critérios. **Limpar filtro** remove os critérios e volta à primeira página.
+Não existe busca textual restrita à página carregada.
+**Adicionar registro funcional/financeiro** e **Importar CSV/XLSX/XML** são
+ações secundárias no topo, disponíveis apenas ao perfil autorizado. Importar
+abre o formulário existente e mantém validação/confirmação antes da gravação.
+
 ## Novos modelos de saída — versão 2
 
 Os formulários seguem as referências locais em

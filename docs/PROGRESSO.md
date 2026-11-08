@@ -1,5 +1,26 @@
 # Progresso da construção
 
+## Filtro único do histórico — 08/11/2026
+
+**Implementado:** removida a busca textual da página carregada e o aviso
+comparando filtros. Um único formulário reúne período, competência e rubrica,
+com Aplicar filtro/Enter e Limpar filtro. Reutiliza a consulta backend que
+filtra antes de paginar; critérios persistem entre páginas e alteração/limpeza
+retorna à primeira página. Adicionar registro e Importar CSV/XLSX/XML são
+ações secundárias no topo. Permissões e validação/confirmação da importação
+preservadas. Nenhuma alteração de backend, contrato ou banco.
+
+**Testado:** build/typecheck web, tipos dos testes e diff check passaram.
+Três testes focados aprovados: filtro único/paginação/ações/relacionamentos,
+semântica dos filtros do contrato e regressão da ficha. API inteiramente
+simulada nos testes de navegador, sem acesso à base real. Capturas fictícias
+observadas em 1366/768/390 px, sem overflow da página.
+
+**Servido:** HTTPS `200` com cadeia/hostname validados; index, seis assets
+de entrada e o chunk atualizado do cadastro iguais ao build. Serviços ativos;
+não foi necessário reiniciar a API. Não houve login, importação ou gravação
+manual na base real nesta validação.
+
 ## Ficha do servidor — 08/11/2026
 
 **Implementado:** Início após login/restauração para todos os perfis; matrícula

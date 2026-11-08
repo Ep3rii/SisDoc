@@ -36,7 +36,8 @@ export function TransferenciaHistorico({ pessoaId, vinculoId, grupo, csrf, onErr
     const link = document.createElement('a'); link.href = url; link.download = `modelo-historico-${grupo}.csv`; link.click(); URL.revokeObjectURL(url);
   }
   const titulo = grupo === 'funcional' ? 'Histórico Funcional' : 'Histórico Financeiro';
-  return <details className="grupo-formulario"><summary>Importar {titulo.toLocaleLowerCase('pt-BR')} deste vínculo — CSV, XLSX ou XML</summary>
+  return <section className="grupo-formulario" aria-label="Importação do histórico">
+    <h4>Importar {titulo.toLocaleLowerCase('pt-BR')} deste vínculo — CSV, XLSX ou XML</h4>
     <p>Use o modelo canônico. A origem e o identificador de cada linha evitam duplicidades. XML usa a raiz SisDoc versão 1. Nenhuma linha é aplicada antes de validar e confirmar.</p>
     <button type="button" className="secundario" onClick={baixarModelo}>Baixar modelo — {titulo}</button>
     <fieldset disabled={ocupado}><div className="grade">
@@ -49,5 +50,5 @@ export function TransferenciaHistorico({ pessoaId, vinculoId, grupo, csrf, onErr
       {relatorio.ocorrencias.map((item, i) => <p key={i}>Linha {item.linha}: {item.motivo}</p>)}
       {relatorio.loteId && <p>Lote protegido: {relatorio.loteId}.</p>}
     </div>}
-  </details>;
+  </section>;
 }

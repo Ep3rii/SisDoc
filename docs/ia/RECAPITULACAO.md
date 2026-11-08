@@ -1,5 +1,17 @@
 # Pontos de memória do projeto
 
+## Filtro único do histórico — 08/11/2026
+
+Histórico do vínculo tem apenas filtro de período, competência e rubrica,
+consultado no backend antes de paginar. Removidos filtro textual local e
+aviso comparativo. Adicionar registro e Importar CSV/XLSX/XML são ações
+secundárias no topo; validação/permissões da importação preservadas.
+Backend/contratos/banco não mudaram. Build web, tipos e três testes focados
+passaram; layout observado com fixtures em 1366/768/390 px.
+Build servido verificado por HTTPS confiável, incluindo chunk do cadastro;
+serviços ativos, sem reinício ou teste de escrita na base real.
+Detalhes em [Progresso](../PROGRESSO.md).
+
 ## Ficha do servidor — 08/11/2026
 
 Início é a entrada de todos os perfis. Busca por matrícula abre diretamente

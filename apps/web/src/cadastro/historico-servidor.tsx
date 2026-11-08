@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useId, useState, type FormEvent } from 'react';
 import { paginaHistoricoServidorSchema, resultadoHistoricoServidorSchema, salvarHistoricoSchema,
   consultaHistoricoServidorSchema, referenciaServidorSchema, revisoesHistoricoSchema, type RegistroHistorico } from '@sisdoc/contratos';
 import { requisitar, validar, ErroApi } from '../infraestrutura/api';
@@ -37,12 +37,13 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
   pessoaId: string; vinculoId: string; csrf: string; podeEditar: boolean;
   onErro: (erro: unknown) => void; onPendente: (valor: boolean) => void; confirmarSaida: () => boolean;
 }) {
+  const importacaoId = useId();
   const [pagina, setPagina] = useState<ReturnType<typeof paginaHistoricoServidorSchema.parse> | null>(null);
   const [cursor, setCursor] = useState<string | undefined>();
   const [versao, setVersao] = useState(0);
   const [falhou, setFalhou] = useState(false);
   const [grupo, setGrupo] = useState<RegistroHistorico['grupo']>('funcional');
-  const [filtro, setFiltro] = useState('');
+  const [importacaoAberta, setImportacaoAberta] = useState(false);
   const [registro, setRegistro] = useState<RegistroHistorico | null>(null);
   const [edicao, setEdicao] = useState<{ id: string; revisao: number } | null>(null);
   const [motivo, setMotivo] = useState('');
@@ -130,9 +131,7 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
     } catch (erro: unknown) { onErro(erro); }
     finally { setOcupado(false); }
   }
-  const itens = pagina?.itens.filter((item) => item.registro.grupo === grupo &&
-    `${item.registro.descricao} ${item.registro.competencia ?? ''} ${item.registro.rubrica ?? ''} ${nomes[item.registro.tipo]} ${item.registro.origem}`
-      .toLocaleLowerCase('pt-BR').includes(filtro.toLocaleLowerCase('pt-BR'))) ?? [];
+  const itens = pagina?.itens ?? [];
   const texto = (campo: keyof RegistroHistorico, rotulo: string, tipo = 'text') => (
     <label>{rotulo}<input type={tipo} value={String(registro?.[campo] ?? '')} maxLength={campo === 'descricao' ? 2000 : 200}
       onChange={(evento) => alterar({ [campo]: evento.target.value || null })} /></label>
@@ -140,21 +139,34 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
   return <section className="painel separado" aria-label="Histórico funcional e financeiro do vínculo">
     <h3>Histórico funcional e financeiro</h3>
     <p>Fatos, concessões e pagamentos são registros distintos. Saldos e efeitos são informados, sem cálculo de direitos ou folha. Alterações são locais e auditadas.</p>
-    {podeEditar && <button type="button" className="secundario" disabled={exportando} onClick={() => void exportar()}>
-      {exportando ? 'Exportando...' : 'Exportar histórico do vínculo (XLSX)'}
-    </button>}
+    {podeEditar && <div className="acoes" role="group" aria-label="Ações do histórico">
+      {!registro && <>
+        <button type="button" className="secundario" onClick={() => { setRegistro(historicoVazio(grupo)); setEdicao(null); setMensagem(''); }}>
+          Adicionar registro {grupo}
+        </button>
+        <button type="button" className="secundario" aria-expanded={importacaoAberta} aria-controls={importacaoId}
+          onClick={() => setImportacaoAberta((aberta) => !aberta)}>Importar CSV/XLSX/XML</button>
+      </>}
+      <button type="button" className="secundario" disabled={exportando} onClick={() => void exportar()}>
+        {exportando ? 'Exportando...' : 'Exportar histórico do vínculo (XLSX)'}
+      </button>
+    </div>}
     <div className="acoes" role="group" aria-label="Tipo de histórico">
       <button type="button" className="secundario" aria-pressed={grupo === 'funcional'} onClick={() => { if (fechar()) { setGrupo('funcional'); setCursor(undefined); } }}>Funcional</button>
       <button type="button" className="secundario" aria-pressed={grupo === 'financeiro'} onClick={() => { if (fechar()) { setGrupo('financeiro'); setCursor(undefined); } }}>Financeiro</button>
     </div>
-    <form onSubmit={(evento) => {
+    {podeEditar && !registro && importacaoAberta && <div id={importacaoId}>
+      <TransferenciaHistorico key={grupo} pessoaId={pessoaId} vinculoId={vinculoId} grupo={grupo} csrf={csrf}
+        onErro={onErro} onImportado={() => setVersao((v) => v + 1)} />
+    </div>}
+    <form aria-label="Filtrar histórico" onSubmit={(evento) => {
       evento.preventDefault();
       const consulta = consultaHistoricoServidorSchema.safeParse({ vinculoId, grupo, ...Object.fromEntries(Object.entries(filtros).filter(([, valor]) => valor !== '')) });
       if (!consulta.success) { onErro(new ErroApi(400, 'Confira as competências e o intervalo dos filtros.')); return; }
       if (registro && !fechar()) return;
-      setAplicados({ ...filtros }); setCursor(undefined); setFiltro('');
+      setAplicados({ ...filtros }); setCursor(undefined);
     }}>
-      <h4>Filtrar todo o histórico do vínculo</h4>
+      <h4>Filtrar histórico</h4>
       <p>Período: sobreposição dos fatos funcionais ou data de pagamento. Competências e rubrica aplicam-se aos lançamentos financeiros.</p>
       <div className="grade-formulario">
         {(['competenciaInicio', 'competenciaFim', 'inicio', 'fim', 'rubrica'] as const).map((campo) => <label key={campo}>
@@ -163,17 +175,15 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
             value={filtros[campo]} onChange={(e) => setFiltros((atual) => ({ ...atual, [campo]: e.target.value }))} />
         </label>)}
       </div>
-      <button type="submit">Aplicar filtros globais</button>
-      <button type="button" className="secundario" onClick={() => {
-        if (registro && !fechar()) return;
-        const vazios = { competenciaInicio: '', competenciaFim: '', inicio: '', fim: '', rubrica: '' };
-        setFiltros(vazios); setAplicados(vazios); setCursor(undefined); setFiltro('');
-      }}>Limpar filtros globais</button>
+      <div className="acoes">
+        <button type="submit">Aplicar filtro</button>
+        <button type="button" className="secundario" onClick={() => {
+          if (registro && !fechar()) return;
+          const vazios = { competenciaInicio: '', competenciaFim: '', inicio: '', fim: '', rubrica: '' };
+          setFiltros(vazios); setAplicados(vazios); setCursor(undefined);
+        }}>Limpar filtro</button>
+      </div>
     </form>
-    <label>Filtrar registros carregados (descrição, competência, rubrica, origem)<input value={filtro} onChange={(e) => setFiltro(e.target.value)} /></label>
-    {podeEditar && !registro && <button type="button" onClick={() => { setRegistro(historicoVazio(grupo)); setEdicao(null); setMensagem(''); }}>Adicionar registro {grupo}</button>}
-    {podeEditar && !registro && <TransferenciaHistorico key={grupo} pessoaId={pessoaId} vinculoId={vinculoId} grupo={grupo} csrf={csrf}
-      onErro={onErro} onImportado={() => setVersao((v) => v + 1)} />}
     {mensagem && <p role="status" className="aviso">{mensagem}</p>}
     {registro && podeEditar && <form onSubmit={salvar}><fieldset disabled={ocupado}>
       <h4>{edicao ? `Editar registro · revisão ${edicao.revisao}` : 'Novo registro'}</h4>
@@ -234,8 +244,8 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
           <RevisoesHistorico pessoaId={pessoaId} id={item.id} revisao={item.revisao} onErro={onErro} />
           {podeEditar && !registro && <button type="button" className="secundario" onClick={() => { setRegistro(item.registro); setEdicao({ id: item.id, revisao: item.revisao }); setMotivo(''); }}>Editar com motivo</button>}
         </details>)}
-        <p>{pagina.totais.registros} registros em todo o vínculo com os filtros globais aplicados. A busca textual acima filtra somente esta página e não altera esses totais.</p>
-        {grupo === 'financeiro' && <p>Totais brutos globais filtrados — proventos pagos: {pagina.totais.proventosPagos};
+        <p>{pagina.totais.registros} registros em todo o vínculo com o filtro aplicado.</p>
+        {grupo === 'financeiro' && <p>Totais brutos filtrados — proventos pagos: {pagina.totais.proventosPagos};
           descontos pagos: {pagina.totais.descontosPagos}; proventos estornados: {pagina.totais.proventosEstornados};
           descontos estornados: {pagina.totais.descontosEstornados}. Não representa saldo líquido nem direitos; estornos são exibidos separadamente.</p>}
         <div className="acoes"><button type="button" disabled={!cursor || !!registro} onClick={() => setCursor(undefined)}>Primeira página de histórico</button>

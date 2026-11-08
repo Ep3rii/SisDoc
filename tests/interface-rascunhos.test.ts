@@ -567,7 +567,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: /Ver vínculos/ }).waitFor();
   });
 
-  it('filtra histórico globalmente, preserva totais e carrega relacionamentos de todas as páginas', async () => {
+  it('usa filtro único no backend, preserva paginação e mantém ações secundárias no topo do histórico', async () => {
     estado.papel = 'admin';
     const consultas: URLSearchParams[] = [];
     const registro = {
@@ -582,31 +582,70 @@ describe('interface de rascunhos com API sintética', () => {
       const consulta = new URL(rota.request().url()).searchParams;
       consultas.push(consulta);
       const segunda = consulta.has('cursor');
+      const apenasAlvo = consulta.get('rubrica') === 'ALVO';
       const itens = consulta.get('grupo') === 'funcional' ? [] : [{
-        id: segunda ? coordenadorId : documentoId, pessoaId, vinculoId, revisao: 1,
-        registro: { ...registro, descricao: segunda ? 'Pagamento página seguinte' : registro.descricao },
+        id: segunda || apenasAlvo ? coordenadorId : documentoId, pessoaId, vinculoId, revisao: 1,
+        registro: { ...registro, descricao: segunda || apenasAlvo ? 'Pagamento página seguinte' : registro.descricao },
         atualizadoEm: '2026-01-30T12:00:00.000Z', loteId: null, linhaOrigem: null,
       }];
-      await responder(rota, 200, { itens, proximoCursor: segunda || !itens.length ? null : documentoId,
-        totais: { registros: itens.length ? 2 : 0, proventosPagos: '50.00', descontosPagos: '0.00',
+      await responder(rota, 200, { itens, proximoCursor: segunda || apenasAlvo || !itens.length ? null : documentoId,
+        totais: { registros: itens.length ? apenasAlvo ? 1 : 2 : 0, proventosPagos: apenasAlvo ? '25.00' : '50.00', descontosPagos: '0.00',
           proventosEstornados: '0.00', descontosEstornados: '0.00' } });
     });
     await pagina.goto(endereco);
     await pagina.getByRole('button', { name: 'Início', exact: true }).click();
     await pagina.getByRole('button', { name: /Ver vínculos/ }).click();
     await pagina.getByRole('button', { name: /^Histórico funcional/ }).click();
+    const secao = pagina.getByRole('region', { name: 'Histórico funcional e financeiro do vínculo', exact: true });
+    expect(await secao.getByRole('form', { name: 'Filtrar histórico', exact: true }).count()).toBe(1);
+    expect(await secao.getByLabel(/^Filtrar registros carregados/).count()).toBe(0);
+    const adicionar = secao.getByRole('button', { name: 'Adicionar registro funcional', exact: true });
+    const importar = secao.getByRole('button', { name: 'Importar CSV/XLSX/XML', exact: true });
+    expect(await adicionar.getAttribute('class')).toBe('secundario');
+    expect(await importar.getAttribute('class')).toBe('secundario');
+    expect(await adicionar.evaluate((botao) => !!(botao.compareDocumentPosition(
+      botao.closest('section')!.querySelector('form')!) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
+    await importar.click();
+    expect(await secao.getByLabel('Arquivo', { exact: true }).getAttribute('accept')).toBe('.csv,.xlsx,.xml');
+    await importar.click();
     await pagina.getByRole('button', { name: 'Financeiro', exact: true }).click();
     await pagina.getByText('2 registros em todo o vínculo', { exact: false }).waitFor();
     await pagina.getByLabel('Competência inicial', { exact: true }).fill('2026-01');
+    await pagina.getByLabel('Competência final', { exact: true }).fill('2026-02');
+    await pagina.getByLabel('Período inicial', { exact: true }).fill('2026-01-01');
+    await pagina.getByLabel('Período final', { exact: true }).fill('2026-02-28');
     await pagina.getByLabel('Rubrica contém').fill('ABONO');
-    await pagina.getByRole('button', { name: 'Aplicar filtros globais' }).click();
+    await pagina.getByRole('button', { name: 'Aplicar filtro', exact: true }).click();
     await expect.poll(() => consultas.some((c) => c.get('competenciaInicio') === '2026-01' && c.get('rubrica') === 'ABONO')).toBe(true);
-    await pagina.getByText('Totais brutos globais filtrados', { exact: false }).waitFor();
+    await pagina.getByText('Totais brutos filtrados', { exact: false }).waitFor();
     await pagina.getByRole('button', { name: 'Próxima página de histórico' }).click();
     await pagina.locator('p').filter({ hasText: /^Pagamento página seguinte$/ }).waitFor({ state: 'attached' });
     await pagina.locator('summary').filter({ hasText: /^Lançamento financeiro ·/ }).click();
     expect(await pagina.locator('p').filter({ hasText: /^Pagamento página seguinte$/ }).isVisible()).toBe(true);
     expect(await pagina.getByText('2 registros em todo o vínculo', { exact: false }).count()).toBe(1);
+    const ultima = consultas.at(-1)!;
+    expect(Object.fromEntries(ultima)).toMatchObject({ competenciaInicio: '2026-01', competenciaFim: '2026-02',
+      inicio: '2026-01-01', fim: '2026-02-28', rubrica: 'ABONO', cursor: documentoId });
+    await pagina.getByLabel('Rubrica contém').fill('ALVO');
+    await pagina.getByLabel('Rubrica contém').press('Enter');
+    await pagina.getByText('1 registros em todo o vínculo', { exact: false }).waitFor();
+    expect(consultas.at(-1)?.has('cursor')).toBe(false);
+    expect(await secao.locator('summary').filter({ hasText: /^Lançamento financeiro ·/ }).count()).toBe(1);
+    expect(await secao.locator('p').filter({ hasText: /^Pagamento página seguinte$/ }).count()).toBe(1);
+    expect(await secao.getByText('A busca textual acima', { exact: false }).count()).toBe(0);
+    await secao.getByRole('button', { name: 'Limpar filtro', exact: true }).click();
+    await pagina.getByText('2 registros em todo o vínculo', { exact: false }).waitFor();
+    for (const campo of ['competenciaInicio', 'competenciaFim', 'inicio', 'fim', 'rubrica']) {
+      expect(consultas.at(-1)?.has(campo)).toBe(false);
+    }
+    for (const largura of [1366, 768, 390]) {
+      await pagina.setViewportSize({ width: largura, height: 900 });
+      expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      const captura = path.join(process.env.SISDOC_TEST_TEMP!, `sisdoc-filtro-historico-${largura}-${process.pid}.png`);
+      await secao.screenshot({ path: captura });
+      process.stdout.write(`Filtro único fictício ${largura}px: ${captura}\n`);
+    }
+    await pagina.setViewportSize({ width: 1366, height: 900 });
     await pagina.getByRole('button', { name: 'Adicionar registro financeiro' }).click();
     await expect.poll(() => pagina.getByLabel('Registro histórico relacionado').isEnabled()).toBe(true);
     expect(await pagina.getByLabel('Registro histórico relacionado').locator('option').allTextContents())
