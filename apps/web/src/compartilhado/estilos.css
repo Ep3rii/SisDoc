@@ -136,6 +136,18 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 }
 .painel textarea, .editor-dof textarea { min-height: 5rem; resize: vertical; }
 .grade-formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: 0 1rem; }
+.dialogo-usuario { width: calc(100% - 2rem); max-width: 640px; max-height: calc(100dvh - 2rem); overflow-y: auto; color: #172b3a; }
+.dialogo-usuario::backdrop { background: rgb(17 40 60 / 60%); }
+.formulario-usuario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 1rem; }
+.formulario-usuario .campo-completo { grid-column: 1 / -1; }
+.formulario-usuario > div { margin-bottom: 1rem; }
+.formulario-usuario > div > label { margin-bottom: 0; }
+.regras-senha { margin: 0 0 1rem; font-size: .875rem; }
+.regras-senha ul { margin: .35rem 0; padding-left: 1.25rem; }
+.dialogo-usuario .acoes { margin-bottom: 0; }
+@media (max-width: 600px) {
+  .formulario-usuario { grid-template-columns: minmax(0, 1fr); }
+}
 button { padding: .55rem .9rem; color: #fff; background: #0d4b6a; border: 1px solid #0d4b6a; border-radius: .3rem; font-weight: 600; }
 button.secundario { color: #0d4b6a; background: #fff; border-color: #bbcbd5; }
 .acoes { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1rem 0; }

@@ -1,5 +1,30 @@
 # Progresso da construção
 
+## Cadastro de usuários em modal — 08/11/2026
+
+**Implementado:** Usuários cadastrados primeiro, Novo usuário abre dialog
+nativo de até 640 px, formulário em duas colunas (uma até 600 px), regras
+da senha inicial visíveis e vinculadas ao campo. Troca no primeiro acesso
+aparece marcada/bloqueada porque já é obrigatória na API atual; não foi
+criada opção de dispensa nem alterado contrato/backend/banco. Edição e
+redefinição mantidas abaixo da lista. Escape/Cancelar confirma descarte,
+foco retorna ao acionador e erros aparecem no modal sem apagar os campos.
+
+**Testado:** build/typecheck web e tipos dos testes passaram. Três testes
+novos de interface aprovados após corrigir o nome acessível do seletor de
+perfil: dimensões/colunas/regras/foco, erro/descarte e criação/recarga sem
+persistir senha no browser. Duas regressões de navegação administrativa
+também passaram. Capturas fictícias observadas em 1366/768/390 px, com
+rolagem interna no modal móvel e sem overflow horizontal da página.
+Criação testada somente com API interceptada, sem cadastro fictício real.
+
+**Servido:** HTTPS confiável validou health 200, index e sete assets iguais
+ao build, incluindo chunk de usuários. SisDoc e SisDocCaddy ativos; alteração
+apenas web, sem necessidade de reinício. Nenhuma escrita de teste na base real.
+Subagente de testes acionado em paralelo, mas retornou vazio; implementação
+e testes realizados pelo agente principal. Sem pendência de suporte à troca
+obrigatória; torná-la opcional exigiria mudança posterior de regra/contrato.
+
 ## Navegação e listas documentais — 08/11/2026
 
 **Implementado:** menu Início/DOFs/DTCs/Histórico/Administração (admin).

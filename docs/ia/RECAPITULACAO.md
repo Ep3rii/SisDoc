@@ -1,5 +1,19 @@
 # Pontos de memória do projeto
 
+## Cadastro de usuários em modal — 08/11/2026
+
+Administração → Usuários mostra a lista primeiro. Novo usuário abre dialog
+nativo de até 640 px com duas colunas, uma em viewport até 600 px. Regras
+da senha inicial (10–1024 caracteres, fora da lista local de senhas comuns)
+visíveis; troca no primeiro acesso marcada/bloqueada porque já é obrigatória
+na API. Backend/contratos/banco inalterados. Escape/Cancelar protege descarte,
+erros preservam campos, foco retorna ao acionador; editar/redefinir mantidos.
+Build/tipos e três testes novos de modal passaram; duas regressões de
+navegação também. Capturas fictícias observadas em 1366/768/390 px.
+HTTPS health 200, index/sete assets iguais ao build incluindo usuários.
+Serviços ativos, sem reinício ou escrita de teste real.
+Evidências em [Progresso](../PROGRESSO.md).
+
 ## Navegação e listas documentais — 08/11/2026
 
 Menu reduzido a Início, DOFs, DTCs, Histórico e Administração (admin).

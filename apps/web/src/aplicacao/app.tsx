@@ -277,7 +277,8 @@ export function App() {
                 {...(podeSalvar ? { onAbrirRascunhos: () => navegar('dofs') } : {})} />
             )}
             {sessao.usuario.papel === 'admin' && tela === 'usuarios' && (
-              <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal} />
+              <Usuarios sessao={sessao} onErro={tratarErro} onMensagem={informar} onSessaoEncerrada={encerrarLocal}
+                onPendente={registrarPendencia} confirmarSaida={confirmarSaida} />
             )}
             {(sessao.usuario.papel === 'admin' && tela === 'auditoria') && (
               <Auditoria onErro={tratarErro} />

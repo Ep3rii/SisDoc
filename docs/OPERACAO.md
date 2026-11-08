@@ -27,6 +27,22 @@ validado; detalhes e limites do backup em [Progresso](PROGRESSO.md).
 
 ## Navegação e listas de documentos
 
+### Administração de usuários
+
+Em Administração → Usuários, **Usuários cadastrados** vem primeiro.
+**Novo usuário** abre um modal de até 640 px, com duas colunas em telas
+maiores e uma no celular. Cancelar ou Escape fecha o formulário; se houver
+dados preenchidos, o sistema pede confirmação antes de descartá-los.
+Falhas de cadastro aparecem no modal e preservam os campos para correção.
+
+A senha inicial deve ter entre 10 e 1024 caracteres e não pode constar da
+lista local de senhas comuns. **Exigir troca de senha no primeiro acesso**
+aparece marcado e bloqueado: a API já exige essa troca para toda nova conta,
+sem opção de dispensá-la no contrato atual. Não houve alteração do backend.
+Editar usuário e redefinir senha continuam disponíveis a partir da lista.
+
+### Seções e abas
+
 O menu principal reúne **Início**, **DOFs**, **DTCs**, **Histórico** e,
 somente para admin, **Administração**. Usuários, importação/exportação,
 sincronização e auditoria ficam nas seções internas de Administração.
