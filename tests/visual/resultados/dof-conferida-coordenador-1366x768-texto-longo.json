@@ -79,10 +79,12 @@
       },
       {
         "texto": "Devolver DOF para ajustes",
-        "razao": 10.463765917745874
+        "razao": 9.410012735368888
       }
     ],
-    "primarios": 1
+    "datasIso": [],
+    "acoesVermelhas": [],
+    "primarios": 0
   },
   "focosEncobertos": [],
   "erros": [],

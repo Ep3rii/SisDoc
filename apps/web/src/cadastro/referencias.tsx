@@ -10,6 +10,7 @@ import type { Props, ProtecaoEdicao } from './contexto';
 import { EditorCadastro } from './editor-cadastro';
 import { SugestoesCadastro } from './sugestoes-cadastro';
 import { HistoricoServidor } from './historico-servidor';
+import { dataCivilTexto } from '../compartilhado/datas-tabela';
 
 /** Consulta referências completas auditadas do vínculo e permite edição local autorizada. */
 export function Referencias({ pessoaId, vinculoId, csrf, podeEditarCadastro, onErro, onPendente, confirmarSaida, onAtualizado }: {
@@ -68,16 +69,16 @@ export function Referencias({ pessoaId, vinculoId, csrf, podeEditarCadastro, onE
           dados={dados} csrf={csrf} onErro={onErro} onPendente={onPendente} confirmarSaida={confirmarSaida}
           onAtualizado={() => { setEditando(false); setSugestao(undefined); onAtualizado(); setVersao((v) => v + 1); }} />}
         <details className="grupo-formulario" open><summary>Cadastro completo</summary>
-        <dl className="dados-servidor">{Object.entries(dados.pessoa).map(([nome, valor]) => <div key={nome}><dt>{nome.replace(/_/g, ' ')}</dt><dd>{valor ?? 'Não informado'}</dd></div>)}</dl>
+        <dl className="dados-servidor">{Object.entries(dados.pessoa).map(([nome, valor]) => <div key={nome}><dt>{nome.replace(/_/g, ' ')}</dt><dd>{dataCivilTexto(valor)}</dd></div>)}</dl>
         </details>
         <details className="grupo-formulario" open><summary>Registros de referência</summary>
         {dados.registros.length === 0 && <p>Nenhum registro deste tipo.</p>}
         {dados.registros.map((registro) => <dl className="bloco" key={registro.id}>
-          {Object.entries(registro.campos).map(([nome, valor]) => <div key={nome}><dt>{nome.replace(/_/g, ' ')}</dt><dd>{valor ?? 'Não informado'}</dd></div>)}
+          {Object.entries(registro.campos).map(([nome, valor]) => <div key={nome}><dt>{nome.replace(/_/g, ' ')}</dt><dd>{dataCivilTexto(valor)}</dd></div>)}
         </dl>)}
         <div className="acoes">
-          <button type="button" disabled={!cursor} onClick={() => setCursor(undefined)}>Primeira página de referências</button>
-          <button type="button" disabled={!dados.proximoCursor} onClick={() => setCursor(dados.proximoCursor ?? undefined)}>Próxima página de referências</button>
+          <button type="button" className="secundario" disabled={!cursor} onClick={() => setCursor(undefined)}>Primeira página de referências</button>
+          <button type="button" className="secundario" disabled={!dados.proximoCursor} onClick={() => setCursor(dados.proximoCursor ?? undefined)}>Próxima página de referências</button>
         </div>
         </details>
         <HistoricoServidor pessoaId={pessoaId} vinculoId={vinculoId} csrf={csrf} podeEditar={podeEditarCadastro}

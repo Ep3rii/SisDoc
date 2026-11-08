@@ -2,13 +2,17 @@
   "fase": "verificacao",
   "navegador": "Chromium",
   "telasExecutadas": [
-    "troca-senha",
     "login",
-    "ficha-servidor",
     "inicio",
+    "troca-senha",
+    "ficha-servidor",
     "documentos-servidor",
     "historico-funcional",
     "historico-financeiro",
+    "historico-funcional-detalhes",
+    "historico-financeiro-detalhes",
+    "historico-revisoes",
+    "sugestoes-cadastro",
     "registro-historico",
     "importar-historico",
     "referencias-cadastro",
@@ -60,7 +64,7 @@
     "historico-emissoes"
   ],
   "temaEscuro": "não suportado",
-  "total": 1832,
+  "total": 1928,
   "registros": [
     {
       "tela": "auditoria",
@@ -14163,6 +14167,246 @@
       "problemas": []
     },
     {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1024x768-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1024x768-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1280x720-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1280x720-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1366x768-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1366x768-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1920x1080-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/admin-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-admin-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1024x768-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1024x768-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1280x720-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1280x720-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1366x768-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1366x768-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1920x1080-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/analista-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-analista-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1024x768-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1024x768-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1280x720-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1280x720-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1366x768-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1366x768-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1920x1080-dados.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-financeiro-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-financeiro-detalhes/coordenador-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-financeiro-detalhes-coordenador-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
       "tela": "historico-financeiro",
       "perfil": "admin",
       "estado": "carregando",
@@ -14880,6 +15124,246 @@
       "zoom": 100,
       "captura": "screenshots/historico-financeiro/coordenador-1920x1080-vazio.png",
       "axe": "resultados/historico-financeiro-coordenador-1920x1080-vazio.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1024x768-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1024x768-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1280x720-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1280x720-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1366x768-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1366x768-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1920x1080-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/admin-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-admin-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1024x768-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1024x768-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1280x720-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1280x720-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1366x768-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1366x768-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1920x1080-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/analista-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-analista-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1024x768-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1024x768-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1280x720-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1280x720-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1366x768-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1366x768-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1920x1080-dados.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-funcional-detalhes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-funcional-detalhes/coordenador-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-funcional-detalhes-coordenador-1920x1080-texto-longo.json",
       "problemas": []
     },
     {
@@ -15660,6 +16144,246 @@
       "zoom": 100,
       "captura": "screenshots/historico-funcional/coordenador-1920x1080-vazio.png",
       "axe": "resultados/historico-funcional-coordenador-1920x1080-vazio.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1024x768-dados.png",
+      "axe": "resultados/historico-revisoes-admin-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1024x768-texto-longo.png",
+      "axe": "resultados/historico-revisoes-admin-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1280x720-dados.png",
+      "axe": "resultados/historico-revisoes-admin-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1280x720-texto-longo.png",
+      "axe": "resultados/historico-revisoes-admin-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1366x768-dados.png",
+      "axe": "resultados/historico-revisoes-admin-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1366x768-texto-longo.png",
+      "axe": "resultados/historico-revisoes-admin-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1920x1080-dados.png",
+      "axe": "resultados/historico-revisoes-admin-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/admin-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-revisoes-admin-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1024x768-dados.png",
+      "axe": "resultados/historico-revisoes-analista-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1024x768-texto-longo.png",
+      "axe": "resultados/historico-revisoes-analista-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1280x720-dados.png",
+      "axe": "resultados/historico-revisoes-analista-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1280x720-texto-longo.png",
+      "axe": "resultados/historico-revisoes-analista-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1366x768-dados.png",
+      "axe": "resultados/historico-revisoes-analista-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1366x768-texto-longo.png",
+      "axe": "resultados/historico-revisoes-analista-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1920x1080-dados.png",
+      "axe": "resultados/historico-revisoes-analista-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/analista-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-revisoes-analista-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1024x768-dados.png",
+      "axe": "resultados/historico-revisoes-coordenador-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1024x768-texto-longo.png",
+      "axe": "resultados/historico-revisoes-coordenador-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1280x720-dados.png",
+      "axe": "resultados/historico-revisoes-coordenador-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1280x720-texto-longo.png",
+      "axe": "resultados/historico-revisoes-coordenador-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1366x768-dados.png",
+      "axe": "resultados/historico-revisoes-coordenador-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1366x768-texto-longo.png",
+      "axe": "resultados/historico-revisoes-coordenador-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1920x1080-dados.png",
+      "axe": "resultados/historico-revisoes-coordenador-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "historico-revisoes",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/historico-revisoes/coordenador-1920x1080-texto-longo.png",
+      "axe": "resultados/historico-revisoes-coordenador-1920x1080-texto-longo.json",
       "problemas": []
     },
     {
@@ -17900,6 +18624,246 @@
       "zoom": 100,
       "captura": "screenshots/sincronizacao/admin-1920x1080-vazio.png",
       "axe": "resultados/sincronizacao-admin-1920x1080-vazio.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1024x768-dados.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1024x768-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1280x720-dados.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1280x720-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1366x768-dados.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1366x768-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1920x1080-dados.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "admin",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/admin-1920x1080-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-admin-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1024x768-dados.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1024x768-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1280x720-dados.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1280x720-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1366x768-dados.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1366x768-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1920x1080-dados.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "analista",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/analista-1920x1080-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-analista-1920x1080-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1024x768-dados.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1024x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1024x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1024x768-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1024x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1280x720-dados.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1280x720-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1280x720",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1280x720-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1280x720-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1366x768-dados.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1366x768-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1366x768",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1366x768-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1366x768-texto-longo.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "dados",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1920x1080-dados.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1920x1080-dados.json",
+      "problemas": []
+    },
+    {
+      "tela": "sugestoes-cadastro",
+      "perfil": "coordenador",
+      "estado": "texto-longo",
+      "viewport": "1920x1080",
+      "zoom": 100,
+      "captura": "screenshots/sugestoes-cadastro/coordenador-1920x1080-texto-longo.png",
+      "axe": "resultados/sugestoes-cadastro-coordenador-1920x1080-texto-longo.json",
       "problemas": []
     },
     {

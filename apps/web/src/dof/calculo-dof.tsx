@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { PreviaDocumento } from '../compartilhado/previa-documento';
 import { renderizarPreviaDof } from '@sisdoc/templates';
 import { CorrecaoNoDocumento } from '../cadastro/correcao-no-documento';
+import { dataTabela } from '../compartilhado/datas-tabela';
 
 /** Apresenta editor e prévia DOF sem desmontar painéis ocultos ou perder edições pendentes. */
 export function CalculoDof(props: Props) {
@@ -24,13 +25,13 @@ export function CalculoDof(props: Props) {
       <div className="editor-dof">
       <p className="identificador-documento">DOF · Declaração de Ocorrências Funcionais</p>
       <h2 id="calculo-dof-titulo">DOF — {rascunho?.nome ?? nome}</h2>
-      <p>{rascunho?.nome ?? nome} — matrícula {rascunho?.matricula ?? matricula}. Admissão na fonte: {admissaoAtual ?? 'não informada'}.</p>
+      <p>{rascunho?.nome ?? nome} — matrícula {rascunho?.matricula ?? matricula}. Admissão na fonte: {admissaoAtual ? dataTabela(admissaoAtual) : 'não informada'}.</p>
       {rascunho && <p>{somenteLeitura ? 'Rascunho encaminhado' : 'Rascunho'} — revisão {rascunho.revisao}. Ainda não conferido nem emitido.</p>}
       {rascunho && podeSalvar && !somenteLeitura
         && <UltimaDevolucaoDof rascunho={rascunho} onErro={onErro} onLimpar={onLimpar} />}
       {rascunho && admissaoAtual !== rascunho.resultado.admissaoConsiderada && (
         <p className="aviso erro" role="alert">
-          A admissão considerada no resultado salvo foi {rascunho.resultado.admissaoConsiderada}, diferente da fonte atual.
+          A admissão considerada no resultado salvo foi {dataTabela(rascunho.resultado.admissaoConsiderada)}, diferente da fonte atual.
           {somenteLeitura
             ? ' Solicite ao autor o recolhimento e a conferência dos dados.'
             : admissaoAtual ? ' Prepare a tabela e confira novamente antes de salvar.' : ' A edição está indisponível até a correção na fonte.'}
@@ -108,7 +109,7 @@ export function CalculoDof(props: Props) {
                   const termino = fim < ultimoDia ? fim : ultimoDia;
                   return (
                     <tr key={ano}>
-                      <th scope="row">{ano}</th><td>{comeco} a {termino}{abrangencias[ano] === 'ano_civil' ? ' — lançamento anual integral' : ''}</td>
+                      <th scope="row">{ano}</th><td>{dataTabela(comeco)} a {dataTabela(termino)}{abrangencias[ano] === 'ano_civil' ? ' — lançamento anual integral' : ''}</td>
                       {campos.map(([campo, titulo]) => (
                         <td key={campo}><input className="dias-anuais" type="number" min="0" step="1" inputMode="numeric"
                           aria-label={`${titulo} em ${ano}`} value={valores[ano]?.[campo] ?? ''}
@@ -135,7 +136,7 @@ export function CalculoDof(props: Props) {
       {resultado && (
         <section className="separado" aria-labelledby="resultado-dof-titulo">
           <h4 id="resultado-dof-titulo">{resultadoSalvo ? 'Resultado salvo' : 'Resultado provisório'}</h4>
-          <p>Admissão considerada: {resultado.admissaoConsiderada}. Período efetivo: {resultado.periodo.inicioEfetivo} a {resultado.periodo.fim}. Regra {resultado.regra.codigo}, versão {resultado.regra.versao}.</p>
+          <p>Admissão considerada: {dataTabela(resultado.admissaoConsiderada)}. Período efetivo: {dataTabela(resultado.periodo.inicioEfetivo)} a {dataTabela(resultado.periodo.fim)}. Regra {resultado.regra.codigo}, versão {resultado.regra.versao}.</p>
           <ul>{resultado.avisos.map((aviso, indice) => <li key={`${aviso.codigo}-${indice}`}>{aviso.mensagem}</li>)}</ul>
           <p>Dias do período: <strong>{resultado.totais.diasBrutos.toLocaleString('pt-BR')}</strong>. Tempo líquido de contribuição: <strong>{resultado.totais.totalContribuicao.toLocaleString('pt-BR')}</strong> dias. Efetivo exercício: <strong>{resultado.totais.efetivoExercicio.toLocaleString('pt-BR')}</strong> dias.</p>
           <div className="tabela" role="region" aria-label="Resultado anual da DOF" tabIndex={0}><table>

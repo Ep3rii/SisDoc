@@ -1,0 +1,34 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1920,
+      "height": 1080
+    },
+    "estado": "erro",
+    "zoom": 100
+  },
+  "tela": "importacao-historico",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1920,
+    "scrollWidth": 1920,
+    "fontesPequenas": [],
+    "foco": "BUTTON",
+    "alturaPrevia": null,
+    "limiteAlturaPrevia": 702,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      }
+    ],
+    "datasIso": [],
+    "acoesVermelhas": [],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

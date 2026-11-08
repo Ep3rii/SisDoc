@@ -28,7 +28,9 @@
         "razao": 9.410012735368888
       }
     ],
-    "primarios": 50
+    "datasIso": [],
+    "acoesVermelhas": [],
+    "primarios": 1
   },
   "focosEncobertos": [],
   "erros": [],

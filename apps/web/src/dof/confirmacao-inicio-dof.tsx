@@ -1,6 +1,7 @@
 import type { RascunhoDof } from '@sisdoc/contratos';
 import { useEffect, useRef, useState } from 'react';
 import { api, ErroApi } from '../infraestrutura/api';
+import { dataTabela } from '../compartilhado/datas-tabela';
 
 type Props = {
   rascunho: RascunhoDof;
@@ -50,8 +51,8 @@ export function ConfirmacaoInicioDof({
   return (
     <section className="separado" aria-labelledby="confirmacao-inicio-titulo">
       <h4 id="confirmacao-inicio-titulo">Início ajustado à admissão</h4>
-      <p>O início informado {rascunho.entrada.inicio} é anterior à admissão considerada{' '}
-        {rascunho.resultado.admissaoConsiderada}; o cálculo usa a admissão como início efetivo.</p>
+      <p>O início informado {dataTabela(rascunho.entrada.inicio)} é anterior à admissão considerada{' '}
+        {dataTabela(rascunho.resultado.admissaoConsiderada)}; o cálculo usa a admissão como início efetivo.</p>
       {rascunho.inicioAjustadoConfirmado ? (
         <p role="status">O autor confirmou o ajuste para este cálculo. Isso não constitui conferência nem emissão.</p>
       ) : (

@@ -1,5 +1,5 @@
 import { calcular, linhasDeclaracaoDof, REGRAS_PLANILHA } from '@sisdoc/calculo';
-import { documentoDtcSchema, resultadoCalculoDofSchema, type ConteudoDtc, type TipoDtc } from '@sisdoc/contratos';
+import { documentoDtcSchema, resultadoCalculoDofSchema, type ConteudoDtc, type TipoDtc, type RegistroHistorico } from '@sisdoc/contratos';
 import { calcularDtc } from '../../apps/api/dist/calculos/calculo-dtc.js';
 import { cpfSintetico } from '../dados-sinteticos';
 import type { Page } from 'playwright';
@@ -16,6 +16,20 @@ export const nomes = (config: ConfiguracaoVisual) => config.estado === 'texto-lo
   : 'Servidor fictício visual';
 export const quantidade = (config: ConfiguracaoVisual) => config.estado === 'vazio' ? 0 : config.estado === 'lista-longa' ? 50 : 2;
 export const uuid = (indice: number) => `aaaaaaaa-aaaa-4aaa-8aaa-${String(indice + 1).padStart(12, '0')}`;
+
+function registroHistorico(config: ConfiguracaoVisual, financeiro = false): RegistroHistorico {
+  return {
+    grupo: financeiro ? 'financeiro' : 'funcional', tipo: financeiro ? 'lancamento' : 'ferias',
+    situacao: financeiro ? 'pago' : 'gozado', inicio: financeiro ? null : '2020-01-01', fim: financeiro ? null : '2020-01-30',
+    aquisitivoInicio: financeiro ? null : '2019-01-01', aquisitivoFim: financeiro ? null : '2019-12-31',
+    diasInformados: financeiro ? null : 30, especieLicenca: null, ato: null,
+    descricao: nomes(config), efeitoTempo: 'nao_informado', efeitoRemuneracao: 'nao_informado',
+    competencia: financeiro ? '2020-01' : null, competenciaOrigem: null, pagamento: financeiro ? '2020-01-31' : null,
+    rubrica: financeiro ? '001 — Provento fictício' : null, natureza: financeiro ? 'provento' : null,
+    valor: financeiro ? '1000.00' : null, folha: financeiro ? 'normal' : null,
+    origem: 'fixture', idOrigem: null, eventoId: null, relacionadoId: null,
+  };
+}
 
 export function cadastro(config: ConfiguracaoVisual) {
   return {
@@ -121,21 +135,21 @@ export async function simular(page: Page, config: ConfiguracaoVisual, opcoes: Op
       removidoNaFonte: false, cadastro: cadastro(config), pessoa: { Nome: nomes(config), admissao: '2020-01-01' },
       registros: lista((i) => ({ id: uuid(i), campos: { descricao: 'Evento fictício', inicio: '2020-01-01', fim: '2021-12-31',
         mes_inicio: '2020-01-01', mes_fim: '2021-12-31', removido_na_fonte_em: null } })), proximoCursor: null };
-    else if (p.endsWith('/sugestoes')) dados = { itens: [], proximoCursor: null };
+    else if (p.endsWith('/sugestoes')) dados = { itens: lista((i) => ({
+      documentoId: uuid(i), tipo: 'DOF', revisao: 1, vinculoId, atualizadoEm: agora,
+      ajustes: { nome: `Nome sugerido fictício — ${nomes(config)}` },
+    })), proximoCursor: null };
+    else if (p.endsWith('/revisoes')) dados = { itens: lista((i) => ({
+      id: uuid(i), em: agora, autor: 'Autor fictício', alteracao: {
+        anterior: null, novo: registroHistorico(config), motivo: 'Inclusão exclusivamente fictícia para auditoria visual',
+      },
+    })), proximoCursor: null };
     else if (p.endsWith('/eventos')) dados = { itens: lista((i) => ({ id: uuid(i), tipo: 'Férias', dataEvento: '2020-01-01',
       atoTipo: 'Portaria', atoNumero: '123', dataPublicacao: '2020-01-02', fonte: 'fixture', removidoNaFonte: false })), proximoCursor: null };
     else if (p.endsWith('/historico')) {
       const financeiro = url.searchParams.get('grupo') === 'financeiro';
       dados = { itens: lista((i) => ({ id: uuid(i), pessoaId, vinculoId, revisao: 1, atualizadoEm: agora, loteId: null, linhaOrigem: null,
-        registro: { grupo: financeiro ? 'financeiro' : 'funcional', tipo: financeiro ? 'lancamento' : 'ferias',
-          situacao: financeiro ? 'pago' : 'gozado', inicio: financeiro ? null : '2020-01-01', fim: financeiro ? null : '2020-01-30',
-          aquisitivoInicio: financeiro ? null : '2019-01-01', aquisitivoFim: financeiro ? null : '2019-12-31',
-          diasInformados: financeiro ? null : 30, especieLicenca: null, ato: null,
-          descricao: nomes(config), efeitoTempo: 'nao_informado', efeitoRemuneracao: 'nao_informado',
-          competencia: financeiro ? '2020-01' : null, competenciaOrigem: null, pagamento: financeiro ? '2020-01-31' : null,
-          rubrica: financeiro ? '001 — Provento fictício' : null, natureza: financeiro ? 'provento' : null,
-          valor: financeiro ? '1000.00' : null, folha: financeiro ? 'normal' : null,
-          origem: 'fixture', idOrigem: null, eventoId: null, relacionadoId: null } })),
+        registro: registroHistorico(config, financeiro) })),
         proximoCursor: longo ? uuid(51) : null,
         totais: { registros: count + (longo ? 1 : 0), proventosPagos: financeiro ? `${count * 1000}.00` : '0.00',
           descontosPagos: '0.00', proventosEstornados: '0.00', descontosEstornados: '0.00' } };

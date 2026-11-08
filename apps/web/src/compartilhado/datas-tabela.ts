@@ -16,3 +16,7 @@ export function dataTabela(valor: string | null | undefined): string {
     hourCycle: 'h23',
   });
 }
+
+export function dataCivilTexto(valor: string | null | undefined): string {
+  return valor && /^\d{4}-\d{2}-\d{2}$/.test(valor) ? dataTabela(valor) : valor ?? 'Não informado';
+}

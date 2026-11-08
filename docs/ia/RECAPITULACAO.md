@@ -1,6 +1,6 @@
 # Pontos de memória do projeto
 
-## Auditoria visual — baseline validada — 08/11/2026
+## Auditoria visual — correções validadas — 08/11/2026
 
 Inventário autorizado e checkpoints seguintes dispensados. Suíte em
 `tests/visual`: 56 cenários, 1.832 combinações Chromium, quatro resoluções,
@@ -8,7 +8,7 @@ perfis e estados fictícios; zoom emulado nas seis telas prioritárias.
 API inteiramente interceptada, sem acesso à base real. Axe-core acrescentado
 somente como devDependency; Playwright já existia. Build, tipos e 107 testes
 em seis arquivos aprovados. Baseline antes de qualquer correção de UI.
-Dez problemas agrupados no [relatório](../qa-visual-relatorio.md), incluindo
+Onze problemas agrupados no [relatório](../qa-visual-relatorio.md), incluindo
 foco encoberto e prévia de 80 px. Lote crítico corrigiu reflow/altura e foco
 com rolagem reservada para a barra fixa. Rodada completa e reteste da única
 falha consolidaram zero ocorrências críticas na cobertura inicial. Cobertura
@@ -16,9 +16,17 @@ ampliada isolou crescimento ilimitado do preview ao rolar: corrigido no
 visualizador e validado em sete cenários/60 Tabs. Dois lotes experimentais
 foram revertidos pela regra das duas tentativas. Após corrigir a causa,
 acessibilidade reaplicada em lote separado: 107/107 testes e 1.832 combinações
-sem ocorrências automatizadas, tipos aprovados. Datas/hierarquia da ficha
-ainda pendentes. Não declarar
+sem ocorrências automatizadas, tipos aprovados. Refinamentos de datas,
+hierarquia de ações (incluindo busca do topo e retentativas) e cores
+concluídos. Cobertura final ampliada: 60 cenários, 1.928 combinações,
+112/112 testes em seis arquivos, build/tipos aprovados, 845,84 segundos.
+Zero ocorrências nas guardas automatizadas; baseline inicial preservada.
+HTTPS confiável: health 200, index e 16 assets idênticos ao build final;
+SisDoc/SisDocCaddy ativos, sem reinício ou escrita de teste real.
+Dois lotes revertidos; melhorias reaplicadas após isolar a causa. Não declarar
 conformidade WCAG completa ou igualdade visual integral preview/PDF.
+Pendentes: zoom nativo/leitor de tela/comparação PDF manuais e quatro decisões
+fora do escopo UI, detalhadas no relatório. Commits locais, sem push.
 
 ## Cadastro de usuários em modal — 08/11/2026
 

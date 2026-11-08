@@ -1,20 +1,23 @@
 # Progresso da construção
 
-## Auditoria visual — baseline inicial — 08/11/2026
+## Auditoria visual — conclusão validada — 08/11/2026
 
-**Implementado:** executor Playwright/axe com 56 cenários e respostas de API
+**Implementado:** executor Playwright/axe com 60 cenários e respostas de API
 inteiramente fictícias. `npm run test:visual` compila e executa auditoria,
 modelos/PDFs, nomes e regressões DOF/DTC/usuários; `test:visual:report` abre
 relatório local. Axe-core é a única dependência nova, apenas de teste.
 
-**Testado:** 1.832 combinações Chromium; quatro resoluções, perfis e estados
-aplicáveis, zoom 125%/150% em seis telas prioritárias. 107 testes em seis
-arquivos, build e tipos aprovados; 747 segundos. Nenhuma chamada de API
+**Testado:** baseline inicial de 56 cenários/1.832 combinações; final com
+60 cenários/1.928 combinações Chromium; quatro resoluções, perfis e estados
+aplicáveis, zoom 125%/150% em seis telas prioritárias. 112 testes em seis
+arquivos, build e tipos aprovados; 845,84 segundos. Nenhuma chamada de API
 inesperada/runtime. Fontes pequenas, contraste 4,27:1, regiões sem foco,
-campos encobertos e prévia com 80 px reproduzidos. Evidências e oito grupos
-de problemas em [QA visual](qa-visual-relatorio.md).
+campos encobertos e prévia com 80 px reproduzidos. Onze grupos corrigidos
+(três críticos, cinco importantes, três refinamentos), zero ocorrências nas
+guardas automatizadas. Evidências e limites em [QA visual](qa-visual-relatorio.md).
 
-**Servido:** build atual recompilado, mas interface ainda sem correções.
+**Servido:** HTTPS confiável confirmou health 200, index e 16 assets iguais
+ao build final; SisDoc/SisDocCaddy ativos, sem reinício.
 Nenhum dado real criado/editado/excluído pelos testes; sem mudança de serviços,
 schema, regras, autenticação ou auditoria. Três agentes de cenários acionados
 em paralelo retornaram vazios; implementação/calibração realizadas diretamente.
@@ -22,8 +25,8 @@ em paralelo retornaram vazios; implementação/calibração realizadas diretamen
 scroll-padding/margin e espaço reservado para a barra fixa. Rodada completa
 106/107; a única falha (dois controles na aba Blocos) passou com a segunda
 correção e reteste em 24 combinações. Consolidado sem foco encoberto nem prévia
-insuficiente; tipos aprovados. Sem lote revertido. Pendente: importantes,
-refinamentos, rodada completa seguinte e conferência dos assets servidos.
+insuficiente; tipos aprovados. Lote crítico inicial sem reversão; os lotes
+posteriores foram revalidados integralmente na rodada final.
 
 **Diagnóstico ampliado:** lote de fontes/acessibilidade `bff4808` revertido
 por `9b99d06`; tentativa isolada de foco `bbb4f15` revertida por `e42a030`.
@@ -31,7 +34,7 @@ por `9b99d06`; tentativa isolada de foco `bbb4f15` revertida por `e42a030`.
 o retorno. Altura normal agora limitada ao viewport (65%, mínimo 240 px).
 Sete cenários DOF/preview e diagnóstico fictício passaram; documento estabiliza
 em 1.146 px em vez de crescer 250 px a cada rolagem. Evidências VIS-10 no QA.
-Código experimental de foco não permanece. Importantes ainda a reaplicar
+Código experimental de foco não permanece. Importantes reaplicados
 depois dessa correção de causa; sem alteração de motor/API/base real.
 
 **Importantes validados após corrigir a causa:** fontes de interface ≥13 px,
@@ -39,8 +42,21 @@ contraste da prévia, foco/roles de regiões roláveis, nomes longos quebrados
 nas tabelas e falha de listagem sem carregamento infinito. Rodada completa
 107/107, 1.832 combinações, zero ocorrências automatizadas; tipos aprovados
 (811 segundos). Reaplicação em lote separado, sem código experimental de
-foco. Refinamentos de datas/hierarquia ainda pendentes; assets finais não
-conferidos. Backend e regras não alterados.
+foco. Backend e regras não alterados.
+
+**Refinamentos:** datas civis e competências formatadas só na apresentação;
+hierarquia de botões da ficha, busca do topo, filtros, paginação e retentativas;
+cancelamento/devolução secundários, exclusão vermelha. Primeira rodada ampliada
+109/112 expôs retentativas com dois primários e falha de abertura de arquivos
+de evidência no Windows. Segunda rodada completa 112/112, sem regressões.
+Capturas finais observadas em ficha, históricos/detalhes/revisões/sugestões,
+usuários com nome longo e editor DOF em zoom 150%.
+
+**Pendente fora desta entrega:** zoom nativo, leitor de tela e comparação
+visual integral preview/PDF com documento de teste aprovado; quatro decisões
+de fluxo/modelos/download no relatório. Não afirmar WCAG completa.
+Baseline inicial intacta, baseline pós-correções separada; commits locais,
+sem push. Dois lotes revertidos conforme a regra das duas tentativas.
 
 ## Cadastro de usuários em modal — 08/11/2026
 

@@ -1,0 +1,29 @@
+{
+  "config": {
+    "perfil": "sem-login",
+    "viewport": {
+      "width": 1366,
+      "height": 768
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "login",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1366,
+    "scrollWidth": 1366,
+    "fontesPequenas": [],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "limiteAlturaPrevia": 499,
+    "contrasteDesabilitados": [],
+    "datasIso": [],
+    "acoesVermelhas": [],
+    "primarios": 1
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

@@ -8,6 +8,7 @@ import { CSP_APLICACAO } from '../../apps/api/dist/aplicacao.js';
 import { cenarios } from './cenarios';
 import { simular } from './fixtures';
 import type { ConfiguracaoVisual } from './tipos';
+import { dataCivilTexto, dataTabela } from '../../apps/web/src/compartilhado/datas-tabela';
 
 declare global { interface Window { axe: typeof axe } }
 
@@ -26,6 +27,17 @@ const fase = process.env.SISDOC_VISUAL_PHASE ?? 'verificacao';
 let baseline: Registro[] = [];
 const escapeHtml = (texto: string) => texto.replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+it('formata somente apresentação civil e preserva identificadores e entradas', () => {
+  const entrada = '2020-01-31';
+  expect(dataTabela(entrada)).toBe('31/01/2020');
+  expect(entrada).toBe('2020-01-31');
+  expect(dataCivilTexto('12345')).toBe('12345');
+  expect(dataCivilTexto('Texto sem data')).toBe('Texto sem data');
+  expect(dataCivilTexto(null)).toBe('Não informado');
+  expect(dataCivilTexto('')).toBe('');
+  expect(dataTabela('2026-11-08T12:00:00.000Z')).toBe('08/11/2026, 09:00');
+});
 
 describe('Auditoria visual com API inteiramente fictícia', () => {
   beforeAll(async () => {
@@ -116,6 +128,7 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
             runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
           }));
           const medidas = await page.evaluate(() => {
+            const contexto = document.querySelector('dialog[open]') ?? document.querySelector('.area-principal');
             const luminancia = (cor: string) => {
               const rgb = cor.match(/[\d.]+/g)?.slice(0, 3).map(Number);
               if (!rgb || rgb.length !== 3) throw new Error(`Cor inesperada: ${cor}`);
@@ -145,8 +158,15 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
               alturaPrevia: document.querySelector('.janela-previa')?.getBoundingClientRect().height ?? null,
               limiteAlturaPrevia: document.querySelector('dialog[open]') ? innerHeight : Math.max(240, Math.floor(innerHeight * 0.65)),
               contrasteDesabilitados,
-              primarios: [...document.querySelectorAll('main button:not(.secundario):not(.perigo)')]
-                .filter((el) => el.getClientRects().length && !el.closest('[role="tablist"],nav')).length };
+              datasIso: [...document.querySelectorAll('.tabela td,.dados-servidor dd,summary,.bloco dd,.editor-dof > p')]
+                .filter((el) => el.getClientRects().length && /\b\d{4}-\d{2}-\d{2}\b/.test(el.textContent ?? ''))
+                .map((el) => el.textContent?.trim()),
+              acoesVermelhas: [...document.querySelectorAll('button.perigo,.zona-perigo > summary')]
+                .filter((el) => el.getClientRects().length && !/exclu|remo/i.test(el.textContent ?? ''))
+                .map((el) => el.textContent?.trim()),
+              primarios: [...(contexto?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+                .filter((el) => el.getClientRects().length && !el.disabled && !el.closest('[role="tablist"],nav')
+                  && getComputedStyle(el).backgroundColor === 'rgb(13, 75, 106)').length };
           });
           const focosEncobertos: string[] = [];
           if (config.estado === 'dados' && config.viewport.width === 1366 && config.zoom === 100) {
@@ -192,6 +212,9 @@ describe('Auditoria visual com API inteiramente fictícia', () => {
             expect(medidas.fontesPequenas, `Fontes de interface em ${cenario.id} ${nome}`).toEqual([]);
             expect(registro.problemas).not.toContain('layout:overflow-horizontal');
             expect(registro.problemas).not.toContain('contraste:botao-desabilitado');
+            expect(medidas.primarios, `Ações primárias em ${cenario.id} ${nome}`).toBeLessThanOrEqual(1);
+            expect(medidas.acoesVermelhas, `Vermelho fora de erro/exclusão em ${cenario.id} ${nome}`).toEqual([]);
+            expect(medidas.datasIso, `Datas apresentadas em ${cenario.id} ${nome}`).toEqual([]);
           }
           expect(mock.inesperadas).toEqual([]);
           expect(erros).toEqual([]);

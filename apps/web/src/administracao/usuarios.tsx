@@ -176,7 +176,7 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada, onPend
     <section aria-labelledby="usuarios-titulo">
       <div className="ficha-cabecalho">
         <h2 id="usuarios-titulo">Usuários cadastrados</h2>
-        <button ref={acionador} type="button" aria-haspopup="dialog" onClick={() => {
+        <button ref={acionador} type="button" className={selecionado ? 'secundario' : undefined} aria-haspopup="dialog" onClick={() => {
           if (!confirmarSaida()) return;
           onPendente(false);
           setSelecionado(null);
@@ -226,7 +226,7 @@ export function Usuarios({ sessao, onErro, onMensagem, onSessaoEncerrada, onPend
             <p>A redefinição encerra as sessões do usuário e exige troca no próximo acesso.</p>
             <label>Nova senha<input name="senha" type="password" minLength={10} maxLength={1024} required autoComplete="new-password" /></label>
             <label>Confirme a nova senha<input name="confirmacao" type="password" minLength={10} maxLength={1024} required autoComplete="new-password" /></label>
-            <button type="submit" disabled={ocupado}>Redefinir senha</button>
+            <button type="submit" className="secundario" disabled={ocupado}>Redefinir senha</button>
           </form>
         </div>
       )}

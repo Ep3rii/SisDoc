@@ -53,6 +53,31 @@ export const cenarios: Cenario[] = [
       await page.getByRole('heading', { name: 'Histórico funcional e financeiro', exact: true }).scrollIntoViewIfNeeded();
     },
   })),
+  ...(['funcional', 'financeiro'] as const).map((grupo): Cenario => ({
+    id: `historico-${grupo}-detalhes`, rota: '#/inicio', perfis: todos, estados: dados,
+    preparar: async (page) => {
+      await ficha(page); await page.getByRole('button', { name: /^Histórico funcional \(/ }).click();
+      if (grupo === 'financeiro') await page.getByRole('button', { name: 'Financeiro', exact: true }).click();
+      const registro = page.locator('[aria-label="Histórico funcional e financeiro do vínculo"] > details').first();
+      await registro.locator('summary').click(); await registro.scrollIntoViewIfNeeded();
+    },
+  })),
+  { id: 'historico-revisoes', rota: '#/inicio', perfis: todos, estados: dados,
+    preparar: async (page) => {
+      await ficha(page); await page.getByRole('button', { name: /^Histórico funcional \(/ }).click();
+      const registro = page.locator('[aria-label="Histórico funcional e financeiro do vínculo"] > details').first();
+      await registro.locator('summary').click();
+      await registro.getByRole('button', { name: 'Consultar revisões e motivos', exact: true }).click();
+      await registro.locator('[aria-label="Revisões do registro histórico"] details > summary').first().click();
+      await registro.locator('[aria-label="Revisões do registro histórico"]').scrollIntoViewIfNeeded();
+    } },
+  { id: 'sugestoes-cadastro', rota: '#/inicio', perfis: todos, estados: dados,
+    preparar: async (page) => {
+      await ficha(page); await page.getByLabel('Dados de referência do vínculo').selectOption({ index: 1 });
+      const sugestoes = page.locator('[aria-label="Sugestões de atualização do cadastro"]');
+      await sugestoes.locator('details > summary').first().click();
+      await sugestoes.scrollIntoViewIfNeeded();
+    } },
   { id: 'registro-historico', rota: '#/inicio', perfis: ['admin'], estados: dados, preparar: async (page) => {
     await ficha(page); await page.getByRole('button', { name: /^Histórico funcional \(/ }).click();
     await page.getByRole('button', { name: 'Adicionar registro funcional', exact: true }).click();

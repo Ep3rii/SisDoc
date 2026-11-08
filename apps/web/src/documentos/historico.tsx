@@ -125,7 +125,7 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, confirm
             onChange={(evento) => setConfirmado(evento.target.checked)} />
             Confirmo o cancelamento desta emissão</label>
           <div className="acoes">
-            <button type="submit" className="perigo" disabled={ocupado || !motivo.trim() || !confirmado}>
+            <button type="submit" className="secundario" disabled={ocupado || !motivo.trim() || !confirmado}>
               {ocupado ? 'Cancelando...' : 'Cancelar emissão'}
             </button>
             <button type="button" className="secundario" disabled={ocupado} onClick={() => {
@@ -187,8 +187,8 @@ export function Historico({ csrf, escopos, onErro, onLimpar, onPendente, confirm
                 {item.podeCopiar && <button type="button" className="secundario" disabled={ocupado}
                   onClick={() => void copiar(item)}>Copiar como rascunho <span className="sr-only">da emissão {item.numero}</span></button>}
               </div>
-              {(item.podeExcluir || (item.podeCancelar && item.status === 'emitido')) && <div className="zona-perigo">
-                {item.podeCancelar && item.status === 'emitido' && <button type="button" className="perigo" disabled={ocupado}
+              {(item.podeExcluir || (item.podeCancelar && item.status === 'emitido')) && <div className={item.podeExcluir ? 'zona-perigo' : 'grupo-formulario'}>
+                {item.podeCancelar && item.status === 'emitido' && <button type="button" className="secundario" disabled={ocupado}
                   onClick={() => { onLimpar(); setMensagem(''); setCancelando(item); }}>
                   Cancelar <span className="sr-only">emissão {item.numero}</span></button>}
                 {item.podeExcluir && <ExclusaoDocumento csrf={csrf} documentoId={item.documentoId} revisao={item.revisao}

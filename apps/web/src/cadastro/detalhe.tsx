@@ -67,7 +67,7 @@ export function Detalhe({ pessoaId, vinculoInicial, csrf, podeSalvar, podeEditar
       : !detalhe ? <p role="status">Carregando ficha...</p> : <>
         <section aria-label="Vínculos">
           {detalhe.vinculos.length === 0 && <p>Nenhum vínculo cadastrado.</p>}
-          {[...detalhe.vinculos].sort((a, b) => Number(b.id === vinculoInicial) - Number(a.id === vinculoInicial)).map((vinculo) => {
+          {[...detalhe.vinculos].sort((a, b) => Number(b.id === vinculoInicial) - Number(a.id === vinculoInicial)).map((vinculo, indice) => {
             const admissao = vinculo.admissao;
             return <article className={`ficha-vinculo${vinculo.id === vinculoInicial ? ' selecionado' : ''}`} key={vinculo.id}
               aria-label={`Vínculo da matrícula ${vinculo.matricula}`}>
@@ -79,7 +79,7 @@ export function Detalhe({ pessoaId, vinculoInicial, csrf, podeSalvar, podeEditar
                 {(vinculo.classe || vinculo.nivel) && <p>Classe / nível: {[vinculo.classe, vinculo.nivel].filter(Boolean).join(' / ')}</p>}
                 {vinculo.matriculaAnteriorId && <p>Vínculo anterior: {detalhe.vinculos.find((item) => item.id === vinculo.matriculaAnteriorId)?.matricula ?? 'Não encontrado'}</p>}
               </div>
-              <button type="button" disabled={!admissao} title={!admissao ? 'Admissão ausente na fonte' : undefined}
+              <button type="button" className={indice === 0 ? undefined : 'secundario'} disabled={!admissao} title={!admissao ? 'Admissão ausente na fonte' : undefined}
                 onClick={() => { if (admissao) trocarContexto(() => { onLimpar(); setVinculoCalculo({ id: vinculo.id, matricula: vinculo.matricula, admissao }); }); }}>
                 Calcular DOF <span className="sr-only">da matrícula {vinculo.matricula}</span>
               </button>

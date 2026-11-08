@@ -5,7 +5,7 @@
 Auditoria autorizada em 08/11/2026, após o inventário do checkpoint 1.
 Os checkpoints seguintes foram dispensados pelo usuário. Apenas interface
 e testes estão no escopo; banco, autenticação, autorização, auditoria,
-aprovações de modelos e motor de cálculo não serão modificados.
+aprovações de modelos e motor de cálculo não foram modificados.
 
 Comandos:
 
@@ -43,7 +43,50 @@ falham explicitamente. Dados e capturas são inteiramente fictícios.
 O JSON inclui configurações, violações, verificações incompletas, medidas e
 falhas de rede/runtime. Zero violações axe não comprova conformidade WCAG completa.
 
-## Cobertura e limitações a registrar no fechamento
+Baseline inicial preservada em [baseline.json](../tests/visual/baseline.json)
+e no commit `850bd05`. As capturas de trabalho são atualizadas pela suíte:
+as imagens iniciais completas continuam no Git nesse commit; exemplos antes
+e depois ficam em [evidencias](../tests/visual/evidencias/). A baseline final
+será registrada separadamente, sem sobrescrever a inicial.
+
+## Arquivos e comandos criados
+
+- [auditoria.test.ts](../tests/visual/auditoria.test.ts): Chromium, matriz,
+  axe, medidas, regressões visuais e relatório HTML local
+- [cenarios.ts](../tests/visual/cenarios.ts), [fixtures.ts](../tests/visual/fixtures.ts)
+  e [tipos.ts](../tests/visual/tipos.ts): cenários e contratos fictícios
+- [relatorio.html](../tests/visual/relatorio.html), [resultados](../tests/visual/resultados/),
+  [screenshots](../tests/visual/screenshots/) e [evidencias](../tests/visual/evidencias/):
+  resultados reutilizáveis da auditoria
+- [package.json](../package.json): `test:visual` (build, tipos dos testes e
+  seis arquivos de testes) e `test:visual:report` (abrir relatório)
+- Este relatório e os pontos de memória em
+  [Recapitulação](ia/RECAPITULACAO.md) e [Progresso](PROGRESSO.md)
+
+Fontes alteradas: estilos/visualizador/datas/tabelas compartilhados; busca,
+ficha, históricos, referências e importação do vínculo; apresentação/ações
+DOF e DTC; histórico documental; usuários, importação e auditoria administrativas.
+Não houve alteração de API, banco, autenticação, permissões ou cálculo.
+
+## Cobertura e limitações
+
+Os cenários completos e seus estados/perfis estão em
+[cenarios.ts](../tests/visual/cenarios.ts). A cobertura foi ampliada de 56
+para 60 cenários após a baseline, acrescentando detalhes funcional/financeiro,
+revisões e sugestões de cadastro.
+
+| Área / rota | Telas e componentes exercitados | Perfis |
+|---|---|---|
+| `#/inicio`, sem sessão | Login, erro de credenciais e troca obrigatória de senha | Sem sessão; todos na troca |
+| `#/inicio` | Busca, seleção, ficha, vínculos, documentos, referências, sugestões, eventos e edição cadastral | Admin, analista, coordenador; edição admin |
+| Histórico dentro da ficha | Funcional/financeiro, filtros, paginação, detalhes e revisões; abertura de novo registro e importação CSV/XLSX/XML | Todos em leitura; ações admin |
+| `#/dofs/{aba}` | Rascunhos, Encaminhadas, Devolvidas, Conferidas, exclusão e emissão em lote | Admin, analista, coordenador |
+| Editor DOF | Dados, Período, Tabela ano a ano, Blocos, Conferência, prévia/ampliação e confirmação inicial | Admin, analista, coordenador conforme ações atuais |
+| `#/dtcs/{aba}` | Quatro abas da lista, filtro por tipo; editores IPAM, Comissionado e INSS, Conferência e documento conferido | Admin, analista, coordenador conforme ações atuais |
+| `#/historico` | Emissões, situações, disponibilidade/falha de PDF e ações autorizadas | Admin, analista, coordenador |
+| `#/administracao/usuarios` | Lista, edição, novo usuário em modal, erros e regras de senha | Admin |
+| `#/administracao/importacao` | Importar, Disponibilizar Legado, Exportar, Histórico de lotes e erro de listagem | Admin |
+| `#/administracao/sincronizacao`, `#/administracao/auditoria` | Status/configuração visível, filtros, tabelas e estados de consulta | Admin |
 
 O inventário foi corrigido durante a leitura para incluir a quarta aba,
 **Histórico**, da importação administrativa. A lista compartilhada tem
@@ -53,11 +96,21 @@ As emissões estão no Histórico.
 Estados sem equivalente visual não são inventados. Login não recebe lista
 longa; editores de documento existente não recebem documento vazio inválido.
 As seis configurações de zoom não cobrem todos os estados em todas as resoluções.
+Carregamento/erro não têm representação independente em todos os editores.
+Upload, mapeamento, resultado completo de arquivos e conversão do legado não
+foram exercitados integralmente. Conflitos e confirmações nativas não cobrem
+toda a matriz. A navegação crítica por teclado usa 60 Tabs em dados/1366×768/
+100%; não comprova todas as sequências possíveis em todos os estados.
+Não houve teste em Firefox/WebKit, leitor de tela ou rasterização comparativa
+integral de preview/PDF. O conteúdo do iframe PDF não entra na análise axe.
 
 PDFs v1/v2 e prévias provisórias possuem finalidades e textos diferentes.
 A comparação com documento oficial não pode ser comprovada por screenshot
 do editor nem por respostas fictícias de emissão. Não serão alteradas aprovações
 ou versões de snapshot para contornar essa limitação.
+Os testes de modelos cobrem documentos fictícios v1/v2, A4, textos, escape,
+limites e paginação: DOF/IPAM/Comissionado com duas páginas e INSS com três.
+Isso não substitui a comparação visual manual entre preview e PDF aprovado.
 
 ## Pendências que precisam de decisão
 
@@ -86,6 +139,18 @@ ou versões de snapshot para contornar essa limitação.
 
 ## Resultado
 
+**Final: 60 cenários, 1.928 combinações, 112/112 testes em seis arquivos.**
+Build completo e tipos aprovados; 845,84 segundos na última rodada completa.
+Onze grupos corrigidos: três críticos, cinco importantes, três refinamentos.
+Zero ocorrências automatizadas remanescentes nas guardas executadas, sem
+rotas inesperadas ou erros de runtime; isso não significa WCAG integral.
+Dois lotes revertidos, registrados abaixo. A segunda rodada dos refinamentos
+passou integralmente após corrigir a hierarquia das retentativas.
+
+**Instalação conferida:** HTTPS com CA confiável, health 200, index e 16
+assets iguais ao build final. Serviços SisDoc e SisDocCaddy ativos, sem
+reinício. Nenhum teste gravou dados reais. Commits locais, sem push.
+
 Baseline inicial: **56 cenários, 1.832 combinações**, 107 testes aprovados
 em seis arquivos (auditoria, modelos/PDFs, nomes e regressões DOF/DTC/usuários).
 Build completo e tipos dos testes aprovados. Nenhuma rota de API inesperada
@@ -100,7 +165,6 @@ Botões desabilitados medidos não apresentaram contraste inferior a 4,5:1.
 ### Lotes e problemas reproduzidos
 
 Todos os itens abaixo foram reproduzidos antes de alterar a interface.
-Os commits e evidências depois serão registrados após cada rodada completa.
 
 | ID | Tela / configuração representativa | Problema e causa provável | Gravidade / regra | Arquivo da correção | Antes | Depois / commit |
 |---|---|---|---|---|---|---|
@@ -110,10 +174,11 @@ Os commits e evidências depois serão registrados após cada rodada completa.
 | VIS-04 | Todas · login sem sessão · 1366×768 · dados | Regras CSS com fontes menores de 13 px, incluindo `small` | Importante · requisito de leitura do projeto | `estilos.css` | [captura](../tests/visual/evidencias/VIS-04-antes.png) | [captura](../tests/visual/evidencias/VIS-04-depois.png) · lote acessibilidade após causa |
 | VIS-05 | Editor DOF · admin · 1366×768 · dados | Identificador da prévia: `#566a78` sobre `#dce1e5`, contraste 4,27:1 | Importante · WCAG 1.4.3 | `estilos.css` | [captura](../tests/visual/evidencias/VIS-05-antes.png) | [captura](../tests/visual/evidencias/VIS-05-depois.png) · lote acessibilidade após causa |
 | VIS-06 | Histórico de importação · admin · 1920×1080 · erro | Falha de listagem mantém “Carregando lotes...” | Importante · comunicação de estado | `importacao.tsx` | [captura](../tests/visual/evidencias/VIS-06-antes.png) | [captura](../tests/visual/evidencias/VIS-06-depois.png) · lote acessibilidade após causa |
-| VIS-07 | Histórico funcional e editor DOF · admin · 1366×768 · dados | Datas civis apresentadas em ISO nos resumos e referências | Refinamento · português e datas | Apresentação dos históricos e DOF | [captura](../tests/visual/evidencias/VIS-07-antes.png) | Pendente |
-| VIS-08 | Ficha · analista · 1366×768 · dados | Múltiplos vínculos geram vários botões primários simultâneos | Refinamento · padrão visual do projeto | `detalhe.tsx` | [captura](../tests/visual/evidencias/VIS-08-antes.png) | Pendente |
+| VIS-07 | Histórico funcional e editor DOF · admin · 1366×768 · dados | Datas civis apresentadas em ISO nos resumos e referências | Refinamento · português e datas | Apresentação dos históricos e DOF | [captura](../tests/visual/evidencias/VIS-07-antes.png) | [captura](../tests/visual/evidencias/VIS-07-depois.png) · lote datas/ações |
+| VIS-08 | Ficha · analista · 1366×768 · dados; busca global | Vários vínculos e busca do topo competem como primários simultâneos | Refinamento · padrão visual do projeto | `detalhe.tsx`, `busca-global.tsx`, estilos contextuais | [captura](../tests/visual/evidencias/VIS-08-antes.png) | [captura](../tests/visual/evidencias/VIS-08-depois.png) · lote datas/ações |
 | VIS-09 | Usuários · admin · 1024×768 · texto longo | `min-width: max-content` impede quebra de nome e empurra ações para fora da área visível | Importante · leitura e texto longo | `estilos.css` | [captura](../tests/visual/evidencias/VIS-09-antes.png) | [captura](../tests/visual/evidencias/VIS-09-depois.png) · lote acessibilidade após causa |
 | VIS-10 | Período DOF · admin · 1366×768 · dados | Altura da prévia cresce com a rolagem, deslocando continuamente o retorno aos rascunhos | Crítico · navegação, WCAG 2.1.1 | `previa-documento.tsx` | [medição](../tests/visual/evidencias/VIS-10-antes.json) | [medição](../tests/visual/evidencias/VIS-10-depois.json), [captura](../tests/visual/evidencias/VIS-10-depois.png) · lote de altura limitada |
+| VIS-11 | Histórico de emissões · admin · 1366×768 · dados; devolução DOF/DTC | Cancelar/devolver indevidamente vermelhos | Refinamento · vermelho só para erro/exclusão | Histórico e ações DOF/DTC | [captura](../tests/visual/evidencias/VIS-11-antes.png), [medição](../tests/visual/evidencias/VIS-11-antes.json) | [captura](../tests/visual/evidencias/VIS-11-depois.png), [medição](../tests/visual/evidencias/VIS-11-depois.json) · lote datas/ações |
 
 ### Lote crítico
 
@@ -136,9 +201,8 @@ Fontes, contraste, regiões com foco e erro de importação passaram nas
 no visualizador e no retorno aos rascunhos. Primeira rodada: 105/107 passaram.
 Segunda tentativa ampliou a reserva de rolagem e estabilizou a medição por
 dois frames; Blocos/Usuários passaram, mas Período continuou falhando.
-Conforme a regra de duas tentativas, este lote é registrado e revertido.
-É necessário corrigir a proteção de foco da barra fixa antes de reaplicar
-os importantes; não considerar estas melhorias entregues por enquanto.
+Conforme a regra de duas tentativas, o lote foi registrado e revertido.
+A reaplicação só ocorreu depois de isolar e corrigir a causa abaixo.
 
 Revertido `bff4808` por `9b99d06`. Uma tentativa isolada de proteger foco
 com evento e espaço adicional também falhou após duas tentativas:
@@ -170,4 +234,27 @@ mudaram. Rodada completa **107/107**, 1.832 combinações, zero ocorrências
 automatizadas (axe, fonte, overflow, contraste desabilitado, foco e altura).
 Tipos aprovados. Os dois lotes revertidos permanecem registrados; a reaplicação
 só ocorreu depois da correção do crescimento ilimitado, em lote separado.
-Datas e hierarquia da ficha ainda pendentes.
+Datas e hierarquia da ficha foram tratadas no lote seguinte.
+
+### Refinamentos de apresentação
+
+Datas civis agora usam dd/mm/aaaa em resumos, referências, revisões e DOF;
+competências usam mm/aaaa. Inputs, contratos, cálculos e valores enviados
+continuam intactos. Busca do topo secundária; apenas o primeiro vínculo é
+primário, e formulários locais mantêm hierarquia contextual. Paginação,
+filtros, redefinição e cancelamento/devolução são secundários; exclusão
+continua vermelha. Botões nas tabelas não quebram palavras no meio.
+
+A guarda de primários abrange cabeçalho e conteúdo, não só `main`; dialog
+aberto é o contexto ativo, e abas/navegação não contam como ações primárias.
+A primeira execução ampliada foi interrompida para incluir a busca do topo
+nessa verificação, sem aceitar uma medida parcial como conformidade.
+O JSON anterior VIS-11 inclui “Confirmar exclusão física” pela expressão
+inicial do teste: isso não era uma violação; cancelar/devolver eram.
+A rodada completa seguinte aprovou 109/112 testes; encontrou dois primários
+no estado de erro dos históricos funcional/financeiro. Retentativas e
+paginação de revisões foram ajustadas somente por classe visual. A mesma
+rodada também teve erro explícito de abertura de arquivos de evidência
+(`UNKNOWN`), inclusive no resumo; não foi contada como validação concluída.
+Na reexecução não foram feitas varreduras Git dos resultados enquanto a suíte
+os escrevia, para evitar concorrência de acesso aos arquivos no Windows.

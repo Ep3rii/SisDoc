@@ -1,4 +1,5 @@
 import { CAMPOS_AJUSTE_CADASTRO, type AjustesCadastro } from '@sisdoc/contratos';
+import { dataTabela } from './datas-tabela';
 
 export function AjustesDeclaracao({ fonte, ajustes, onAlterar, bloqueado = false }: {
   fonte: { nome: string; matricula: string; admissao: string | null };
@@ -17,7 +18,7 @@ export function AjustesDeclaracao({ fonte, ajustes, onAlterar, bloqueado = false
         return <div key={campo}>
           <label>{rotulo}<input type={tipo} value={valor ?? ''} maxLength={campo === 'endereco' ? 500 : 200}
             onChange={(evento) => onAlterar({ ...ajustes, [campo]: evento.target.value || (['nome', 'cpf', 'matricula', 'admissao'].includes(campo) ? '' : null) })} /></label>
-          <small>Referência: {original ?? 'Não informado'}{alterado ? ' · Ajuste local' : ''}</small>
+          <small>Referência: {tipo === 'date' && original ? dataTabela(original) : original ?? 'Não informado'}{alterado ? ' · Ajuste local' : ''}</small>
           {alterado && <button type="button" className="secundario" onClick={() => {
             const novo = { ...ajustes }; delete novo[campo]; onAlterar(novo);
           }}>Usar referência <span className="sr-only">para {rotulo}</span></button>}

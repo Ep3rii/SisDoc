@@ -114,7 +114,7 @@ export function Documento({ id, tipo, csrf, papel, onVoltar, onErro, onLimpar, o
             setMotivo(evento.target.value);
             onPendente(evento.target.value.trim().length > 0);
           }} /></label>
-          <div className="acoes"><button type="button" className="perigo" disabled={ocupado || !motivo.trim()}
+          <div className="acoes"><button type="button" className="secundario" disabled={ocupado || !motivo.trim()}
             onClick={() => void executar(async () => {
               await api.devolverDtc(csrf, id, { revisao: documento.revisao, motivo });
               setMotivo('');

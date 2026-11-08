@@ -3,6 +3,7 @@ import { paginaHistoricoServidorSchema, resultadoHistoricoServidorSchema, salvar
   consultaHistoricoServidorSchema, referenciaServidorSchema, revisoesHistoricoSchema, type RegistroHistorico } from '@sisdoc/contratos';
 import { requisitar, validar, ErroApi } from '../infraestrutura/api';
 import { TransferenciaHistorico } from './transferencia-historico';
+import { dataTabela } from '../compartilhado/datas-tabela';
 
 export const historicoVazio = (grupo: RegistroHistorico['grupo']): RegistroHistorico => ({
   grupo, tipo: grupo === 'funcional' ? 'ferias' : 'lancamento', situacao: 'informado',
@@ -29,9 +30,17 @@ const valoresRotulados: Record<string, string> = {
   nao_informado: 'Não informado', sem_efeito: 'Sem efeito (informado)', com_efeito: 'Com efeito (informado)',
   abono_pecuniario: 'Abono pecuniário', abono_permanencia: 'Abono de permanência', lancamento: 'Lançamento financeiro',
 };
-const valorApresentado = (valor: unknown) => typeof valor === 'string'
-  ? (valoresRotulados[valor] ?? valor.replace(/_/g, ' '))
-  : String(valor ?? 'Não informado');
+const valorApresentado = (valor: unknown, campo?: string) => {
+  if (typeof valor !== 'string') return String(valor ?? 'Não informado');
+  if (['inicio', 'fim', 'aquisitivoInicio', 'aquisitivoFim', 'pagamento'].includes(campo ?? '')) return dataTabela(valor);
+  if (['competencia', 'competenciaOrigem'].includes(campo ?? '') && /^\d{4}-\d{2}$/.test(valor)) {
+    return `${valor.slice(5)}/${valor.slice(0, 4)}`;
+  }
+  return valoresRotulados[valor] ?? valor.replace(/_/g, ' ');
+};
+const dataRegistro = (registro: RegistroHistorico) => registro.competencia
+  ? valorApresentado(registro.competencia, 'competencia')
+  : registro.inicio ? dataTabela(registro.inicio) : 'Sem data';
 
 export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErro, onPendente, confirmarSaida }: {
   pessoaId: string; vinculoId: string; csrf: string; podeEditar: boolean;
@@ -176,7 +185,7 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
         </label>)}
       </div>
       <div className="acoes">
-        <button type="submit">Aplicar filtro</button>
+        <button type="submit" className="secundario">Aplicar filtro</button>
         <button type="button" className="secundario" onClick={() => {
           if (registro && !fechar()) return;
           const vazios = { competenciaInicio: '', competenciaFim: '', inicio: '', fim: '', rubrica: '' };
@@ -218,10 +227,10 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
           {opcoes?.historico.filter((item) => item.id !== edicao?.id && (registro.situacao !== 'estornado' ||
             (item.registro.situacao === 'pago' && item.registro.natureza === registro.natureza && item.registro.valor === registro.valor &&
               !opcoes.historico.some((outro) => outro.id !== edicao?.id && outro.registro.situacao === 'estornado' && outro.registro.relacionadoId === item.id)))).map((item) =>
-            <option key={item.id} value={item.id}>{nomes[item.registro.tipo]} — {item.registro.descricao.slice(0, 80)} — {item.registro.competencia ?? item.registro.inicio} — {item.registro.valor ?? ''}</option>)}
+            <option key={item.id} value={item.id}>{nomes[item.registro.tipo]} — {item.registro.descricao.slice(0, 80)} — {dataRegistro(item.registro)} — {item.registro.valor ?? ''}</option>)}
         </select></label>
         {!opcoes && <p role="status">{falhaOpcoes ? 'Não foi possível carregar os relacionamentos.' : 'Carregando todos os relacionamentos do vínculo...'}</p>}
-        {falhaOpcoes && <button type="button" onClick={() => setTentativaOpcoes((v) => v + 1)}>Tentar carregar relacionamentos</button>}
+        {falhaOpcoes && <button type="button" className="secundario" onClick={() => setTentativaOpcoes((v) => v + 1)}>Tentar carregar relacionamentos</button>}
         {(['efeitoTempo', 'efeitoRemuneracao'] as const).map((campo) => <label key={campo}>{campo === 'efeitoTempo' ? 'Efeito informado no tempo' : 'Efeito informado na remuneração'}
           <select value={registro[campo]} onChange={(e) => alterar({ [campo]: e.target.value })}>
             <option value="nao_informado">Não informado</option><option value="sem_efeito">Sem efeito (informado)</option><option value="com_efeito">Com efeito (informado)</option>
@@ -231,16 +240,16 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
       <label>Motivo (mínimo 15 caracteres)<textarea required minLength={15} maxLength={2000} value={motivo} onChange={(e) => { setMotivo(e.target.value); onPendente(true); }} /></label>
       <div className="acoes"><button type="submit">{ocupado ? 'Salvando...' : 'Salvar histórico local'}</button><button type="button" className="secundario" onClick={fechar}>Cancelar edição</button></div>
     </fieldset></form>}
-    {falhou ? <button type="button" onClick={() => setVersao((v) => v + 1)}>Tentar carregar histórico</button> :
+    {falhou ? <button type="button" className="secundario" onClick={() => setVersao((v) => v + 1)}>Tentar carregar histórico</button> :
       !pagina ? <p role="status">Carregando histórico...</p> : <>
         {!itens.length && <p>Nenhum registro deste grupo nesta página.</p>}
         {itens.map((item) => <details key={item.id} className="grupo-formulario"><summary>
-          {nomes[item.registro.tipo]} · {item.registro.competencia ?? item.registro.inicio ?? 'Sem data'} · {item.registro.situacao}
+          {nomes[item.registro.tipo]} · {dataRegistro(item.registro)} · {item.registro.situacao}
         </summary>
           <p>{item.registro.descricao}</p>
           <dl className="dados-servidor">{Object.entries(item.registro).filter(([, valor]) => valor !== null).map(([campo, valor]) =>
-            <div key={campo}><dt>{rotulos[campo as keyof RegistroHistorico]}</dt><dd>{valorApresentado(valor)}</dd></div>)}</dl>
-          <p>Registro {item.id} · revisão {item.revisao} · atualizado em {new Date(item.atualizadoEm).toLocaleString('pt-BR')}.</p>
+            <div key={campo}><dt>{rotulos[campo as keyof RegistroHistorico]}</dt><dd>{valorApresentado(valor, campo)}</dd></div>)}</dl>
+          <p>Registro {item.id} · revisão {item.revisao} · atualizado em {dataTabela(item.atualizadoEm)}.</p>
           <RevisoesHistorico pessoaId={pessoaId} id={item.id} revisao={item.revisao} onErro={onErro} />
           {podeEditar && !registro && <button type="button" className="secundario" onClick={() => { setRegistro(item.registro); setEdicao({ id: item.id, revisao: item.revisao }); setMotivo(''); }}>Editar com motivo</button>}
         </details>)}
@@ -248,8 +257,8 @@ export function HistoricoServidor({ pessoaId, vinculoId, csrf, podeEditar, onErr
         {grupo === 'financeiro' && <p>Totais brutos filtrados — proventos pagos: {pagina.totais.proventosPagos};
           descontos pagos: {pagina.totais.descontosPagos}; proventos estornados: {pagina.totais.proventosEstornados};
           descontos estornados: {pagina.totais.descontosEstornados}. Não representa saldo líquido nem direitos; estornos são exibidos separadamente.</p>}
-        <div className="acoes"><button type="button" disabled={!cursor || !!registro} onClick={() => setCursor(undefined)}>Primeira página de histórico</button>
-          <button type="button" disabled={!pagina.proximoCursor || !!registro} onClick={() => setCursor(pagina.proximoCursor ?? undefined)}>Próxima página de histórico</button></div>
+        <div className="acoes"><button type="button" className="secundario" disabled={!cursor || !!registro} onClick={() => setCursor(undefined)}>Primeira página de histórico</button>
+          <button type="button" className="secundario" disabled={!pagina.proximoCursor || !!registro} onClick={() => setCursor(pagina.proximoCursor ?? undefined)}>Próxima página de histórico</button></div>
       </>}
   </section>;
 }
@@ -274,16 +283,16 @@ function RevisoesHistorico({ pessoaId, id, revisao, onErro }: {
     <button type="button" className="secundario" aria-expanded={aberto} onClick={() => setAberto((valor) => !valor)}>
       {aberto ? 'Ocultar revisões' : 'Consultar revisões e motivos'}
     </button>
-    {aberto && (falhou ? <button type="button" onClick={() => setTentativa((valor) => valor + 1)}>Tentar carregar revisões</button> :
+    {aberto && (falhou ? <button type="button" className="secundario" onClick={() => setTentativa((valor) => valor + 1)}>Tentar carregar revisões</button> :
       !pagina ? <p role="status">Carregando revisões...</p> : <>
-        {pagina.itens.map((item) => <details key={item.id}><summary>{new Date(item.em).toLocaleString('pt-BR')} · {item.autor}</summary>
+        {pagina.itens.map((item) => <details key={item.id}><summary>{dataTabela(item.em)} · {item.autor}</summary>
           <p>Motivo: {item.alteracao.motivo}</p>
           <dl>{Object.entries(item.alteracao.novo).filter(([campo, valor]) =>
             Reflect.get(item.alteracao.anterior ?? {}, campo) !== valor).map(([campo, valor]) =>
-            <div key={campo}><dt>{rotulos[campo as keyof RegistroHistorico]}</dt><dd>{valorApresentado(Reflect.get(item.alteracao.anterior ?? {}, campo))} → {valorApresentado(valor)}</dd></div>)}</dl>
+            <div key={campo}><dt>{rotulos[campo as keyof RegistroHistorico]}</dt><dd>{valorApresentado(Reflect.get(item.alteracao.anterior ?? {}, campo), campo)} → {valorApresentado(valor, campo)}</dd></div>)}</dl>
         </details>)}
-        <div className="acoes"><button type="button" disabled={!cursor} onClick={() => setCursor(undefined)}>Revisões recentes</button>
-          <button type="button" disabled={!pagina.proximoCursor} onClick={() => setCursor(pagina.proximoCursor ?? undefined)}>Revisões anteriores</button></div>
+        <div className="acoes"><button type="button" className="secundario" disabled={!cursor} onClick={() => setCursor(undefined)}>Revisões recentes</button>
+          <button type="button" className="secundario" disabled={!pagina.proximoCursor} onClick={() => setCursor(pagina.proximoCursor ?? undefined)}>Revisões anteriores</button></div>
       </>)}
   </section>;
 }

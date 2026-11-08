@@ -44,7 +44,7 @@ export function TransferenciaHistorico({ pessoaId, vinculoId, grupo, csrf, onErr
       <label>Origem técnica<input value={origem} onChange={(e) => { setOrigem(e.target.value); setRelatorio(null); }} /></label>
       <label>Nome exato da aba XLSX (vazio = primeira aba)<input value={aba} onChange={(e) => { setAba(e.target.value); setRelatorio(null); }} /></label>
       <label>Arquivo<input type="file" accept=".csv,.xlsx,.xml" onChange={(e) => { setArquivo(e.target.files?.[0] ?? null); setRelatorio(null); }} /></label>
-    </div><div className="acoes"><button type="button" disabled={!arquivo} onClick={() => void processar('validar')}>Validar {titulo}</button>
+    </div><div className="acoes"><button type="button" className={relatorio?.modo === 'validar' ? 'secundario' : undefined} disabled={!arquivo} onClick={() => void processar('validar')}>Validar {titulo}</button>
       <button type="button" disabled={!relatorio || relatorio.modo !== 'validar'} onClick={() => void processar('gravar')}>Confirmar importação</button></div></fieldset>
     {relatorio && <div role="status"><p>{relatorio.modo === 'validar' ? 'Validação sem gravação' : 'Importação concluída'}: {relatorio.inseridos} {relatorio.modo === 'validar' ? 'a inserir' : 'inseridos'}, {relatorio.inalterados} inalterados, {relatorio.divergentes} divergentes, {relatorio.rejeitados} rejeitados.</p>
       {relatorio.ocorrencias.map((item, i) => <p key={i}>Linha {item.linha}: {item.motivo}</p>)}

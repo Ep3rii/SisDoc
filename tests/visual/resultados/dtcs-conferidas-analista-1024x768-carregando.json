@@ -19,7 +19,9 @@
     "alturaPrevia": null,
     "limiteAlturaPrevia": 499,
     "contrasteDesabilitados": [],
-    "primarios": 0
+    "datasIso": [],
+    "acoesVermelhas": [],
+    "primarios": 1
   },
   "focosEncobertos": [],
   "erros": [],

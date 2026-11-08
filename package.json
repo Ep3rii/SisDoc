@@ -20,7 +20,7 @@
     "aprovar-modelo": "node apps/api/dist/setup/aprovar-modelo.cli.js",
     "importacao": "node apps/api/dist/importacao/importacao.cli.js",
     "importacao:conferir": "node apps/api/dist/importacao/conferir.cli.js",
-    "test:visual": "npm run build && node scripts/executar-testes.cjs tests/visual/auditoria.test.ts tests/modelos-oficiais.test.ts tests/nome-pdf.test.ts tests/interface-usuarios.test.ts tests/interface-rascunhos.test.ts tests/interface-dtc.test.ts",
+    "test:visual": "npm run build && tsc -p tsconfig.tests.json --noEmit && node scripts/executar-testes.cjs tests/visual/auditoria.test.ts tests/modelos-oficiais.test.ts tests/nome-pdf.test.ts tests/interface-usuarios.test.ts tests/interface-rascunhos.test.ts tests/interface-dtc.test.ts",
     "test:visual:report": "powershell -NoProfile -Command \"Start-Process tests\\visual\\relatorio.html\"",
     "test": "npm run build && node scripts/executar-testes.cjs"
   },

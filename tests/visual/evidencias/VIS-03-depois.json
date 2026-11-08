@@ -1,0 +1,42 @@
+{
+  "config": {
+    "perfil": "admin",
+    "viewport": {
+      "width": 1024,
+      "height": 768
+    },
+    "estado": "dados",
+    "zoom": 100
+  },
+  "tela": "auditoria",
+  "axe": [],
+  "incompletos": [],
+  "medidas": {
+    "largura": 1024,
+    "scrollWidth": 1024,
+    "fontesPequenas": [],
+    "foco": "BODY",
+    "alturaPrevia": null,
+    "limiteAlturaPrevia": 499,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Primeira página",
+        "razao": 9.410012735368888
+      },
+      {
+        "texto": "Próxima página",
+        "razao": 9.410012735368888
+      }
+    ],
+    "datasIso": [],
+    "acoesVermelhas": [],
+    "primarios": 0
+  },
+  "focosEncobertos": [],
+  "erros": [],
+  "rotasInesperadas": []
+}

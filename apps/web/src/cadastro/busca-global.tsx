@@ -30,7 +30,7 @@ export function BuscaGlobal({ onBuscar, onErro, inicio = false }: {
         <input name="q" maxLength={200} required autoComplete="off" autoFocus={inicio}
           placeholder="Nome ou matrícula do servidor" aria-describedby={orientacaoId} aria-keyshortcuts="/" />
       </label>
-      <button type="submit">Buscar</button>
+      <button type="submit" className={inicio ? undefined : 'secundario'}>Buscar</button>
       <span className="sr-only" id={orientacaoId}>Nome: mínimo de três caracteres. Números ou matrícula com sufixo, como 15-1: matrícula exata. Enter busca; barra foca a busca.</span>
     </form>
   );

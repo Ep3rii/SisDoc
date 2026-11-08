@@ -199,7 +199,7 @@ export function ConferidosDof({ csrf, podeDevolver, podeEmitir, administrador = 
                 onPendente(evento.target.value.trim().length > 0);
               }} />
             </label>
-            <button type="submit" className="perigo" disabled={ocupado || !motivo.trim()}>
+            <button type="submit" className="secundario" disabled={ocupado || !motivo.trim()}>
               {ocupado ? 'Devolvendo...' : 'Devolver DOF para ajustes'}
             </button>
           </form>
