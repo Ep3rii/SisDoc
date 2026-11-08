@@ -17,6 +17,7 @@
     "fontesPequenas": [],
     "foco": "BODY",
     "alturaPrevia": null,
+    "limiteAlturaPrevia": 399,
     "contrasteDesabilitados": [],
     "primarios": 1
   },

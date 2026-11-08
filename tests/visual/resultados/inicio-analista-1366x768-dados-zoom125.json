@@ -14,14 +14,10 @@
   "medidas": {
     "largura": 1093,
     "scrollWidth": 1093,
-    "fontesPequenas": [
-      "button.secundario:12.8px",
-      "p.:12.8px",
-      "span.:12px",
-      "strong.:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "INPUT",
     "alturaPrevia": null,
+    "limiteAlturaPrevia": 399,
     "contrasteDesabilitados": [
       {
         "texto": "Primeira página de resultados",

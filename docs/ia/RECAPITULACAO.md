@@ -14,7 +14,10 @@ com rolagem reservada para a barra fixa. Rodada completa e reteste da única
 falha consolidaram zero ocorrências críticas na cobertura inicial. Cobertura
 ampliada isolou crescimento ilimitado do preview ao rolar: corrigido no
 visualizador e validado em sete cenários/60 Tabs. Dois lotes experimentais
-foram revertidos pela regra das duas tentativas. Demais lotes pendentes. Não declarar
+foram revertidos pela regra das duas tentativas. Após corrigir a causa,
+acessibilidade reaplicada em lote separado: 107/107 testes e 1.832 combinações
+sem ocorrências automatizadas, tipos aprovados. Datas/hierarquia da ficha
+ainda pendentes. Não declarar
 conformidade WCAG completa ou igualdade visual integral preview/PDF.
 
 ## Cadastro de usuários em modal — 08/11/2026

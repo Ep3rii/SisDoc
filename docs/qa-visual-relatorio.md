@@ -106,13 +106,13 @@ Os commits e evidências depois serão registrados após cada rodada completa.
 |---|---|---|---|---|---|---|
 | VIS-01 | Editor DOF · analista · 1366×768 · dados | Campo focado por Tab sob a barra fixa; espaço/rolagem não consideram o rodapé | Crítico · teclado, WCAG 2.4.7 | `estilos.css` | [captura](../tests/visual/evidencias/VIS-01-antes.png), [medida](../tests/visual/evidencias/VIS-01-antes.json) | [captura](../tests/visual/evidencias/VIS-01-depois.png), [medida](../tests/visual/evidencias/VIS-01-depois.json) · lote crítico |
 | VIS-02 | Editor DOF · analista · 1366×768 · zoom 150% | Prévia com apenas 80 px de altura CSS; editor e controles disputam largura/altura | Crítico · emissão, reflow | `previa-documento.tsx`, `estilos.css` | [captura](../tests/visual/evidencias/VIS-02-antes.png) | [captura](../tests/visual/evidencias/VIS-02-depois.png) · lote crítico |
-| VIS-03 | Auditoria · admin · 1024×768 · dados; tabela DOF, lotes e prévia ampliada | Regiões roláveis sem foco próprio; teclado não alcança conteúdo lateral | Importante · WCAG 2.1.1 | Tabelas e visualizador compartilhado | [captura](../tests/visual/evidencias/VIS-03-antes.png) | Pendente |
-| VIS-04 | Todas · login sem sessão · 1366×768 · dados | Regras CSS com fontes menores de 13 px, incluindo `small` | Importante · requisito de leitura do projeto | `estilos.css` | [captura](../tests/visual/evidencias/VIS-04-antes.png) | Pendente |
-| VIS-05 | Editor DOF · admin · 1366×768 · dados | Identificador da prévia: `#566a78` sobre `#dce1e5`, contraste 4,27:1 | Importante · WCAG 1.4.3 | `estilos.css` | [captura](../tests/visual/evidencias/VIS-05-antes.png) | Pendente |
-| VIS-06 | Histórico de importação · admin · 1920×1080 · erro | Falha de listagem mantém “Carregando lotes...” | Importante · comunicação de estado | `importacao.tsx` | [captura](../tests/visual/evidencias/VIS-06-antes.png) | Pendente |
+| VIS-03 | Auditoria · admin · 1024×768 · dados; tabela DOF, lotes e prévia ampliada | Regiões roláveis sem foco próprio; teclado não alcança conteúdo lateral | Importante · WCAG 2.1.1 | Tabelas e visualizador compartilhado | [captura](../tests/visual/evidencias/VIS-03-antes.png) | [captura](../tests/visual/evidencias/VIS-03-depois.png) · lote acessibilidade após causa |
+| VIS-04 | Todas · login sem sessão · 1366×768 · dados | Regras CSS com fontes menores de 13 px, incluindo `small` | Importante · requisito de leitura do projeto | `estilos.css` | [captura](../tests/visual/evidencias/VIS-04-antes.png) | [captura](../tests/visual/evidencias/VIS-04-depois.png) · lote acessibilidade após causa |
+| VIS-05 | Editor DOF · admin · 1366×768 · dados | Identificador da prévia: `#566a78` sobre `#dce1e5`, contraste 4,27:1 | Importante · WCAG 1.4.3 | `estilos.css` | [captura](../tests/visual/evidencias/VIS-05-antes.png) | [captura](../tests/visual/evidencias/VIS-05-depois.png) · lote acessibilidade após causa |
+| VIS-06 | Histórico de importação · admin · 1920×1080 · erro | Falha de listagem mantém “Carregando lotes...” | Importante · comunicação de estado | `importacao.tsx` | [captura](../tests/visual/evidencias/VIS-06-antes.png) | [captura](../tests/visual/evidencias/VIS-06-depois.png) · lote acessibilidade após causa |
 | VIS-07 | Histórico funcional e editor DOF · admin · 1366×768 · dados | Datas civis apresentadas em ISO nos resumos e referências | Refinamento · português e datas | Apresentação dos históricos e DOF | [captura](../tests/visual/evidencias/VIS-07-antes.png) | Pendente |
 | VIS-08 | Ficha · analista · 1366×768 · dados | Múltiplos vínculos geram vários botões primários simultâneos | Refinamento · padrão visual do projeto | `detalhe.tsx` | [captura](../tests/visual/evidencias/VIS-08-antes.png) | Pendente |
-| VIS-09 | Usuários · admin · 1024×768 · texto longo | `min-width: max-content` impede quebra de nome e empurra ações para fora da área visível | Importante · leitura e texto longo | `estilos.css` | [captura](../tests/visual/evidencias/VIS-09-antes.png) | Pendente |
+| VIS-09 | Usuários · admin · 1024×768 · texto longo | `min-width: max-content` impede quebra de nome e empurra ações para fora da área visível | Importante · leitura e texto longo | `estilos.css` | [captura](../tests/visual/evidencias/VIS-09-antes.png) | [captura](../tests/visual/evidencias/VIS-09-depois.png) · lote acessibilidade após causa |
 | VIS-10 | Período DOF · admin · 1366×768 · dados | Altura da prévia cresce com a rolagem, deslocando continuamente o retorno aos rascunhos | Crítico · navegação, WCAG 2.1.1 | `previa-documento.tsx` | [medição](../tests/visual/evidencias/VIS-10-antes.json) | [medição](../tests/visual/evidencias/VIS-10-depois.json), [captura](../tests/visual/evidencias/VIS-10-depois.png) · lote de altura limitada |
 
 ### Lote crítico
@@ -159,3 +159,15 @@ em 1.146 px e o retorno ficou acima do rodapé. Sete cenários DOF/preview e
 um diagnóstico passaram; tipos aprovados. Diagnóstico temporário removido,
 medidas e captura fictícia preservadas. A suíte permanente verifica mínimo,
 máximo e 60 passos de Tab. Este lote não altera cálculo documental ou dados.
+
+### Acessibilidade após corrigir a causa
+
+Reaplicadas fontes de interface ≥13 px, cor do identificador `#435968`,
+foco visível para todos os controles/regiões, regiões roláveis nomeadas com
+Tab e quebra de nomes longos nas tabelas. Erro de importação agora comunica
+a falha e orienta usar Atualizar lista; requisições, importação e dados não
+mudaram. Rodada completa **107/107**, 1.832 combinações, zero ocorrências
+automatizadas (axe, fonte, overflow, contraste desabilitado, foco e altura).
+Tipos aprovados. Os dois lotes revertidos permanecem registrados; a reaplicação
+só ocorreu depois da correção do crescimento ilimitado, em lote separado.
+Datas e hierarquia da ficha ainda pendentes.

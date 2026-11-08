@@ -14,11 +14,10 @@
   "medidas": {
     "largura": 1366,
     "scrollWidth": 1366,
-    "fontesPequenas": [
-      "p.aviso erro:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "BODY",
     "alturaPrevia": null,
+    "limiteAlturaPrevia": 499,
     "contrasteDesabilitados": [],
     "primarios": 1
   },

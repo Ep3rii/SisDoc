@@ -14,15 +14,16 @@
   "medidas": {
     "largura": 1920,
     "scrollWidth": 1920,
-    "fontesPequenas": [
-      "button.secundario:12.8px",
-      "p.:12.8px",
-      "span.:12px",
-      "strong.:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "BODY",
     "alturaPrevia": null,
-    "contrasteDesabilitados": [],
+    "limiteAlturaPrevia": 702,
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      }
+    ],
     "primarios": 0
   },
   "focosEncobertos": [],

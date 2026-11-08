@@ -14,15 +14,10 @@
   "medidas": {
     "largura": 1920,
     "scrollWidth": 1920,
-    "fontesPequenas": [
-      "button.secundario:12.8px",
-      "p.:12.8px",
-      "p.aviso erro:12.8px",
-      "span.:12px",
-      "strong.:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "BUTTON",
     "alturaPrevia": null,
+    "limiteAlturaPrevia": 702,
     "contrasteDesabilitados": [
       {
         "texto": "Primeira página de documentos",

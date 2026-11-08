@@ -88,38 +88,6 @@
             {
               "id": "color-contrast",
               "data": {
-                "contrastRatio": 0,
-                "fontSize": "9.8pt (13px)",
-                "fontWeight": "normal",
-                "messageKey": "elmPartiallyObscured",
-                "expectedContrastRatio": "4.5:1"
-              },
-              "relatedNodes": [
-                {
-                  "html": "<div class=\"tabela tabela-documentos\">",
-                  "target": [
-                    ".tabela"
-                  ]
-                }
-              ],
-              "impact": "serious",
-              "message": "Element's background color could not be determined because it's partially obscured by another element"
-            }
-          ],
-          "all": [],
-          "none": [],
-          "impact": "serious",
-          "html": "<button type=\"button\" class=\"secundario abrir-documento\" aria-label=\"Abrir DOF de Servidor inteiramente fictício para auditoria visual com nome extenso e sobrenomes de oitenta caracteres ou mais\">",
-          "target": [
-            ".linha-documento:nth-child(1) > td:nth-child(1) > .abrir-documento.secundario[type=\"button\"]"
-          ],
-          "failureSummary": "Fix any of the following:\n  Element's background color could not be determined because it's partially obscured by another element"
-        },
-        {
-          "any": [
-            {
-              "id": "color-contrast",
-              "data": {
                 "messageKey": "nonBmp"
               },
               "relatedNodes": [],
@@ -163,14 +131,10 @@
   "medidas": {
     "largura": 1280,
     "scrollWidth": 1280,
-    "fontesPequenas": [
-      "button.secundario:12.8px",
-      "p.:12.8px",
-      "span.:12px",
-      "strong.:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "TEXTAREA",
     "alturaPrevia": null,
+    "limiteAlturaPrevia": 468,
     "contrasteDesabilitados": [
       {
         "texto": "Confirmar exclusão física",

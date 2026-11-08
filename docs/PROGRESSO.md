@@ -34,6 +34,14 @@ em 1.146 px em vez de crescer 250 px a cada rolagem. Evidências VIS-10 no QA.
 Código experimental de foco não permanece. Importantes ainda a reaplicar
 depois dessa correção de causa; sem alteração de motor/API/base real.
 
+**Importantes validados após corrigir a causa:** fontes de interface ≥13 px,
+contraste da prévia, foco/roles de regiões roláveis, nomes longos quebrados
+nas tabelas e falha de listagem sem carregamento infinito. Rodada completa
+107/107, 1.832 combinações, zero ocorrências automatizadas; tipos aprovados
+(811 segundos). Reaplicação em lote separado, sem código experimental de
+foco. Refinamentos de datas/hierarquia ainda pendentes; assets finais não
+conferidos. Backend e regras não alterados.
+
 ## Cadastro de usuários em modal — 08/11/2026
 
 **Implementado:** Usuários cadastrados primeiro, Novo usuário abre dialog

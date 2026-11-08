@@ -10,67 +10,14 @@
   },
   "tela": "dtc_inss-editor-1",
   "axe": [],
-  "incompletos": [
-    {
-      "id": "aria-prohibited-attr",
-      "impact": "serious",
-      "tags": [
-        "cat.aria",
-        "wcag2a",
-        "wcag412",
-        "EN-301-549",
-        "EN-9.4.1.2",
-        "RGAAv4",
-        "RGAA-7.1.1"
-      ],
-      "description": "Ensure ARIA attributes are not prohibited for an element's role",
-      "help": "Elements must only use permitted ARIA attributes",
-      "helpUrl": "https://dequeuniversity.com/rules/axe/4.11/aria-prohibited-attr?application=axeAPI",
-      "nodes": [
-        {
-          "any": [],
-          "all": [],
-          "none": [
-            {
-              "id": "aria-prohibited-attr",
-              "data": {
-                "role": null,
-                "nodeName": "div",
-                "messageKey": "noRoleSingular",
-                "prohibited": [
-                  "aria-label"
-                ]
-              },
-              "relatedNodes": [],
-              "impact": "serious",
-              "message": "aria-label attribute is not well supported on a div with no valid role attribute."
-            }
-          ],
-          "impact": "serious",
-          "html": "<div class=\"acoes controles-previa\" aria-label=\"Exibição da prévia\">",
-          "target": [
-            ".controles-previa"
-          ],
-          "failureSummary": "Fix all of the following:\n  aria-label attribute is not well supported on a div with no valid role attribute."
-        }
-      ]
-    }
-  ],
+  "incompletos": [],
   "medidas": {
     "largura": 1024,
     "scrollWidth": 1024,
-    "fontesPequenas": [
-      "button.:12.8px",
-      "button.secundario:12.8px",
-      "button.secundario:12px",
-      "label.:12px",
-      "p.:12.48px",
-      "p.:12.8px",
-      "span.:12px",
-      "strong.:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "BUTTON",
     "alturaPrevia": 499,
+    "limiteAlturaPrevia": 499,
     "contrasteDesabilitados": [],
     "primarios": 1
   },

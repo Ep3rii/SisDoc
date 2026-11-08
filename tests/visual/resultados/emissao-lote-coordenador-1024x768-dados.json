@@ -57,15 +57,10 @@
   "medidas": {
     "largura": 1024,
     "scrollWidth": 1024,
-    "fontesPequenas": [
-      "button.secundario:12.8px",
-      "p.:12.8px",
-      "span.:12px",
-      "strong.:12.8px",
-      "summary.:12.8px"
-    ],
+    "fontesPequenas": [],
     "foco": "SUMMARY",
     "alturaPrevia": null,
+    "limiteAlturaPrevia": 499,
     "contrasteDesabilitados": [
       {
         "texto": "Emitir 0 documento(s) selecionado(s)",
