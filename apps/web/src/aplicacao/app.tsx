@@ -229,18 +229,7 @@ export function App() {
           </span>
         )}
       </header>
-      <main onFocusCapture={(evento) => {
-        const alvo = evento.target;
-        const barra = evento.currentTarget.querySelector('.barra-totais');
-        if (!(alvo instanceof HTMLElement) || !barra || barra.contains(alvo) || alvo.closest('dialog')) return;
-        requestAnimationFrame(() => {
-          if (document.activeElement !== alvo) return;
-          const limites = alvo.getBoundingClientRect();
-          if (limites.bottom > barra.getBoundingClientRect().top && limites.top < window.innerHeight) {
-            alvo.scrollIntoView({ block: 'start' });
-          }
-        });
-      }}>
+      <main>
       <div className="conteudo">
         <h1 className="sr-only">DOF e DTC</h1>
         {erro && <p className="aviso erro" role="alert">{erro}</p>}

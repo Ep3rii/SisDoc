@@ -195,9 +195,8 @@ th { background: #e7eef2; }
 .editor-previa iframe, .previa-conferida { display: block; width: 100%; min-height: 36rem; margin-top: 1rem; border: 1px solid #627988; background: #fff; }
 .bloco { margin-top: 1rem; padding: 1rem; border: 1px solid #b8cbd5; }
 .bloco h5 { margin: 0 0 .75rem; }
-.conteudo:has(.barra-totais) { padding-bottom: 14rem; }
-.conteudo:has(.barra-totais) :is(button, input, select, textarea, summary, iframe, [tabindex]) { scroll-margin-top: 5rem; scroll-margin-bottom: 14rem; }
-.estudio-dof { padding-bottom: 1rem; }
+.estudio-dof { padding-bottom: 14rem; }
+.estudio-dof :is(button, input, select, textarea, summary, [tabindex]) { scroll-margin-top: 5rem; scroll-margin-bottom: 14rem; }
 .editor-dof > h2 { margin: .2rem 0; font-family: Georgia, serif; font-size: 1.4rem; }
 .editor-dof > p { margin: .45rem 0; font-size: .8rem; }
 .orientacoes-dof { margin: .5rem 0; font-size: .8rem; }
