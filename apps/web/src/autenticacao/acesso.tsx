@@ -12,8 +12,11 @@ function CampoSenha({ nome, titulo, nova = false }: { nome: string; titulo: stri
   const [visivel, setVisivel] = useState(false);
   const id = useId();
   return <div className="campo-senha"><label htmlFor={id}>{titulo}</label>
+    <div className="campo-senha-controle">
     <input id={id} name={nome} type={visivel ? 'text' : 'password'} autoComplete={nova ? 'new-password' : 'current-password'}
-      minLength={nova ? 10 : undefined} maxLength={1024} required aria-describedby={nova ? `${id}-requisito` : undefined} />
+      minLength={nova ? 10 : undefined} maxLength={1024} required aria-describedby={nova ? `${id}-requisito` : undefined}
+      onCopy={(evento) => evento.preventDefault()} onCut={(evento) => evento.preventDefault()}
+      onPaste={(evento) => evento.preventDefault()} onDrop={(evento) => evento.preventDefault()} />
     <button type="button" className="secundario campo-senha-botao" aria-label={`${visivel ? 'Ocultar' : 'Mostrar'} ${titulo.toLocaleLowerCase('pt-BR')}`}
       aria-pressed={visivel} aria-controls={id} onClick={() => setVisivel((valor) => !valor)}>
       {visivel ? (
@@ -22,6 +25,7 @@ function CampoSenha({ nome, titulo, nova = false }: { nome: string; titulo: stri
         <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z" /><circle cx="12" cy="12" r="2.5" /></svg>
       )}
     </button>
+    </div>
     {nova && <small id={`${id}-requisito`}>Pelo menos 10 caracteres; evite senhas comuns.</small>}
   </div>;
 }

@@ -1,5 +1,21 @@
 # Pontos de memória do projeto
 
+## Ajustes de login, editor e Salvar DOF — 08/11/2026
+
+Olho centralizado no input; mensagens de sessão abaixo do cabeçalho, cartão
+centralizado. Clipboard bloqueado nos campos de senha, mesmo revelados,
+conforme solicitação (não é ganho de segurança; dificulta colagem de gerenciadores).
+Editor/prévia em metades iguais acima de 900 px, empilhados abaixo; removidos
+ajuste de largura, Atualizar e Ampliar prévia. Atualização local automática
+preservada; fonte DOF reconsulta no retorno à janela/mudança de revisão,
+bloqueada por foco durante conferência; retentativa só em erro.
+Salvar rascunho visível desde o cálculo para autorizados, desabilitado até
+cálculo/motivo válidos. Admin não ganhou criação, somente leitura preservada.
+Build/tipos e 116/116 testes, 60 cenários/1.928 combinações sem ocorrências
+automatizadas (849,31 s). HTTPS health 200, index/16 assets iguais, serviços
+ativos, sem reinício ou dados fictícios reais. Baseline final atualizada;
+inicial preservada. [Relatório e evidências](../qa-visual-relatorio.md).
+
 ## Auditoria visual — correções validadas — 08/11/2026
 
 Inventário autorizado e checkpoints seguintes dispensados. Suíte em

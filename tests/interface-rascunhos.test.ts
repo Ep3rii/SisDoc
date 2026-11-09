@@ -806,6 +806,7 @@ describe('interface de rascunhos com API sintética', () => {
     if (!editor || !previa) throw new Error('Editor ou painel de prévia não está visível.');
     expect(editor.width).toBeGreaterThan(300);
     expect(previa.width).toBeGreaterThan(300);
+    expect(Math.abs(editor.width - previa.width)).toBeLessThanOrEqual(1);
     expect(previa.x).toBeGreaterThanOrEqual(editor.x + editor.width - 1);
     const quadro = await pagina.locator('iframe[title="Prévia provisória da DOF"]').boundingBox();
     const rodape = await pagina.locator('.barra-totais').boundingBox();
@@ -936,7 +937,7 @@ describe('interface de rascunhos com API sintética', () => {
     estado.admissao = '1981-01-01';
     await abrirRascunho(pagina);
     await pagina.getByRole('alert').getByText(/admissão considerada no resultado salvo/).waitFor();
-    expect(await pagina.getByRole('button', { name: 'Salvar alterações' }).count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Salvar alterações' }).isDisabled()).toBe(true);
     await selecionarAba(pagina, 'Período');
     await pagina.getByRole('button', { name: 'Preparar tabela anual' }).click();
     await pagina.getByText('44 ano(s) no intervalo efetivo.', { exact: false }).waitFor();
@@ -1109,7 +1110,7 @@ describe('interface de rascunhos com API sintética', () => {
 
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     estado.adiarPrevia = true;
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expect.poll(() => estado.liberarPrevia !== null).toBe(true);
     await selecionarAba(pagina, 'Dados do servidor');
     expect(await pagina.getByLabel('Motivo da alteração do processo').isVisible()).toBe(false);
@@ -1133,7 +1134,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).waitFor();
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     expect(await pagina.getByText('Esta consulta não foi vinculada a uma prévia aberta.', { exact: false }).count()).toBe(0);
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
@@ -1143,7 +1144,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByRole('alert').getByText(/A fonte ou a revisão do rascunho mudou desde a prévia/).waitFor();
     expect(await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).count()).toBe(0);
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('A prévia aberta e esta consulta usaram as mesmas revisões', { exact: false }).waitFor();
@@ -1152,7 +1153,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await expect.poll(() => estado.liberarPreconferencia !== null).toBe(true);
     estado.revisaoFonte += 1;
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     estado.adiarPreconferencia = false;
     estado.liberarPreconferencia?.();
@@ -1194,15 +1195,8 @@ describe('interface de rascunhos com API sintética', () => {
       });
     }
     await pagina.setViewportSize({ width: 1366, height: 900 });
-    await pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).click();
-    await pagina.getByRole('dialog', { name: 'Prévia provisória da DOF ampliada', exact: true }).waitFor();
-    expect(await pagina.getByRole('button', { name: 'Recolher prévia', exact: true }).evaluate((el) => el === document.activeElement)).toBe(true);
-    expect(await pagina.locator('.visualizador-previa.ampliado').count()).toBe(1);
-    await pagina.getByRole('button', { name: 'Recolher prévia', exact: true }).click();
-    await expect.poll(() => pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).evaluate((el) => el === document.activeElement)).toBe(true);
-    await pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).click();
-    await pagina.keyboard.press('Escape');
-    await expect.poll(() => pagina.getByRole('dialog').count()).toBe(0);
+    expect(await pagina.getByRole('button', { name: 'Ampliar prévia', exact: true }).count()).toBe(0);
+    expect(await pagina.getByLabel(/Largura do editor/).count()).toBe(0);
     await selecionarAba(pagina, 'Tabela ano a ano');
     await calcularTabela(pagina);
     await pagina.getByLabel('Motivo dos lançamentos ou da alteração').fill('Nome ajustado somente na declaração fictícia');
@@ -1233,7 +1227,7 @@ describe('interface de rascunhos com API sintética', () => {
       })),
     };
     await abrirRascunho(pagina);
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
     await quadro.getByText('BLOCO-200-', { exact: false }).waitFor();
     await selecionarAba(pagina, 'Blocos de texto');
@@ -1268,7 +1262,7 @@ describe('interface de rascunhos com API sintética', () => {
       })),
     };
     await abrirRascunho(pagina);
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     const quadro = pagina.frameLocator('iframe[title="Prévia provisória da DOF"]');
     await quadro.getByText('Há expressões de variáveis malformadas nos blocos ativos.').waitFor();
     expect(await quadro.locator('mark').count()).toBe(6600);
@@ -1309,7 +1303,7 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.getByRole('button', { name: 'Adicionar bloco' }).isDisabled()).toBe(false);
     await pagina.getByRole('button', { name: 'Adicionar bloco' }).click();
     await pagina.getByLabel('Texto do bloco 1').fill('Referência {{processo}}');
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]')
       .getByText('Referência 1234/5678').waitFor();
     await pagina.getByLabel('Motivo da alteração dos blocos').fill('Referência fictícia');
@@ -1371,7 +1365,7 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.getByLabel('Número do processo').isDisabled()).toBe(true);
     expect(await pagina.getByRole('button', { name: 'Adicionar bloco', includeHidden: true }).isDisabled()).toBe(true);
     expect(estado.rascunho?.encaminhamento?.destinatarioId).toBe(coordenadorId);
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('Rascunho não conferido — revisão 2,', { exact: false }).waitFor();
@@ -1387,7 +1381,7 @@ describe('interface de rascunhos com API sintética', () => {
     expect(await pagina.getByLabel('Faltas em 1980').isDisabled()).toBe(true);
     expect(await pagina.getByLabel('Número do processo').isDisabled()).toBe(true);
     expect(await pagina.getByRole('button', { name: 'Recolher encaminhamento' }).count()).toBe(0);
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
 
     await selecionarAba(pagina, 'Conferência');
@@ -1503,7 +1497,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: /^Encaminhadas/ }).click();
     await pagina.getByRole('button', { name: /Abrir DOF de Pessoa Ficticia/ }).click();
     await selecionarAba(pagina, 'Conferência');
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/PRÉVIA PROVISÓRIA/).waitFor();
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByText('Nenhum bloqueio técnico identificado nesta consulta.').waitFor();
@@ -1520,7 +1514,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).click();
     await pagina.getByRole('alert').getByText(/A fonte ou as pendências mudaram/).waitFor();
     expect(estado.conferido).toBeNull();
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();
     await pagina.getByRole('checkbox', { name: /Revisei a prévia/ }).check();
     await pagina.getByRole('button', { name: 'Conferir DOF provisória' }).click();
@@ -1591,7 +1585,7 @@ describe('interface de rascunhos com API sintética', () => {
     await pagina.getByLabel('Motivo da alteração dos blocos').fill('Teste de variáveis');
     await pagina.getByRole('button', { name: 'Salvar blocos' }).click();
     await pagina.getByText('Blocos salvos na revisão 2.', { exact: false }).waitFor();
-    await pagina.getByRole('button', { name: 'Atualizar prévia' }).click();
+    await pagina.evaluate(() => window.dispatchEvent(new Event('focus')));
     await pagina.frameLocator('iframe[title="Prévia provisória da DOF"]').getByText(/Expressão malformada/).first().waitFor();
     await selecionarAba(pagina, 'Conferência');
     await pagina.getByRole('button', { name: 'Verificar pendências para conferência' }).click();

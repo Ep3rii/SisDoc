@@ -120,11 +120,10 @@ export const cenarios: Cenario[] = [
     await page.locator('.linha-documento').first().click();
     await page.locator('iframe').first().waitFor();
   } },
-  { id: 'preview-ampliado', rota: '#/dofs/rascunhos', perfis: todos, estados: dados, preparar: async (page) => {
+  { id: 'preview-pagina-inteira', rota: '#/dofs/rascunhos', perfis: todos, estados: dados, preparar: async (page) => {
     await page.locator('.linha-documento').first().click();
     await page.locator('.painel-previa iframe').first().waitFor();
-    await page.getByRole('button', { name: 'Ampliar prévia', exact: true }).click();
-    await page.getByRole('dialog').waitFor();
+    await page.getByRole('button', { name: 'Página inteira', exact: true }).click();
   } },
   { id: 'excluir-documento', rota: '#/dofs/rascunhos', perfis: ['admin'], estados: dados, preparar: async (page) => {
     await page.locator('.menu-acoes-documento > button').first().click();

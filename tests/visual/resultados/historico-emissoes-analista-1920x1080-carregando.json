@@ -18,7 +18,12 @@
     "foco": "BODY",
     "alturaPrevia": null,
     "limiteAlturaPrevia": 702,
-    "contrasteDesabilitados": [],
+    "contrasteDesabilitados": [
+      {
+        "texto": "Limpar filtro",
+        "razao": 9.410012735368888
+      }
+    ],
     "datasIso": [],
     "acoesVermelhas": [],
     "primarios": 0

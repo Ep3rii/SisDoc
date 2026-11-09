@@ -1,5 +1,55 @@
 # Auditoria visual do SisDoc
 
+## Ajustes solicitados após a auditoria — 08/11/2026
+
+O lote posterior atende à revisão do usuário:
+
+- **Login:** ícone do olho centralizado pela altura real do input; mensagens
+  de sessão/erro abaixo do cabeçalho, fora da área centralizada do cartão.
+  Clipboard (copiar, recortar, colar e arrastar) bloqueado nos campos de senha
+  do acesso e da troca, inclusive quando revelados. Autocomplete e autenticação
+  permanecem intactos. Essa restrição foi solicitada pelo usuário; não é
+  apresentada como ganho de segurança e dificulta colagem de gerenciadores.
+- **Editor/prévia:** duas colunas iguais (50% do espaço disponível para cada,
+  descontado o intervalo) em desktop acima de 900 px; abaixo disso, empilhadas
+  para preservar leitura e ausência de overflow. Removidos ajuste da largura,
+  Atualizar prévia e Ampliar prévia; mantidos zoom e Página inteira.
+  Prévia local continua automática. A fonte DOF é reconsultada automaticamente
+  ao retornar à janela e após mudança de revisão; falhas mantêm retentativa
+  explícita. Durante conferência, a reconsulta por foco permanece bloqueada.
+- **Salvar DOF:** ação visível desde a abertura do cálculo para perfis
+  autorizados, desabilitada com orientação até cálculo/motivo válidos.
+  Edição em somente leitura e criação pelo admin continuam impedidas.
+  Salvar ainda exige os mesmos dados, confirmação e motivo no backend.
+
+Reprodução antes da correção: teste de geometria mediu olho 5,40625 px fora
+do centro, diferença de 226,875 px entre as colunas e ausência de Salvar
+rascunho no cálculo inicial. Capturas usam apenas dados fictícios.
+Novas regressões em
+[interface-ajustes-visuais.test.ts](../tests/interface-ajustes-visuais.test.ts)
+incluem clipboard, aviso após Sair, divisão em 1920/1366/1024 px e reflow em
+768/390 px. Testes existentes de fonte/revisão/conferência agora exercitam
+atualização automática ao retornar à janela, sem botão manual.
+
+O cenário antigo `preview-ampliado` foi substituído por
+`preview-pagina-inteira`; não é reportado como modal ainda disponível.
+A baseline inicial e as evidências históricas permanecem preservadas no Git.
+
+**Validado:** build e tipos aprovados, **116/116 testes em sete arquivos**,
+60 cenários/1.928 combinações, 849,31 segundos, sem ocorrências automatizadas
+ou rotas inesperadas. A primeira rodada focada passou 30/31; uma expectativa
+histórica de botão ausente foi atualizada para botão desabilitado, conforme
+o novo requisito, e a rodada completa passou. Nenhum lote revertido neste
+ajuste. HTTPS confiável confirmou health 200, index e 16 assets iguais ao
+build; serviços ativos, sem reinício ou teste de escrita real.
+
+Evidências finais: [login](../tests/visual/evidencias/AJ-01-login-depois.png),
+[editor](../tests/visual/evidencias/AJ-02-editor-depois.png),
+[salvar](../tests/visual/evidencias/AJ-03-salvar-depois.png).
+A baseline pós-correções foi atualizada após essa validação; a baseline inicial
+permanece intacta. Um agente foi acionado para o visualizador, mas retornou
+sem patch; implementação e integração realizadas diretamente.
+
 ## Escopo e execução
 
 Auditoria autorizada em 08/11/2026, após o inventário do checkpoint 1.
@@ -60,7 +110,7 @@ as 1.928 combinações finais separadamente, sem sobrescrever a inicial.
   [screenshots](../tests/visual/screenshots/) e [evidencias](../tests/visual/evidencias/):
   resultados reutilizáveis da auditoria
 - [package.json](../package.json): `test:visual` (build, tipos dos testes e
-  seis arquivos de testes) e `test:visual:report` (abrir relatório)
+  sete arquivos de testes) e `test:visual:report` (abrir relatório)
 - Este relatório e os pontos de memória em
   [Recapitulação](ia/RECAPITULACAO.md) e [Progresso](PROGRESSO.md)
 

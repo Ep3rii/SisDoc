@@ -239,8 +239,10 @@ export function CalculoDof(props: Props) {
           <div><dt>Contribuição</dt><dd>{resultado?.totais.totalContribuicao.toLocaleString('pt-BR') ?? '—'}</dd></div>
         </dl>
         <div className="acoes">
-          {podeSalvar && resultado && pedidoCalculado && <button type="submit" form={`${id}-salvar`} className="secundario"
-            disabled={bloqueioSalvar || !calculoAlterado || !motivo.trim()}>{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>}
+          {podeSalvar && !somenteLeitura && <button type="submit" form={`${id}-salvar`} className="secundario"
+            title={!resultado || !pedidoCalculado ? 'Calcule a DOF e informe o motivo dos lançamentos antes de salvar'
+              : !motivo.trim() ? 'Informe o motivo dos lançamentos ou da alteração na aba Tabela ano a ano' : undefined}
+            disabled={bloqueioSalvar || !resultado || !pedidoCalculado || !calculoAlterado || !motivo.trim()}>{ocupado ? 'Salvando...' : rascunho ? 'Salvar alterações' : 'Salvar rascunho'}</button>}
           <button type="button" disabled title="Após conferir, abra DOFs conferidas para revisão e emissão pelo coordenador">Emitir PDF · após conferir</button>
         </div>
       </footer>

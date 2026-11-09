@@ -229,11 +229,15 @@ export function App() {
           </span>
         )}
       </header>
+      {!sessao && (erro || mensagem) && <div className="mensagens-sessao">
+        {erro && <p className="aviso erro" role="alert">{erro}</p>}
+        {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
+      </div>}
       <main>
       <div className="conteudo">
         <h1 className="sr-only">DOF e DTC</h1>
-        {erro && <p className="aviso erro" role="alert">{erro}</p>}
-        {mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
+        {sessao && erro && <p className="aviso erro" role="alert">{erro}</p>}
+        {sessao && mensagem && <p className="aviso sucesso" role="status">{mensagem}</p>}
         {carregando ? <p role="status">Verificando sessão...</p> : !sessao ? (
           <Login onEntrar={entrar} onErro={tratarErro} />
         ) : sessao.usuario.trocaSenhaObrigatoria ? (

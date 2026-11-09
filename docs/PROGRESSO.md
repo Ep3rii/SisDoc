@@ -1,5 +1,31 @@
 # Progresso da construção
 
+## Ajustes de login e editor DOF — 08/11/2026
+
+**Implementado:** ícone do olho centralizado, mensagens fora da região
+centralizada do login, clipboard bloqueado na senha por solicitação explícita.
+Editor/prévia 50/50 do espaço disponível acima de 900 px; reflow abaixo.
+Sem Atualizar/Ampliar/slider; zoom e Página inteira mantidos. Fonte DOF
+reconsulta automaticamente ao retornar à janela e mudar revisão, com
+retentativa de erro e bloqueio por foco durante conferência.
+Salvar rascunho aparece desde a abertura, desabilitado até cálculo/motivo
+válidos; permissões, contratos, auditoria, banco e motor preservados.
+
+**Testado:** reprodução dos três sintomas antes; build/tipos e 116/116
+testes em sete arquivos, 60 cenários/1.928 combinações sem ocorrências
+automatizadas (849,31 s). Regressores verificam clipboard/revelação/aviso
+de sessão e metades em 1920/1366/1024 px, reflow em 768/390 px, gravação
+sintética e proteção de fonte/revisão/conferência. Uma expectativa antiga
+de ausência mudou para desabilitado, seguida de rodada completa aprovada.
+Um agente sem patch útil; implementação direta. Nenhum lote revertido.
+
+**Servido:** HTTPS confiável, health 200, index/16 assets idênticos ao build,
+SisDoc/SisDocCaddy ativos; sem reinício nem escrita fictícia real.
+Baseline final atualizada, inicial intacta; commits locais sem push.
+**Limites:** zoom nativo/leitor de tela/comparação PDF manuais continuam
+pendentes. Restrição de clipboard não é medida de segurança e dificulta
+colar senhas de gerenciadores. [Evidências](qa-visual-relatorio.md).
+
 ## Auditoria visual — conclusão validada — 08/11/2026
 
 **Implementado:** executor Playwright/axe com 60 cenários e respostas de API

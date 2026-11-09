@@ -61,6 +61,13 @@ export function BlocosDof({
   const revisaoAtual = useRef({ id: rascunho.id, revisao: rascunho.revisao });
   revisaoAtual.current = { id: rascunho.id, revisao: rascunho.revisao };
   useEffect(() => {
+    const atualizarAoRetornar = () => {
+      if (!previaBloqueada && !carregandoPrevia) setAtualizacaoPrevia((valor) => valor + 1);
+    };
+    window.addEventListener('focus', atualizarAoRetornar);
+    return () => window.removeEventListener('focus', atualizarAoRetornar);
+  }, [previaBloqueada, carregandoPrevia]);
+  useEffect(() => {
     ativa.current = true;
     return () => { ativa.current = false; };
   }, []);
@@ -311,10 +318,10 @@ export function BlocosDof({
             <summary>Dados consultados ao abrir · proteja a prévia</summary>
             <p>Prévia de edição, sem validade oficial. Reflete os dados locais; não comprova gravação. Conferência usa exclusivamente revisão e fonte salvas. Contém dados pessoais integrais; proteja a tela.</p>
           </details>
-          <button type="button" className="secundario" disabled={carregandoPrevia || previaBloqueada}
+          {falhaPrevia && <button type="button" className="secundario" disabled={carregandoPrevia || previaBloqueada}
             onClick={() => { onLimpar(); setAtualizacaoPrevia((valor) => valor + 1); }}>
-            {falhaPrevia ? 'Tentar carregar prévia novamente' : 'Atualizar prévia'}
-          </button>
+            Tentar carregar prévia novamente
+          </button>}
           {carregandoPrevia && <p role="status">Carregando prévia da revisão {rascunho.revisao}...</p>}
           {falhaPrevia && <p className="aviso erro">A prévia não pôde ser carregada. Tente novamente antes de conferir.</p>}
           {fonte && fonte.documentoId === rascunho.id && fonte.revisao === rascunho.revisao ? (
